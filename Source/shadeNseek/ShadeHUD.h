@@ -41,7 +41,7 @@ public:
 
 	int32 Selected = 0;
 
-	/** Faces: "Script" (Lobster), "Hand" (Kalam), "Body" (Lato), "Bold", "Black", "Italic". */
+	/** Faces: "Script" (Lobster), "Hand" (Kalam), "Body"/"Bold"/"Black"/"Italic" (Lato), "Serif"/"SerifBold"/"SerifItalic"/"SerifBoldItalic" (Cormorant Garamond). */
 	FSlateFontInfo Font(FName Face, float Size, int32 LetterSpacing = 0) const;
 
 private:
