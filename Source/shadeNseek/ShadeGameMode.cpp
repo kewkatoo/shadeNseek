@@ -74,7 +74,7 @@ void AShadeGameMode::BuildObjectives()
 	Add(TEXT("Zone_AfterAlley"), TEXT("OBJ_Cart"), LOCTEXT("O1", "Cross the sunlit alley"), LOCTEXT("O1H", "Push the lemon cart into the sunbeam and walk in its shade."));
 	Add(TEXT("Zone_AfterPiazza"), TEXT("OBJ_Awning"), LOCTEXT("O2", "Shade the little piazza"), LOCTEXT("O2H", "Hold E on the awning cord to roll the canvas out."));
 	Add(TEXT("Zone_Terrace"), TEXT("OBJ_Pot"), LOCTEXT("O3", "Climb the old steps"), LOCTEXT("O3H", "Hop onto the wall and nudge the potted lemon tree off the edge."));
-	Add(TEXT("TowerShadeArrived"), TEXT("OBJ_Wait"), LOCTEXT("O4", "Wait for the bell tower's shadow"), LOCTEXT("O4H", "The sun is sinking. Stay in the cool porch until the shade reaches him."));
+	Add(TEXT("TowerShadeArrived"), TEXT("OBJ_Wait"), LOCTEXT("O4", "Wait for the bell tower's shadow"), LOCTEXT("O4H", "The sun is sinking. Stay in the tower's shade and let it carry you to him."));
 	Add(TEXT("Reunited"), TEXT("OBJ_Biscotto"), LOCTEXT("O5", "Reunite with Biscotto"), LOCTEXT("O5H", "Slip into his shadow - press E beside him."));
 
 	EventLines.Add(TEXT("FirstBurn"), LOCTEXT("L_Burn", "Ouch! Sunlight is no place for a shadow."));
