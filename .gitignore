@@ -1,0 +1,19 @@
+# Unreal build artefacts
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+.vscode/
+*.sln
+*.slnx
+*.VC.db
+*.opensdf
+*.sdf
+# Submission archives are built from the repo (Scripts/make_submission.ps1)
+Dist/
+__pycache__/
+*.part
+# Raw captures stay local
+*.mp4
+*.mkv

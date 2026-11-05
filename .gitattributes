@@ -1,0 +1,11 @@
+*.uasset binary
+*.umap binary
+*.png binary
+*.jpg binary
+*.hdr binary
+*.wav binary
+*.bin binary
+*.fbx binary
+*.glb binary
+*.ttf binary
+*.blend binary
