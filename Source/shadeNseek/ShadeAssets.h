@@ -1,0 +1,35 @@
+#pragma once
+
+#include "CoreMinimal.h"
+
+class UStaticMesh;
+class USkeletalMesh;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class USoundBase;
+class UAudioComponent;
+class USceneComponent;
+class UPrimitiveComponent;
+
+/**
+ * Central lookup for project assets by short name. Everything lives under /Game/Shade and is always cooked:
+ *   Meshes/<Name>, Materials/<Name>, Audio/<Name>, Characters/<Name>.
+ */
+namespace ShadeAssets
+{
+	SHADENSEEK_API UStaticMesh* Mesh(const TCHAR* Name);
+	SHADENSEEK_API UStaticMesh* PropMesh(const TCHAR* Folder, const TCHAR* Name);
+	SHADENSEEK_API USkeletalMesh* Skeletal(const TCHAR* Name);
+	SHADENSEEK_API UMaterialInterface* Material(const TCHAR* Name);
+	SHADENSEEK_API USoundBase* Sound(const TCHAR* Name);
+
+	/** Creates a dynamic instance of the named material (or of the slot's current material) on the given slot. */
+	SHADENSEEK_API UMaterialInstanceDynamic* MakeMID(UPrimitiveComponent* Comp, int32 Slot = 0, const TCHAR* MaterialName = nullptr);
+
+	SHADENSEEK_API void Play2D(const UObject* WorldContext, const TCHAR* Name, float Volume = 1.f, float Pitch = 1.f);
+	SHADENSEEK_API void PlayAt(const UObject* WorldContext, const TCHAR* Name, const FVector& Location, float Volume = 1.f, float Pitch = 1.f);
+	/** Plays one of Name_01..Name_Count at random. */
+	SHADENSEEK_API void PlayVariantAt(const UObject* WorldContext, const TCHAR* Name, int32 Count, const FVector& Location, float Volume = 1.f, float PitchJitter = 0.06f);
+	/** Persistent looping audio component (the sound asset must be set to loop). */
+	SHADENSEEK_API UAudioComponent* Loop(USceneComponent* AttachTo, const TCHAR* Name, float Volume = 1.f, bool bAutoPlay = true);
+}

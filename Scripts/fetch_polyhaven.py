@@ -32,8 +32,7 @@ TEX_MAPS = ["Diffuse", "nor_dx", "arm"]
 # Models: id -> resolution
 MODELS = {
     # vegetation
-    "island_tree_01": "2k", "island_tree_02": "2k", "island_tree_03": "2k", "jacaranda_tree": "2k", "tree_small_02": "2k",
-    "pine_tree_01": "1k", "shrub_01": "1k", "shrub_02": "1k", "shrub_03": "1k", "shrub_sorrel_01": "1k",
+    "island_tree_01": "2k", "island_tree_02": "2k", "shrub_01": "1k", "shrub_02": "1k", "shrub_03": "1k", "shrub_sorrel_01": "1k",
     "flower_gazania": "1k", "flower_heliophila": "1k", "flower_ursinia": "1k", "flower_empodium": "1k",
     "periwinkle_plant": "1k", "grass_medium_02": "1k",
     # pots and ceramics
