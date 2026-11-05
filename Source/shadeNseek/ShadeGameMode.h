@@ -103,6 +103,7 @@ protected:
 	void TickFinale(float Dt);
 	void TickReunion(float Dt);
 	void RunCatGallery();
+	void RunCamShots();
 	void WriteSunMap(const TCHAR* Suffix);
 
 	EShadePhase Phase = EShadePhase::Title;

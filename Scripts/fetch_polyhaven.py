@@ -52,6 +52,8 @@ MODELS = {
     "garden_hose_wall_mounted_01": "1k",
 }
 EXTRA_MODEL_MAPS = ("nor_dx", "alpha")
+# Sky dome: warm late-afternoon cirrus over a pale sky (the dome is rotated so its glow sits behind our sun).
+HDRIS = {"evening_road_01_puresky": "4k"}
 
 
 def get_json(url):
@@ -105,9 +107,17 @@ def jobs_for_model(mid, res):
     return out
 
 
+def jobs_for_hdri(hid, res):
+    e = get_json(f"{API}/files/{hid}")["hdri"][res]["hdr"]
+    return [(e["url"], os.path.join(LIB, "HDRIs", "polyhaven", hid, os.path.basename(e["url"])), e.get("md5"))]
+
+
 def main():
     jobs = []
     meta = []
+    for hid, res in HDRIS.items():
+        jobs += jobs_for_hdri(hid, res)
+        meta.append(("hdri", hid, res))
     for tid, res in TEXTURES.items():
         jobs += jobs_for_texture(tid, res)
         meta.append(("texture", tid, res))
@@ -123,7 +133,7 @@ def main():
     records = []
     for kind, aid, res in meta:
         info = get_json(f"{API}/info/{aid}")
-        folder = ("Textures" if kind == "texture" else "Models") + f"/polyhaven/{aid}"
+        folder = {"texture": "Textures", "model": "Models", "hdri": "HDRIs"}[kind] + f"/polyhaven/{aid}"
         records.append({
             "path": f"asset-library/{folder}",
             "source_name": f"Poly Haven - {info.get('name', aid)}",

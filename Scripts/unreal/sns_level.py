@@ -574,20 +574,15 @@ for (tag, x, y, z) in (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), 
                        ("AP_WallDown", 3400, 30, 300), ("AP_Terrace", 3480, -150, 300), ("AP_Porch", 3760, -100, 300), ("AP_Biscotto", 3880, -372, 300)):
     waypoint(tag, x, y, z)
 
-# Cameras
-tc = spawn(unreal.CameraActor, (1650, 5200, -560), (0, 0, 0), "Cinematic", tags=("TitleCam",))
-tc.set_actor_rotation(unreal.MathLibrary.make_rot_from_x(V(1650 - 1650, -400 - 5200, 450 + 560)), False)
-tc.camera_component.set_editor_property("field_of_view", 48.0)
-ec = spawn(unreal.CameraActor, (3150, 2900, 700), (0, 0, 0), "Cinematic", tags=("EndCam",))
-ec.set_actor_rotation(unreal.MathLibrary.make_rot_from_x(V(3800 - 3150, -500 - 2900, 650 - 700)), False)
-ec.camera_component.set_editor_property("field_of_view", 50.0)
+# Cameras: see sns_lighting.py (TitleCam / EndCam + QA candidates)
 
 def warm_light(loc, lumens, radius, color=(1.0, 0.68, 0.38), folder="Lighting/Warm"):
     a = spawn(unreal.PointLight, loc, (0, 0, 0), folder)
     c = a.get_component_by_class(unreal.PointLightComponent)
     c.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
     c.set_editor_property("intensity", float(lumens))
-    c.set_editor_property("light_color", unreal.Color(int(color[0] * 255), int(color[1] * 255), int(color[2] * 255), 255))
+    # keyword args: positional unreal.Color(...) fills B, G, R (FColor memory order) - that turned every "warm" light blue
+    c.set_editor_property("light_color", unreal.Color(r=int(color[0] * 255), g=int(color[1] * 255), b=int(color[2] * 255), a=255))
     c.set_editor_property("attenuation_radius", float(radius))
     c.set_editor_property("cast_shadows", False)
     c.set_editor_property("source_radius", 6.0)
@@ -617,7 +612,7 @@ def festoon(x0, y0, x1, y1, z, n=10, sag=45.0, light=True):
         place(bulb_sm, p, (0, 0, 0), 1.0, "Festoon", collision=False, shadow=False)
     if light:
         mid = pts[len(pts) // 2]
-        warm_light((mid[0], mid[1], mid[2] - 25), 1500, 650)
+        warm_light((mid[0], mid[1], mid[2] - 25), 260, 520)
 
 
 for (x, z) in ((60, 430), (520, 470), (1180, 450), (1560, 440), (2560, 520), (3120, 640)):
@@ -651,7 +646,7 @@ def pot_cluster(x, y, z, n=3, spread=45, h=(45, 95)):
 
 
 for (kind, (x, y, z), yaw, extra) in DECOR:
-    if kind == "sill" and R.random() < 0.55:
+    if kind == "sill" and R.random() < 0.75:
         place(mesh("SM_WindowBox"), (x, y, z), (0, yaw - 90, 0), (extra / 80 * 0.95, 1, 1), F, collision=False)
         for k in range(3):
             fl = pick(FLOWERS)
@@ -673,7 +668,7 @@ for (kind, (x, y, z), yaw, extra) in DECOR:
             ly = y + math.sin(side) * (extra * 0.5 + 25) - math.sin(math.radians(yaw)) * 25
             place(prop("street_lamp_02"), (lx, ly, 255), (0, yaw + 180, 0), 1.0, F, collision=False)
             if abs(ly) < 1000 and -1200 < lx < 5000:
-                warm_light((lx + math.cos(math.radians(yaw)) * 30, ly + math.sin(math.radians(yaw)) * 30, 270), 900, 520)
+                warm_light((lx + math.cos(math.radians(yaw)) * 30, ly + math.sin(math.radians(yaw)) * 30, 270), 170, 450)
     elif kind == "drape" and R.random() < 0.75:
         place(mesh(R.choice(["SM_BougainDrape", "SM_BougainClump_B", "SM_LeafyClump", "SM_BougainClump_A"])), (x, y, z), (0, R.uniform(0, 360), 0),
               R.uniform(0.9, 1.5), F, collision=False)
@@ -741,14 +736,14 @@ def fill_row(prefix, x0, x1, y0, y1, z0, hmin, hmax, faces=("+y",), detail=0.45,
 
 
 # lower town, stepping down to the harbour (seen from the piazza and in the title shot)
-fill_row("L1_", -2200, 4800, 900, 1500, -620, 550, 750, detail=0.5)
-fill_row("L2_", -2600, 5200, 1700, 2300, -1180, 500, 700, detail=0.4)
+fill_row("L1_", -2200, 4800, 900, 1500, -620, 550, 750, faces=("+y", "-x", "+x"), detail=0.85)
+fill_row("L2_", -2600, 5200, 1700, 2300, -1180, 500, 700, faces=("+y", "-x"), detail=0.65)
 slab(-3000, 5600, 760, 1500, -620, 1400, "MI_Wall_Stone")
 slab(-3000, 5600, 1500, 2300, -1180, 600, "MI_Wall_Stone")
 # upper town up the slope
-fill_row("U1_", -2200, 5000, -1700, -950, 420, 600, 850, detail=0.5)
-fill_row("U2_", -2600, 5400, -2500, -1750, 980, 600, 800, detail=0.4)
-fill_row("U3_", -2400, 5200, -3300, -2550, 1560, 500, 750, detail=0.3)
+fill_row("U1_", -2200, 5000, -1700, -950, 420, 600, 850, faces=("+y", "-x", "+x"), detail=0.8)
+fill_row("U2_", -2600, 5400, -2500, -1750, 980, 600, 800, faces=("+y", "-x"), detail=0.6)
+fill_row("U3_", -2400, 5200, -3300, -2550, 1560, 500, 750, detail=0.5)
 slab(-3000, 5600, -1700, -950, 420, 1400, "MI_Wall_Stone")
 slab(-3000, 5600, -2500, -1700, 980, 1600, "MI_Wall_Stone")
 slab(-3000, 5600, -3300, -2500, 1560, 1800, "MI_Wall_Stone")
@@ -779,90 +774,13 @@ ssm = save(sea, "SM_Sea", [mat("M_Water")], collision=None, uv_tile=1000.0)
 place(ssm, (0, 150000, -1250), folder="Coast", collision=False, shadow=False)
 
 # =====================================================================================================================
-# 7. Sky, sun, fog, post
+# 7. Sky, sun, fog, post, cinematic cameras: Scripts/unreal/sns_lighting.py (also runnable on its own)
 # =====================================================================================================================
-F = "Lighting"
-sun = spawn(unreal.DirectionalLight, (0, 0, 3000), SUN_ROT, F)
-sc = sun.get_component_by_class(unreal.DirectionalLightComponent)
-sc.set_editor_property("intensity", 16.0)
-sc.set_editor_property("light_color", unreal.Color(255, 216, 172, 255))
-sc.set_editor_property("atmosphere_sun_light", True)
-sc.set_editor_property("cast_shadows", True)
-sc.set_editor_property("light_source_angle", 0.5357)
-sc.set_editor_property("volumetric_scattering_intensity", 1.5)
-sc.set_mobility(unreal.ComponentMobility.MOVABLE)
-# Cascaded shadow maps (sharp near the cat) + distance-field shadows for the far town: much lighter than VSM.
-for k, v in (("dynamic_shadow_distance_movable_light", 6500.0), ("dynamic_shadow_cascades", 4), ("cascade_distribution_exponent", 3.0),
-             ("cascade_transition_fraction", 0.15), ("shadow_distance_fadeout_fraction", 0.15), ("use_ray_traced_distance_field_shadows", True),
-             ("distance_field_shadow_distance", 60000.0)):
-    try:
-        sc.set_editor_property(k, v)
-    except Exception as e:
-        log("sun prop", k, e)
-spawn(unreal.SkyAtmosphere, (0, 0, 0), (0, 0, 0), F)
-# Warm "bounce card": a shadowless low fill from the land side, standing in for light reflected off sunlit
-# whitewash into the lanes (keeps the shade cosy instead of sky-blue). Not the atmosphere sun, so gameplay ignores it.
-fill = spawn(unreal.DirectionalLight, (0, 0, 3200), (-18.0, 100.0, 0.0), F)
-flc = fill.get_component_by_class(unreal.DirectionalLightComponent)
-flc.set_editor_property("intensity", 1.6)
-flc.set_editor_property("light_color", unreal.Color(255, 186, 132, 255))
-flc.set_editor_property("atmosphere_sun_light", False)
-flc.set_editor_property("cast_shadows", False)
-flc.set_editor_property("affects_world", True)
-flc.set_mobility(unreal.ComponentMobility.MOVABLE)
-sky = spawn(unreal.SkyLight, (0, 0, 1000), (0, 0, 0), F)
-slc = sky.get_component_by_class(unreal.SkyLightComponent)
-slc.set_editor_property("real_time_capture", True)
-slc.set_editor_property("intensity", 0.45)
-slc.set_editor_property("light_color", unreal.Color(255, 200, 160, 255))
-slc.set_mobility(unreal.ComponentMobility.MOVABLE)
-fog = spawn(unreal.ExponentialHeightFog, (0, 0, -1300), (0, 0, 0), F)
-fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
-fc.set_editor_property("fog_density", 0.0045)
-fc.set_editor_property("fog_height_falloff", 0.06)
-fc.set_editor_property("start_distance", 3000.0)
-fc.set_editor_property("directional_inscattering_exponent", 8.0)
-fc.set_editor_property("directional_inscattering_luminance", unreal.LinearColor(1.0, 0.62, 0.36, 1))
-fc.set_editor_property("fog_inscattering_luminance", unreal.LinearColor(0.5, 0.5, 0.52, 1))
-fc.set_editor_property("enable_volumetric_fog", True)
-fc.set_editor_property("volumetric_fog_scattering_distribution", 0.6)
-fc.set_editor_property("volumetric_fog_extinction_scale", 0.5)
-
-ppv = spawn(unreal.PostProcessVolume, (0, 0, 0), (0, 0, 0), F)
-ppv.set_editor_property("unbound", True)
-s = ppv.get_editor_property("settings")
-
-
-def pp(name, value):
-    s.set_editor_property("override_" + name, True)
-    s.set_editor_property(name, value)
-
-
-pp("auto_exposure_method", unreal.AutoExposureMethod.AEM_HISTOGRAM)
-pp("auto_exposure_min_brightness", 0.5)
-pp("auto_exposure_max_brightness", 2.9)
-pp("auto_exposure_bias", 0.25)
-pp("auto_exposure_speed_up", 2.0)
-pp("auto_exposure_speed_down", 1.5)
-pp("bloom_intensity", 0.55)
-pp("vignette_intensity", 0.32)
-pp("film_grain_intensity", 0.06)
-pp("color_saturation", unreal.Vector4(1.0, 1.0, 1.0, 1.12))
-pp("color_gain_midtones", unreal.Vector4(1.05, 1.0, 0.93, 1.0))
-pp("color_contrast", unreal.Vector4(1.0, 1.0, 1.0, 1.06))
-pp("color_gain_shadows", unreal.Vector4(1.06, 1.0, 0.92, 1.0))
-pp("color_gain_highlights", unreal.Vector4(1.05, 1.0, 0.93, 1.0))
-pp("white_temp", 7400.0)
-pp("motion_blur_amount", 0.12)
-pp("lumen_scene_lighting_quality", 1.0)
-pp("lumen_final_gather_quality", 1.5)
-pp("indirect_lighting_intensity", 1.9)
-ppv.set_editor_property("settings", s)
-
 # Ambience: gulls over the bay.
 spawn(gclass("ShadeSoundScatter"), (0, 0, 0), (0, 0, 0), "Audio", sound_name="SFX_Gull", variants=4, interval=unreal.Vector2D(4.0, 10.0),
       distance=unreal.Vector2D(1500.0, 4500.0), height=1100.0, volume=0.7, bias_yaw=90.0)
 
 lvl.save_current_level()
+exec(open(os.path.join(os.path.dirname(__file__), "sns_lighting.py"), encoding="utf-8").read(), {"__file__": os.path.join(os.path.dirname(__file__), "sns_lighting.py"), "__name__": "sns_lighting"})
 log("LEVEL actors", len(actors.get_all_level_actors()), "decor", len(DECOR))
 log("ALL DONE")

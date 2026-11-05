@@ -155,6 +155,10 @@ void AShadeGameMode::StartPlay()
 	{
 		RunCatGallery();
 	}
+	if (HasParam(TEXT("camshots")))
+	{
+		RunCamShots();
+	}
 	if (HasParam(TEXT("sunmap")))
 	{
 		bSunMapPending = true;
@@ -289,7 +293,7 @@ void AShadeGameMode::NotifyEvent(FName EventName, AActor* Source)
 		{
 			++PuzzlesSolved;
 			ShadeAssets::Play2D(this, TEXT("SFX_Solve"), 0.6f);
-			PushToast(FText::Format(LOCTEXT("Solved", "Shade made  {0}/3"), FText::AsNumber(PuzzlesSolved)));
+			PushToast(FText::Format(LOCTEXT("Solved", "{0} of 3"), FText::AsNumber(PuzzlesSolved)));
 		}
 	}
 	if (EventName == TEXT("Zone_Terrace") && bNew && Phase == EShadePhase::Playing)
@@ -536,6 +540,15 @@ void AShadeGameMode::BeginReunion(AShadeNapCat* Cat)
 	if (CineCamera)
 	{
 		CineCamera->GetCameraComponent()->SetFieldOfView(42.f);
+		// Portrait focus on the cats, the church soft behind them.
+		{
+			UCameraComponent* CC = CineCamera->GetCameraComponent();
+			CC->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = true;
+			CC->PostProcessSettings.DepthOfFieldFocalDistance = FVector::Dist(CamLoc, CatLoc);
+			CC->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
+			CC->PostProcessSettings.DepthOfFieldFstop = 2.8f;
+			CC->PostProcessBlendWeight = 1.f;
+		}
 		// Cinematic key + rim so Biscotto reads warm even inside the tower's shade.
 		auto AddCineLight = [this](const FVector& Loc, float Lumens, float Radius, const FLinearColor& Col)
 		{
@@ -660,6 +673,43 @@ void AShadeGameMode::WriteSunMap(const TCHAR* Suffix)
 	SS->WriteSunMap(Area, 10.f, Bounds.Max.Z + 1500.f, FPaths::ProjectSavedDir() / FString::Printf(TEXT("SunMap%s.png"), Suffix));
 }
 
+void AShadeGameMode::RunCamShots()
+{
+	// QA: one UI-free screenshot per camera tagged CamCandidate_<n> (placed by sns_lighting.py), then quit.
+	TArray<ACameraActor*> Cams;
+	for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
+	{
+		for (const FName& T : It->Tags)
+		{
+			if (T.ToString().StartsWith(TEXT("CamCandidate")))
+			{
+				Cams.Add(*It);
+			}
+		}
+	}
+	Cams.Sort([](const ACameraActor& A, const ACameraActor& B) { return A.Tags[0].LexicalLess(B.Tags[0]); });
+	TWeakObjectPtr<AShadeGameMode> Self(this);
+	const float Step = 2.6f;
+	for (int32 i = 0; i < Cams.Num(); ++i)
+	{
+		TWeakObjectPtr<ACameraActor> C(Cams[i]);
+		const FString Name = Cams[i]->Tags[0].ToString();
+		FTimerHandle H0, H1;
+		GetWorldTimerManager().SetTimer(H0, [Self, C]()
+		{
+			APlayerController* PC = Self.IsValid() ? UGameplayStatics::GetPlayerController(Self.Get(), 0) : nullptr;
+			if (PC && C.IsValid()) { PC->SetViewTarget(C.Get()); }
+		}, 1.0f + i * Step, false);
+		GetWorldTimerManager().SetTimer(H1, [Name]()
+		{
+			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / FString::Printf(TEXT("Shots/%s.png"), *Name), false, false);
+		}, 1.0f + i * Step + 2.2f, false);
+	}
+	FTimerHandle HQ;
+	GetWorldTimerManager().SetTimer(HQ, [Self]() { if (Self.IsValid()) { Self->QuitGame(); } }, 2.0f + Cams.Num() * Step + 0.6f, false);
+	UE_LOG(LogShade, Log, TEXT("SHADE_CAMSHOTS %d cameras"), Cams.Num());
+}
+
 void AShadeGameMode::RunCatGallery()
 {
 	// Lines up the cat poses in front of a camera, screenshots, quits. Used to tune ShadeCatRig without the editor.
@@ -673,33 +723,33 @@ void AShadeGameMode::RunCatGallery()
 			Facing = It->GetActorRotation();
 		}
 	}
-	const ECatPose Poses[5] = { ECatPose::Sleep, ECatPose::Sit, ECatPose::Locomote, ECatPose::Locomote, ECatPose::Push };
-	const float Speeds[5] = { 0.f, 0.f, 0.f, 320.f, 120.f };
+	const ECatPose Poses[5] = { ECatPose::Sleep, ECatPose::Sit, ECatPose::Locomote, ECatPose::Locomote, ECatPose::Locomote };
+	const float Speeds[5] = { 0.f, 0.f, 135.f, 300.f, 0.f };
 	const FVector Right = FRotationMatrix(Facing).GetUnitAxis(EAxis::Y);
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	for (int32 i = 0; i < 5; ++i)
 	{
 		const FVector Fwd = FRotationMatrix(Facing).GetUnitAxis(EAxis::X);
-		AShadeNapCat* C = GetWorld()->SpawnActor<AShadeNapCat>(Origin + Fwd * (i - 2) * 95.f, Facing, P);
+		AShadeNapCat* C = GetWorld()->SpawnActor<AShadeNapCat>(Origin + Fwd * (i - 2) * 78.f, Facing, P);
 		if (C)
 		{
 			C->GetRig()->SetPose(Poses[i], 0.01f);
-			C->GetRig()->Speed = Speeds[i];
+			C->GetRig()->TreadmillSpeed = Speeds[i];
 			C->GetRig()->bGrounded = true;
 			// NapCat starts asleep; override after its BeginPlay ran.
 			FTimerHandle H;
 			TWeakObjectPtr<AShadeNapCat> WC(C);
 			const ECatPose Pose = Poses[i];
 			const float Sp = Speeds[i];
-			GetWorldTimerManager().SetTimer(H, [WC, Pose, Sp]() { if (WC.IsValid()) { WC->GetRig()->SetPose(Pose, 0.01f); WC->GetRig()->Speed = Sp; } }, 0.2f, false);
+			GetWorldTimerManager().SetTimer(H, [WC, Pose, Sp]() { if (WC.IsValid()) { WC->GetRig()->SetPose(Pose, 0.01f); WC->GetRig()->TreadmillSpeed = Sp; } }, 0.2f, false);
 		}
 	}
-	ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Origin + Right * 330.f + FVector(0, 0, 80.f), FRotator::ZeroRotator, P);
+	ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Origin + Right * 300.f + FVector(0, 0, 55.f), FRotator::ZeroRotator, P);
 	if (Cam)
 	{
 		Cam->SetActorRotation(((Origin + FVector(0, 0, 20.f)) - Cam->GetActorLocation()).Rotation());
-		Cam->GetCameraComponent()->SetFieldOfView(55.f);
+		Cam->GetCameraComponent()->SetFieldOfView(62.f);
 		if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 		{
 			FTimerHandle H0;
@@ -722,7 +772,50 @@ void AShadeGameMode::RunCatGallery()
 		}
 	}, 1.5f, false);
 	GetWorldTimerManager().SetTimer(H1, []() { FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots/cat_gallery.png"), false, false); }, 2.5f, false);
-	GetWorldTimerManager().SetTimer(H2, [this]() { QuitGame(); }, 4.0f, false);
+	// Second angle: three-quarter view from the front, closer.
+	FTimerHandle H4, H5, H6;
+	TWeakObjectPtr<ACameraActor> WCam2(Cam);
+	const FVector Fwd0 = FRotationMatrix(Facing).GetUnitAxis(EAxis::X);
+	GetWorldTimerManager().SetTimer(H4, [WCam2, Origin, Fwd0, Right]()
+	{
+		if (WCam2.IsValid())
+		{
+			WCam2->SetActorLocation(Origin + Fwd0 * 230.f + Right * 150.f + FVector(0, 0, 70.f));
+			WCam2->SetActorRotation(((Origin + Fwd0 * 40.f + FVector(0, 0, 18.f)) - WCam2->GetActorLocation()).Rotation());
+		}
+	}, 2.9f, false);
+	GetWorldTimerManager().SetTimer(H5, []() { FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots/cat_gallery_34.png"), false, false); }, 3.6f, false);
+	GetWorldTimerManager().SetTimer(H6, [WCam2, Origin, Fwd0, Right]()
+	{
+		if (WCam2.IsValid())
+		{
+			WCam2->SetActorLocation(Origin + Fwd0 * 222.f + Right * 48.f + FVector(0, 0, 32.f));
+			WCam2->SetActorRotation(((Origin + Fwd0 * 168.f + FVector(0, 0, 25.f)) - WCam2->GetActorLocation()).Rotation());
+			WCam2->GetCameraComponent()->SetFieldOfView(40.f);
+		}
+	}, 4.0f, false);
+	FTimerHandle H7;
+	GetWorldTimerManager().SetTimer(H7, []() { FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots/cat_gallery_face.png"), false, false); }, 4.7f, false);
+	// Gait filmstrip: the walking and trotting cats from the side, 16 frames ~70 ms apart.
+	FTimerHandle H8;
+	GetWorldTimerManager().SetTimer(H8, [WCam2, Origin, Fwd0, Right]()
+	{
+		if (WCam2.IsValid())
+		{
+			WCam2->SetActorLocation(Origin + Fwd0 * 39.f + Right * 175.f + FVector(0, 0, 28.f));
+			WCam2->SetActorRotation(((Origin + Fwd0 * 39.f + FVector(0, 0, 18.f)) - WCam2->GetActorLocation()).Rotation());
+			WCam2->GetCameraComponent()->SetFieldOfView(44.f);
+		}
+	}, 5.0f, false);
+	for (int32 k = 0; k < 16; ++k)
+	{
+		FTimerHandle HK;
+		GetWorldTimerManager().SetTimer(HK, [k]()
+		{
+			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / FString::Printf(TEXT("Shots/gait_%02d.png"), k), false, false);
+		}, 5.6f + k * 0.07f, false);
+	}
+	GetWorldTimerManager().SetTimer(H2, [this]() { QuitGame(); }, 7.4f, false);
 }
 
 #undef LOCTEXT_NAMESPACE

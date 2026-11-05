@@ -9,10 +9,13 @@ Masters (parameter names are shared with C++ where noted):
   M_Card       masked two-sided card (RGBA diffuse) - bougainvillea / leafy sprays
   M_Cloth      two-sided fabric with optional hanging flutter (laundry), used static for awnings
   M_Iron, M_Glass, M_Emissive, M_Water, M_Majolica
-  M_ShadeBody  (C++: Burn, Dissolve, Pulse)  unlit ink silhouette, violet rim, ember burn edge, dissolve
-  M_ShadeEye   (C++: Glow, Burn)
-  M_CatFur     (C++: CoatTint, CoatDark)   vertex-colour tabby + fur normal + sheen
-  M_CatEye     slit-pupil amber eye
+  M_ShadeBody / M_ShadeShell / M_ShadeWhisker  (C++: Burn, Dissolve, Pulse)  black-velvet ink cat, smoky fur shells,
+               faint violet sheen, ember burn front, dissolve
+  M_ShadeEye   (C++: Glow, Burn, Lid)  glowing amber eyes with slit pupils and eyelids
+  M_CatFur / M_CatShell  (C++: CoatTint, CoatDark)  vertex-colour tabby, fur normal + sheen; shells = combed fur strands
+               (UV1.x = shell height, T_FurStrands)
+  M_CatEye     (C++: Lid, LidColor)  wet amber-green eye, slit pupil, limbal ring, blinking lids
+  M_CatWhisker
   M_Wisp       translucent ink/ember/dust puffs driven by custom primitive data 0..2
 """
 import unreal
@@ -216,6 +219,13 @@ def macro_noise(g, scale=1800.0):
     return (t, "R")
 
 
+def camera_fade(g, alpha, near=35.0, span=110.0):
+    """Foliage the camera pushes into thins out instead of filling the screen with blurry leaves."""
+    depth = (g.node(unreal.MaterialExpressionPixelDepth), "")
+    fade = g.sat(g.div(g.sub(depth, g.const(near)), g.const(span)))
+    return g.mul(alpha, fade)
+
+
 def wind_wpo(g, amp_name="WindAmp", amp=2.0, speed=1.6, height=180.0):
     wp = g.wpos()
     phase = g.div(g.add(g.mask(wp, r=True), g.mask(wp, g=True)), g.const(90.0))
@@ -294,7 +304,7 @@ def build_foliage():
     g.out((arm, "G"), MP.MP_ROUGHNESS)
     g.out((nm, "RGB"), MP.MP_NORMAL)
     g.out((arm, "R"), MP.MP_AMBIENT_OCCLUSION)
-    g.out((al, "R"), MP.MP_OPACITY_MASK)
+    g.out(camera_fade(g, (al, "R")), MP.MP_OPACITY_MASK)
     g.out(g.mul(col, g.const(0.55)), MP.MP_SUBSURFACE_COLOR)
     g.out(wind_wpo(g, amp=1.6), MP.MP_WORLD_POSITION_OFFSET)
     return g.finish(clip=0.4)
@@ -308,7 +318,7 @@ def build_card():
     col = g.mul(col, g.lerp(g.const(0.8), g.const(1.1), mn))
     g.out(col, MP.MP_BASE_COLOR)
     g.out(g.scalar("Roughness", 0.65), MP.MP_ROUGHNESS)
-    g.out((bc, "A"), MP.MP_OPACITY_MASK)
+    g.out(camera_fade(g, (bc, "A")), MP.MP_OPACITY_MASK)
     g.out(g.mul(col, g.const(0.6)), MP.MP_SUBSURFACE_COLOR)
     g.out(wind_wpo(g, amp=2.2, height=120.0), MP.MP_WORLD_POSITION_OFFSET)
     return g.finish(clip=0.45)
@@ -401,106 +411,192 @@ def build_water():
     return g.finish()
 
 
-def build_shade_body():
-    g = Graph("M_ShadeBody", blend=unreal.BlendMode.BLEND_MASKED, shading=unreal.MaterialShadingModel.MSM_UNLIT)
+def tcoord(g, index=0):
+    return (g.node(unreal.MaterialExpressionTextureCoordinate, coordinate_index=index), "")
+
+
+def shell_height(g):
+    return g.mask(tcoord(g, 1), r=True)
+
+
+def coat_color(g):
+    """Vertex-colour tabby (authored as sRGB bytes) x CoatTint, darkened by CoatDark."""
+    vc = (g.node(unreal.MaterialExpressionVertexColor), "")
+    lin = g.pow(g.mask(vc, r=True, g=True, b=True), g.const(2.2))
+    coat = g.mul(g.desat(lin, g.scalar("CoatDesat", 0.0)), g.vec("CoatTint", (1, 1, 1)))
+    return g.mul(g.mul(coat, g.scalar("CoatBrightness", 0.92)), g.lerp(g.const(1.0), g.const(0.16), g.scalar("CoatDark", 0.0)))
+
+
+def fur_strands(g, h):
+    """Shell opacity: keep texels whose strand is longer than the shell height (strands taper to the tips)."""
+    st = g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("FurTiling", 3.6)))
+    return g.add(g.mul(g.sub((st, "R"), g.mul(h, g.const(0.94))), g.const(24.0)), g.const(0.5))
+
+
+def no_shadow(g, mask):
+    """Fur shells never cast shadows (they would speckle the coat with hard shadow-map blotches)."""
+    cu = g.node(unreal.MaterialExpressionCustom, code="return GetShadowReplaceState() ? -1.0 : Mask;",
+                output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="NoShellShadow")
+    ci = unreal.CustomInput()
+    ci.set_editor_property("input_name", "Mask")
+    cu.set_editor_property("inputs", [ci])
+    g.link(mask, cu, "Mask")
+    return (cu, "")
+
+
+def ink_noise(g, scale=34.0, speed=(0.05, 0.08)):
     wp = g.wpos()
-    tt = g.time()
-    uvn = g.div(g.add(g.mask(wp, r=True, g=True), g.mask(wp, b=True)), g.const(38.0))
-    pan = g.node(unreal.MaterialExpressionPanner, speed_x=0.05, speed_y=0.08)
+    uvn = g.div(g.add(g.mask(wp, r=True, g=True), g.mask(wp, b=True)), g.const(scale))
+    pan = g.node(unreal.MaterialExpressionPanner, speed_x=speed[0], speed_y=speed[1])
     g.link(uvn, pan, "Coordinate")
-    nz = g.texs(tex("T_InkNoise"), S_GRAY, (pan, ""))
-    nzr = (nz, "R")
-    rim = g.fresnel(4.0, 0.0)
-    ink = g.mul(g.vec("InkColor", (0.0012, 0.001, 0.0028)), g.lerp(g.const(0.6), g.const(1.4), nzr))
-    rimc = g.mul(g.mul(rim, g.vec("RimColor", (0.022, 0.014, 0.06))), g.add(g.const(0.75), g.mul(g.scalar("Pulse", 0.5), g.const(0.5))))
-    rimc = g.mul(rimc, g.mul(g.scalar("Glow", 1.0), g.lerp(g.const(0.5), g.const(1.4), nzr)))
-    # Burn: an ember front creeps across the body as exposure rises.
+    return (g.texs(tex("T_InkNoise"), S_GRAY, (pan, "")), "R")
+
+
+def burn_terms(g, nzr):
     burn = g.scalar("Burn", 0.0)
     front = g.sub(g.const(1.0), burn)
     edge = g.sat(g.sub(g.const(1.0), g.mul(g.absv(g.sub(nzr, front)), g.const(7.0))))
     ember = g.mul(g.mul(edge, g.vec("EmberColor", (6.0, 1.6, 0.25))), g.sat(g.mul(burn, g.const(3.0))))
     charred = g.mul(g.sat(g.mul(g.sub(nzr, front), g.const(6.0))), g.mul(burn, g.const3((0.25, 0.08, 0.02))))
-    body = g.add(g.add(g.add(ink, rimc), ember), charred)
-    # Eyes live in the same section: vertex alpha is 0 on the eyeballs. Amber glow with a slit pupil.
-    # Eyeballs are painted pure blue in the vertex colours; no coat colour is ever bluer than it is red.
-    vce = (g.node(unreal.MaterialExpressionVertexColor), "")
-    eye = g.sat(g.mul(g.sub(g.mask(vce, b=True), g.mask(vce, r=True)), g.const(4.0)))
-    tc = (g.node(unreal.MaterialExpressionTextureCoordinate), "")
-    slit = g.node(unreal.MaterialExpressionDistance)
-    g.link(g.mul(g.sub(tc, (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")), (g.node(unreal.MaterialExpressionConstant2Vector, r=3.4, g=1.0), "")), slit, "A")
-    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), slit, "B")
-    pupil = g.sat(g.mul(g.sub((slit, ""), g.const(0.36)), g.const(18.0)))
-    ecol = g.lerp(g.vec("EyeColor", (1.0, 0.55, 0.12)), g.const3((1.0, 0.95, 0.8)), burn)
-    eyes = g.mul(g.mul(g.mul(ecol, g.scalar("EyeIntensity", 1.6)), g.scalar("EyeGlow", 1.0)), g.lerp(g.const(0.04), g.const(1.0), pupil))
-    g.out(g.lerp(body, eyes, eye), MP.MP_EMISSIVE_COLOR)
-    # Dissolve (evaporate / merge).
-    dis = g.scalar("Dissolve", 0.0)
-    g.out(g.add(g.sub(nzr, g.mul(dis, g.const(1.2))), g.const(0.5)), MP.MP_OPACITY_MASK)
+    return g.add(ember, charred)
+
+
+def eye_shapes(g):
+    """Returns (iris_mask, pupil_open, dist, lid_mask, lash) for the cat eye UVs (centre 0.5; opening ~ +-0.28 x +-0.18)."""
+    tc = tcoord(g)
+    c = (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")
+    dd = g.node(unreal.MaterialExpressionDistance)
+    g.link(tc, dd, "A")
+    g.link(c, dd, "B")
+    d = (dd, "")
+    rel = g.sub(tc, c)
+    # vertical slit pupil (narrow in the afternoon sun)
+    sl = g.node(unreal.MaterialExpressionDistance)
+    g.link(g.div(rel, g.append(g.scalar("PupilWidth", 0.045), g.const(0.24))), sl, "A")
+    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), sl, "B")
+    pupil_open = g.sat(g.mul(g.sub((sl, ""), g.const(1.0)), g.const(9.0)))
+    iris = g.sat(g.mul(g.sub(g.const(0.262), d), g.const(70.0)))
+    # Eyelids close from the top (and a little from below); V grows downward in UE.
+    v = g.mask(tc, g=True)
+    lid = g.scalar("Lid", 0.0)
+    top = g.add(g.const(0.3), g.mul(lid, g.const(0.4)))
+    upper = g.sat(g.mul(g.sub(top, v), g.const(60.0)))
+    bottom = g.sub(g.const(0.7), g.mul(lid, g.const(0.04)))
+    lower = g.sat(g.mul(g.sub(v, bottom), g.const(60.0)))
+    lidm = g.sat(g.add(upper, lower))
+    lash = g.sat(g.sub(g.const(1.0), g.mul(g.absv(g.sub(v, top)), g.const(45.0))))
+    lash = g.mul(lash, g.sat(g.mul(lid, g.const(8.0))))
+    return iris, pupil_open, d, lidm, lash
+
+
+def build_shade_body():
+    """Shade: a black-velvet cat of living shadow. Lit (so its form reads), ink swirl, faint violet sheen, ember burn."""
+    g = Graph("M_ShadeBody", blend=unreal.BlendMode.BLEND_MASKED)
+    nzr = ink_noise(g)
+    ink = g.mul(g.vec("InkColor", (0.0042, 0.004, 0.0048)), g.lerp(g.const(0.7), g.const(1.3), nzr))
+    g.out(ink, MP.MP_BASE_COLOR)
+    g.out(g.scalar("Roughness", 0.66), MP.MP_ROUGHNESS)
+    g.out(g.scalar("Specular", 0.26), MP.MP_SPECULAR)
+    rim = g.mul(g.fresnel(3.2, 0.0), g.vec("RimColor", (0.008, 0.007, 0.013)))
+    rim = g.mul(rim, g.mul(g.add(g.const(0.75), g.mul(g.scalar("Pulse", 0.5), g.const(0.5))), g.lerp(g.const(0.5), g.const(1.4), nzr)))
+    g.out(g.add(rim, burn_terms(g, nzr)), MP.MP_EMISSIVE_COLOR)
+    g.out(g.add(g.sub(nzr, g.mul(g.scalar("Dissolve", 0.0), g.const(1.2))), g.const(0.5)), MP.MP_OPACITY_MASK)
+    return g.finish(clip=0.5, skeletal=True)
+
+
+def build_shade_shell():
+    """Smoky fur: shells thin out into drifting ink at the tips."""
+    g = Graph("M_ShadeShell", blend=unreal.BlendMode.BLEND_MASKED)
+    h = shell_height(g)
+    nzr = ink_noise(g, 22.0, (0.09, 0.13))
+    strands = fur_strands(g, h)
+    wisp = g.mul(g.sub(nzr, g.const(0.5)), g.mul(h, g.const(1.6)))
+    mask = g.add(g.add(strands, wisp), g.mul(g.scalar("Dissolve", 0.0), g.const(-30.0)))
+    g.out(no_shadow(g, mask), MP.MP_OPACITY_MASK)
+    ink = g.mul(g.vec("InkColor", (0.0042, 0.004, 0.0048)), g.lerp(g.const(0.6), g.const(1.4), h))
+    g.out(ink, MP.MP_BASE_COLOR)
+    g.out(g.const(0.7), MP.MP_ROUGHNESS)
+    g.out(g.const(0.3), MP.MP_SPECULAR)
+    rim = g.mul(g.mul(g.fresnel(2.5, 0.0), g.vec("RimColor", (0.009, 0.008, 0.016))), g.add(g.const(0.4), h))
+    g.out(g.add(rim, g.mul(burn_terms(g, nzr), h)), MP.MP_EMISSIVE_COLOR)
     return g.finish(clip=0.5, skeletal=True)
 
 
 def build_shade_eye():
     g = Graph("M_ShadeEye", shading=unreal.MaterialShadingModel.MSM_UNLIT)
-    tc = (g.node(unreal.MaterialExpressionTextureCoordinate), "")
-    slit = g.node(unreal.MaterialExpressionDistance)
-    g.link(g.mul(g.sub(tc, (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")), (g.node(unreal.MaterialExpressionConstant2Vector, r=3.4, g=1.0), "")), slit, "A")
-    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), slit, "B")
-    pupil = g.sat(g.mul(g.sub((slit, ""), g.const(0.36)), g.const(18.0)))
+    iris, pupil_open, d, lidm, lash = eye_shapes(g)
     glow = g.scalar("Glow", 1.0)
-    col = g.lerp(g.vec("EyeColor", (1.0, 0.55, 0.12)), g.vec("HotColor", (1.0, 0.95, 0.8)), g.scalar("Burn", 0.0))
-    g.out(g.mul(g.mul(g.mul(col, g.scalar("Intensity", 9.0)), glow), g.lerp(g.const(0.05), g.const(1.0), pupil)), MP.MP_EMISSIVE_COLOR)
+    col = g.lerp(g.vec("EyeColor", (1.0, 0.56, 0.12)), g.vec("HotColor", (1.0, 0.95, 0.8)), g.scalar("Burn", 0.0))
+    inner = g.lerp(g.const(1.0), g.const(0.5), g.sat(g.mul(d, g.const(3.8))))
+    e = g.mul(g.mul(g.mul(col, g.scalar("Intensity", 5.0)), glow), g.mul(inner, g.lerp(g.const(0.02), g.const(1.0), pupil_open)))
+    e = g.mul(e, g.lerp(g.const(0.15), g.const(1.0), iris))
+    g.out(g.lerp(e, g.const3((0.0, 0.0, 0.0)), lidm), MP.MP_EMISSIVE_COLOR)
     return g.finish(skeletal=True)
+
+
+def build_shade_whisker():
+    g = Graph("M_ShadeWhisker", blend=unreal.BlendMode.BLEND_MASKED)
+    g.out(g.vec("InkColor", (0.01, 0.009, 0.014)), MP.MP_BASE_COLOR)
+    g.out(g.const(0.4), MP.MP_ROUGHNESS)
+    g.out(g.mul(g.fresnel(2.0, 0.1), g.vec("RimColor", (0.03, 0.025, 0.06))), MP.MP_EMISSIVE_COLOR)
+    g.out(g.sub(g.const(1.0), g.scalar("Dissolve", 0.0)), MP.MP_OPACITY_MASK)
+    return g.finish(clip=0.5, skeletal=True)
 
 
 def build_cat_fur():
     g = Graph("M_CatFur", shading=unreal.MaterialShadingModel.MSM_SUBSURFACE)
-    vc = (g.node(unreal.MaterialExpressionVertexColor), "")
-    vc3 = g.mask(vc, r=True, g=True, b=True)
-    lin = g.pow(vc3, g.const(2.2))  # vertex colours were authored as sRGB bytes
-    coat = g.mul(g.desat(lin, g.scalar("CoatDesat", 0.0)), g.vec("CoatTint", (1, 1, 1)))
-    coat = g.mul(g.mul(coat, g.const(0.72)), g.lerp(g.const(1.0), g.const(0.18), g.scalar("CoatDark", 0.0)))
-    nm = g.texs(tex("T_FurNormal"), S_NORMAL, g.uv(g.const(1.5)))
-    sheen = g.fresnel(2.2, 0.0)
-    col = g.lerp(coat, g.add(g.mul(coat, g.const(1.5)), g.const3((0.04, 0.035, 0.03))), g.mul(sheen, g.const(0.45)))
-    eye = g.sat(g.mul(g.sub(g.mask(vc, b=True), g.mask(vc, r=True)), g.const(4.0)))
-    tc = (g.node(unreal.MaterialExpressionTextureCoordinate), "")
-    c2 = (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")
-    dd = g.node(unreal.MaterialExpressionDistance)
-    g.link(tc, dd, "A")
-    g.link(c2, dd, "B")
-    slit = g.node(unreal.MaterialExpressionDistance)
-    g.link(g.mul(g.sub(tc, c2), (g.node(unreal.MaterialExpressionConstant2Vector, r=2.6, g=1.0), "")), slit, "A")
-    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), slit, "B")
-    pupil = g.sat(g.mul(g.sub((slit, ""), g.const(0.3)), g.const(16.0)))
-    ring = g.sat(g.mul(g.sub((dd, ""), g.const(0.25)), g.const(9.0)))
-    iris = g.mul(g.lerp(g.vec("IrisInner", (0.62, 0.42, 0.04)), g.vec("IrisOuter", (0.28, 0.34, 0.04)), ring), pupil)
-    g.out(g.lerp(col, iris, eye), MP.MP_BASE_COLOR)
-    g.out(g.lerp(g.const(0.88), g.const(0.05), eye), MP.MP_ROUGHNESS)
-    g.out(g.lerp(g.const(0.18), g.const(1.0), eye), MP.MP_SPECULAR)
-    g.out(g.lerp(g.lerp(g.const3((0, 0, 1)), (nm, "RGB"), g.const(0.25)), g.const3((0, 0, 1)), eye), MP.MP_NORMAL)
-    g.out(g.mul(coat, g.const(0.45)), MP.MP_SUBSURFACE_COLOR)
-    g.out(g.const(0.2), MP.MP_OPACITY)
+    coat = coat_color(g)
+    nm = g.texs(tex("T_FurNormal"), S_NORMAL, g.uv(g.const(5.0)))
+    sheen = g.fresnel(2.4, 0.0)
+    col = g.lerp(coat, g.add(g.mul(coat, g.const(1.45)), g.const3((0.03, 0.026, 0.02))), g.mul(sheen, g.const(0.4)))
+    g.out(col, MP.MP_BASE_COLOR)
+    g.out(g.scalar("Roughness", 0.8), MP.MP_ROUGHNESS)
+    g.out(g.scalar("Specular", 0.25), MP.MP_SPECULAR)
+    g.out(g.lerp(g.const3((0, 0, 1)), (nm, "RGB"), g.const(0.3)), MP.MP_NORMAL)
+    g.out(g.mul(coat, g.const(0.5)), MP.MP_SUBSURFACE_COLOR)
+    g.out(g.const(0.25), MP.MP_OPACITY)
     return g.finish(skeletal=True)
+
+
+def build_cat_shell():
+    g = Graph("M_CatShell", blend=unreal.BlendMode.BLEND_MASKED, shading=unreal.MaterialShadingModel.MSM_SUBSURFACE)
+    h = shell_height(g)
+    coat = coat_color(g)
+    # Roots sit in the shadow of the coat, tips catch the light.
+    col = g.mul(coat, g.lerp(g.const(0.6), g.const(1.12), h))
+    g.out(col, MP.MP_BASE_COLOR)
+    g.out(g.const(0.85), MP.MP_ROUGHNESS)
+    g.out(g.const(0.2), MP.MP_SPECULAR)
+    g.out(no_shadow(g, fur_strands(g, h)), MP.MP_OPACITY_MASK)
+    g.out(g.mul(coat, g.const(0.6)), MP.MP_SUBSURFACE_COLOR)
+    g.out(g.const(0.35), MP.MP_OPACITY)
+    return g.finish(clip=0.5, skeletal=True)
 
 
 def build_cat_eye():
     g = Graph("M_CatEye")
-    tc = (g.node(unreal.MaterialExpressionTextureCoordinate), "")
-    c = (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")
-    d = g.node(unreal.MaterialExpressionDistance)
-    g.link(tc, d, "A")
-    g.link(c, d, "B")
-    slit = g.node(unreal.MaterialExpressionDistance)
-    g.link(g.mul(g.sub(tc, c), (g.node(unreal.MaterialExpressionConstant2Vector, r=2.6, g=1.0), "")), slit, "A")
-    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), slit, "B")
-    pupil = g.sat(g.mul(g.sub((slit, ""), g.const(0.3)), g.const(16.0)))
-    ring = g.sat(g.mul(g.sub((d, ""), g.const(0.25)), g.const(9.0)))
-    iris = g.lerp(g.vec("IrisInner", (0.78, 0.55, 0.06)), g.vec("IrisOuter", (0.35, 0.42, 0.05)), ring)
-    col = g.mul(iris, pupil)
-    g.out(col, MP.MP_BASE_COLOR)
-    g.out(g.const(0.04), MP.MP_ROUGHNESS)
-    g.out(g.const(1.0), MP.MP_SPECULAR)
-    g.out(g.mul(col, g.const(0.15)), MP.MP_EMISSIVE_COLOR)
+    iris, pupil_open, d, lidm, lash = eye_shapes(g)
+    streak = g.texs(tex("T_WearMask"), S_GRAY, g.uv(g.const(3.0)))
+    ring = g.sat(g.mul(g.sub(d, g.const(0.08)), g.const(6.0)))
+    iris_col = g.lerp(g.vec("IrisInner", (0.6, 0.4, 0.06)), g.vec("IrisOuter", (0.3, 0.34, 0.08)), ring)
+    iris_col = g.mul(iris_col, g.lerp(g.const(0.75), g.const(1.15), (streak, "R")))
+    limbal = g.sat(g.sub(g.const(1.0), g.mul(g.absv(g.sub(d, g.const(0.25))), g.const(45.0))))
+    iris_col = g.mul(iris_col, g.sub(g.const(1.0), g.mul(limbal, g.const(0.65))))
+    eye = g.lerp(g.vec("Sclera", (0.62, 0.58, 0.45)), iris_col, iris)
+    eye = g.mul(eye, pupil_open)
+    lidc = g.mul(g.vec("LidColor", (0.55, 0.24, 0.07)), g.sub(g.const(1.0), g.mul(lash, g.const(0.85))))
+    g.out(g.lerp(eye, lidc, lidm), MP.MP_BASE_COLOR)
+    g.out(g.lerp(g.const(0.04), g.const(0.8), lidm), MP.MP_ROUGHNESS)
+    g.out(g.lerp(g.const(0.9), g.const(0.25), lidm), MP.MP_SPECULAR)
+    g.out(g.mul(g.mul(iris_col, g.mul(iris, pupil_open)), g.mul(g.scalar("IrisGlow", 0.05), g.sub(g.const(1.0), lidm))), MP.MP_EMISSIVE_COLOR)
+    return g.finish(skeletal=True)
+
+
+def build_cat_whisker():
+    g = Graph("M_CatWhisker")
+    g.out(g.vec("Color", (0.82, 0.79, 0.72)), MP.MP_BASE_COLOR)
+    g.out(g.const(0.42), MP.MP_ROUGHNESS)
+    g.out(g.const(0.5), MP.MP_SPECULAR)
     return g.finish(skeletal=True)
 
 
@@ -556,9 +652,9 @@ def build_instances(M):
     mi("MI_Wall_Stacked", S, {"Tiling": 1.0, "DirtAmount": 0.3, "MacroAmount": 0.15}, None, surf("stacked_stone_wall"))
     mi("MI_Trim_White", S, {"Tiling": 2.5, "MacroAmount": 0.06, "NormalStrength": 0.5}, {"Tint": (1.05, 1.03, 1.0)}, surf("white_stucco"))
     ground = {"MacroAmount": 0.2, "DirtAmount": 0.0}
-    mi("MI_Cobble", S, dict(ground, Tiling=1.3), {"Tint": (1.0, 0.97, 0.92)}, surf("cobblestone_floor_08"))
-    mi("MI_Flag", S, dict(ground, Tiling=0.8), {"Tint": (1.02, 0.98, 0.92)}, surf("stone_pathway"))
-    mi("MI_StepStone", S, dict(ground, Tiling=1.2), {"Tint": (1.0, 0.97, 0.92)}, surf("grey_stone_path"))
+    mi("MI_Cobble", S, dict(ground, Tiling=1.3), {"Tint": (1.07, 0.96, 0.82)}, surf("cobblestone_floor_08"))
+    mi("MI_Flag", S, dict(ground, Tiling=0.8), {"Tint": (1.06, 0.97, 0.86)}, surf("stone_pathway"))
+    mi("MI_StepStone", S, dict(ground, Tiling=1.2), {"Tint": (1.06, 0.96, 0.84)}, surf("grey_stone_path"))
     mi("MI_Terracotta", S, dict(ground, Tiling=1.6), None, surf("terracotta_floor_tiles"))
     mi("MI_Sand", S, dict(ground, Tiling=0.6), None, surf("coast_sand_01"))
     mi("MI_Cliff", S, {"Tiling": 0.35, "MacroAmount": 0.25}, {"Tint": (0.95, 0.9, 0.84)}, surf("marble_cliff_02"))
@@ -603,7 +699,9 @@ def build_instances(M):
         mi(f"MI_Sign_{n}", Pp, {"RoughMul": 0.75 if n != "Street" else 0.25}, None, {"BaseColorTex": tex(f"T_Sign_{n}")})
     mi("MI_Lemon_Skin", Pp, {"RoughMul": 0.6}, {"Tint": (1.0, 0.95, 0.55)}, {"BaseColorTex": WHITE})
     mi("MI_CatFur", M["M_CatFur"], {"CoatDark": 0.0}, {"CoatTint": (1, 1, 1)})
+    mi("MI_CatShell", M["M_CatShell"], {"CoatDark": 0.0}, {"CoatTint": (1, 1, 1)})
     mi("MI_CatEye", M["M_CatEye"])
+    mi("MI_CatWhisker", M["M_CatWhisker"])
 
 
 FLAT_N = tex("T_FlatNormal")
@@ -611,7 +709,8 @@ FLAT_ARM = tex("T_FlatARM")
 WHITE = tex("T_White")
 M = {}
 for fn in (build_surface, build_paint, build_prop, build_foliage, build_card, build_cloth, build_iron, build_glass, build_emissive,
-           build_majolica, build_water, build_shade_body, build_shade_eye, build_cat_fur, build_cat_eye, build_wisp):
+           build_majolica, build_water, build_shade_body, build_shade_shell, build_shade_eye, build_shade_whisker,
+           build_cat_fur, build_cat_shell, build_cat_eye, build_cat_whisker, build_wisp):
     try:
         m = fn()
         M[m.get_name()] = m
