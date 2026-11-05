@@ -9,9 +9,12 @@
 #include "ShadeSunSubsystem.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/DirectionalLight.h"
+#include "Engine/PointLight.h"
+#include "Components/PointLightComponent.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -87,6 +90,11 @@ void AShadeGameMode::BuildObjectives()
 void AShadeGameMode::StartPlay()
 {
 	Super::StartPlay();
+	// Uncooked runs print asset-compilation progress on screen; never show engine debug text over the game.
+	if (APlayerController* PC0 = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		PC0->ConsoleCommand(TEXT("DisableAllScreenMessages"), true);
+	}
 	for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
 	{
 		if (It->ActorHasTag(TEXT("TitleCam")))
@@ -439,7 +447,7 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 		if (ShotTimer <= 0.f)
 		{
 			ShotTimer = 2.5f;
-			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / FString::Printf(TEXT("Shots/auto_%03d.png"), ShotIndex++), false, false);
+			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / FString::Printf(TEXT("Shots/auto_%03d.png"), ShotIndex++), true, false);
 		}
 	}
 	if (IsAutoplayExit() && RunTime > 420.f)
@@ -518,16 +526,34 @@ void AShadeGameMode::BeginReunion(AShadeNapCat* Cat)
 		S->BeginMerge(ReunionSpot, 2.2f);
 	}
 
-	// Close two-shot from the side, slightly low (cat height).
+	// Close shot from the sun side, cat height: Biscotto lit warm against the church, his shadow pouring away from us.
 	const FVector CatLoc = Cat->GetActorLocation();
 	const FVector Side = FVector::CrossProduct(FVector::UpVector, Away).GetSafeNormal();
-	const FVector CamLoc = CatLoc + Side * 175.f + Away * 110.f + FVector(0.f, 0.f, 62.f);
+	const FVector CamLoc = CatLoc - Away * 185.f + Side * 95.f + FVector(0.f, 0.f, 48.f);
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	CineCamera = GetWorld()->SpawnActor<ACameraActor>(CamLoc, ((CatLoc + Away * 20.f + FVector(0, 0, 18.f)) - CamLoc).Rotation(), P);
+	CineCamera = GetWorld()->SpawnActor<ACameraActor>(CamLoc, ((CatLoc + Away * 25.f + FVector(0, 0, 12.f)) - CamLoc).Rotation(), P);
 	if (CineCamera)
 	{
-		CineCamera->GetCameraComponent()->SetFieldOfView(48.f);
+		CineCamera->GetCameraComponent()->SetFieldOfView(42.f);
+		// Cinematic key + rim so Biscotto reads warm even inside the tower's shade.
+		auto AddCineLight = [this](const FVector& Loc, float Lumens, float Radius, const FLinearColor& Col)
+		{
+			APointLight* L = GetWorld()->SpawnActor<APointLight>(Loc, FRotator::ZeroRotator);
+			if (L)
+			{
+				UPointLightComponent* C = Cast<UPointLightComponent>(L->GetLightComponent());
+				C->SetMobility(EComponentMobility::Movable);
+				C->SetIntensityUnits(ELightUnits::Lumens);
+				C->SetIntensity(Lumens);
+				C->SetAttenuationRadius(Radius);
+				C->SetLightColor(Col);
+				C->SetCastShadows(false);
+				C->SetSourceRadius(20.f);
+			}
+		};
+		AddCineLight(CatLoc - Away * 140.f + Side * 70.f + FVector(0, 0, 110.f), 260.f, 420.f, FLinearColor(1.f, 0.74f, 0.5f));
+		AddCineLight(CatLoc + Away * 80.f - Side * 50.f + FVector(0, 0, 70.f), 140.f, 260.f, FLinearColor(1.f, 0.62f, 0.32f));
 		CineCamera->GetCameraComponent()->bConstrainAspectRatio = false;
 		if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 		{
@@ -573,24 +599,31 @@ void AShadeGameMode::TickReunion(float Dt)
 		ReunionStep = 3;
 		Say(LOCTEXT("Reunion", "There you are. Welcome home, little shadow."), 4.5f);
 	}
-	if (ReunionStep == 3 && ReunionTime > 7.4f)
+	if (ReunionStep == 3 && ReunionTime > 7.0f)
 	{
 		ReunionStep = 4;
+		FadeTo(1.f, 0.7f, FLinearColor(0.02f, 0.015f, 0.03f));
+	}
+	if (ReunionStep == 4 && ReunionTime > 7.8f)
+	{
+		// Cut (a long blend would fly the camera through the houses) to the wide sunset shot, then fade up.
+		ReunionStep = 5;
 		for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
 		{
 			if (It->ActorHasTag(TEXT("EndCam")))
 			{
 				if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 				{
-					PC->SetViewTargetWithBlend(*It, 5.f, VTBlend_EaseInOut, 2.f);
+					PC->SetViewTarget(*It);
 				}
 				break;
 			}
 		}
+		FadeTo(0.f, 1.4f, FLinearColor(0.02f, 0.015f, 0.03f));
 	}
-	if (ReunionStep == 4 && ReunionTime > 11.f)
+	if (ReunionStep == 5 && ReunionTime > 10.5f)
 	{
-		ReunionStep = 5;
+		ReunionStep = 6;
 		MusicTarget = 0.4f;
 		SetPhase(EShadePhase::Ended);
 		UE_LOG(LogShade, Log, TEXT("SHADE_COMPLETE t=%.1f evaporations=%d utc=%s"), RunTime, GetShade() ? GetShade()->GetEvaporations() : -1, *FDateTime::UtcNow().ToIso8601());
@@ -647,7 +680,8 @@ void AShadeGameMode::RunCatGallery()
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	for (int32 i = 0; i < 5; ++i)
 	{
-		AShadeNapCat* C = GetWorld()->SpawnActor<AShadeNapCat>(Origin + Right * (i - 2) * 85.f, Facing, P);
+		const FVector Fwd = FRotationMatrix(Facing).GetUnitAxis(EAxis::X);
+		AShadeNapCat* C = GetWorld()->SpawnActor<AShadeNapCat>(Origin + Fwd * (i - 2) * 95.f, Facing, P);
 		if (C)
 		{
 			C->GetRig()->SetPose(Poses[i], 0.01f);
@@ -661,7 +695,7 @@ void AShadeGameMode::RunCatGallery()
 			GetWorldTimerManager().SetTimer(H, [WC, Pose, Sp]() { if (WC.IsValid()) { WC->GetRig()->SetPose(Pose, 0.01f); WC->GetRig()->Speed = Sp; } }, 0.2f, false);
 		}
 	}
-	ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Origin - FRotationMatrix(Facing).GetUnitAxis(EAxis::X) * -320.f + FVector(0, 0, 70.f), FRotator::ZeroRotator, P);
+	ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Origin + Right * 330.f + FVector(0, 0, 80.f), FRotator::ZeroRotator, P);
 	if (Cam)
 	{
 		Cam->SetActorRotation(((Origin + FVector(0, 0, 20.f)) - Cam->GetActorLocation()).Rotation());
@@ -674,7 +708,19 @@ void AShadeGameMode::RunCatGallery()
 			GetWorldTimerManager().SetTimer(H0, [WPC, WCam]() { if (WPC.IsValid() && WCam.IsValid()) { WPC->SetViewTarget(WCam.Get()); } }, 0.3f, false);
 		}
 	}
-	FTimerHandle H1, H2;
+	FTimerHandle H1, H2, H3;
+	TWeakObjectPtr<UWorld> WW(GetWorld());
+	GetWorldTimerManager().SetTimer(H3, [WW]()
+	{
+		for (TActorIterator<AShadeNapCat> It(WW.Get()); It; ++It)
+		{
+			UPoseableMeshComponent* M = It->Mesh;
+			const FBoxSphereBounds B = M->Bounds;
+			UE_LOG(LogShade, Log, TEXT("SHADE_GALLERY %s pose %d visible %d bounds o=%s e=%s head=%s pelvis=%s"), *It->GetName(),
+				static_cast<int32>(It->GetRig()->GetPose()), M->IsVisible() ? 1 : 0, *B.Origin.ToCompactString(), *B.BoxExtent.ToCompactString(),
+				*M->GetBoneLocation(TEXT("head")).ToCompactString(), *M->GetBoneLocation(TEXT("pelvis")).ToCompactString());
+		}
+	}, 1.5f, false);
 	GetWorldTimerManager().SetTimer(H1, []() { FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots/cat_gallery.png"), false, false); }, 2.5f, false);
 	GetWorldTimerManager().SetTimer(H2, [this]() { QuitGame(); }, 4.0f, false);
 }

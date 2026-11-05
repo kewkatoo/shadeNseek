@@ -67,15 +67,19 @@ void UShadeCatRig::Init(UPoseableMeshComponent* InMesh)
 	YawAxis = AxU;
 	RollAxis = FVector::CrossProduct(AxU, AxR);
 	FacingYaw = -FMath::RadiansToDegrees(FMath::Atan2(AxF.Y, AxF.X));
+	// The authored cat measures 36.5 cm (horizontal) from pelvis to head; normalise whatever units the importer used.
+	const float Span = F.Size();
+	UnitScale = Span > 1e-4f ? FMath::Clamp(36.5f / Span, 0.01f, 1000.f) : 1.f;
+	if (FMath::IsNearlyEqual(UnitScale, 1.f, 0.25f)) { UnitScale = 1.f; }
 
 	bReady = true;
-	UE_LOG(LogShade, Log, TEXT("CatRig ready: %d bones, forward (%.2f %.2f %.2f), facing yaw %.1f"), N, AxF.X, AxF.Y, AxF.Z, FacingYaw);
+	UE_LOG(LogShade, Log, TEXT("CatRig ready: %d bones, forward (%.2f %.2f %.2f), facing yaw %.1f, unit scale %.2f"), N, AxF.X, AxF.Y, AxF.Z, FacingYaw, UnitScale);
 }
 
 FVector UShadeCatRig::GetRestBoneLocation(CatBone::Type Bone) const
 {
 	const int32 I = BoneIndex[Bone];
-	return (bReady && RefComp.IsValidIndex(I)) ? RefComp[I].GetLocation() : FVector::ZeroVector;
+	return (bReady && RefComp.IsValidIndex(I)) ? RefComp[I].GetLocation() * UnitScale : FVector::ZeroVector;
 }
 
 void UShadeCatRig::SetPose(ECatPose Pose, float BlendTime)
@@ -354,12 +358,12 @@ void UShadeCatRig::PoseSit(FCatPoseSample& S) const
 	using namespace CatBone;
 	// Upright sit: torso pitched up around the hips, hind legs folded, front legs straight, tail curled in front.
 	S.Pelvis = FVector(-3.f, 0.f, -7.f);
-	S.Ang[Pelvis] = FVector(34.f, 0.f, 0.f);
-	S.Ang[Spine1] = FVector(6.f, 0.f, 0.f);
-	S.Ang[Spine2] = FVector(4.f, 0.f, 0.f);
-	S.Ang[Neck] = FVector(-30.f, 0.f, 0.f);
-	S.Ang[Head] = FVector(-8.f, 0.f, 0.f);
-	S.Ang[UArmL] = S.Ang[UArmR] = FVector(-42.f, 0.f, 0.f);
+	S.Ang[Pelvis] = FVector(30.f, 0.f, 0.f);
+	S.Ang[Spine1] = FVector(5.f, 0.f, 0.f);
+	S.Ang[Spine2] = FVector(2.f, 0.f, 0.f);
+	S.Ang[Neck] = FVector(-44.f, 0.f, 0.f);
+	S.Ang[Head] = FVector(4.f, 0.f, 0.f);
+	S.Ang[UArmL] = S.Ang[UArmR] = FVector(-34.f, 0.f, 0.f);
 	S.Ang[FArmL] = S.Ang[FArmR] = FVector(2.f, 0.f, 0.f);
 	S.Ang[HandL] = S.Ang[HandR] = FVector(-2.f, 0.f, 0.f);
 	S.Ang[ThighL] = S.Ang[ThighR] = FVector(30.f, 0.f, 0.f);
@@ -399,7 +403,9 @@ void UShadeCatRig::Apply(const FCatPoseSample& S)
 		L.SetRotation((Pq.Inverse() * Q * Pq) * RefLocal[I].GetRotation());
 		if (b == CatBone::Pelvis)
 		{
-			L.SetTranslation(RefLocal[I].GetTranslation() + Pq.Inverse().RotateVector(CatToMesh(S.Pelvis)));
+			// Offset is in mesh-space cm; the parent bone may carry the FBX unit scale (x100), so use its full transform.
+			const FVector Off = CatToMesh(S.Pelvis);
+			L.SetTranslation(RefLocal[I].GetTranslation() + (P >= 0 ? RefComp[P].InverseTransformVector(Off) : Off));
 		}
 		M->BoneSpaceTransforms[I] = L;
 	}

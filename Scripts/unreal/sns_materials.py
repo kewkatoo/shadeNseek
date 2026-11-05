@@ -49,12 +49,22 @@ class Graph:
         path = f"{MAT_DIR}/{name}"
         if eal.does_asset_exist(path):
             self.m = eal.load_asset(path)
+            # delete_all_material_expressions() leaves the graph intact headless; remove nodes one by one.
+            for e in list(mel.get_material_expressions(self.m)):
+                mel.delete_material_expression(self.m, e)
             mel.delete_all_material_expressions(self.m)
+            left = mel.get_num_material_expressions(self.m)
+            if left:
+                log("WARNING", name, left, "expressions survived the reset")
         else:
             self.m = tools.create_asset(name, MAT_DIR, unreal.Material, unreal.MaterialFactoryNew())
         self.m.set_editor_property("blend_mode", blend if blend is not None else unreal.BlendMode.BLEND_OPAQUE)
         self.m.set_editor_property("shading_model", shading if shading is not None else unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
         self.m.set_editor_property("two_sided", two_sided)
+        # Headless builds never get the editor's automatic usage flags; without them the game falls back to the
+        # default material on Nanite meshes.
+        self.m.set_editor_property("used_with_nanite", True)
+        self.m.set_editor_property("used_with_static_lighting", False)
         self.x, self.y = -1800, -800
 
     def node(self, cls, **props):
@@ -169,7 +179,9 @@ class Graph:
     def fresnel(self, exponent=3.0, base=0.04):
         return (self.node(unreal.MaterialExpressionFresnel, exponent=float(exponent), base_reflect_fraction=float(base)), "")
 
-    def finish(self, clip=None):
+    def finish(self, clip=None, skeletal=False):
+        if skeletal:
+            self.m.set_editor_property("used_with_skeletal_mesh", True)
         if clip is not None:
             self.m.set_editor_property("opacity_mask_clip_value", float(clip))
         mel.layout_material_expressions(self.m)
@@ -182,7 +194,7 @@ class Graph:
 S_COLOR = unreal.MaterialSamplerType.SAMPLERTYPE_COLOR
 S_NORMAL = unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL
 S_MASKS = unreal.MaterialSamplerType.SAMPLERTYPE_MASKS
-S_GRAY = unreal.MaterialSamplerType.SAMPLERTYPE_GRAYSCALE
+S_GRAY = unreal.MaterialSamplerType.SAMPLERTYPE_MASKS  # all single-channel maps are imported as TC_Masks
 S_LCOLOR = unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR
 MP = unreal.MaterialProperty
 
@@ -274,7 +286,7 @@ def build_prop():
 def build_foliage():
     g = Graph("M_Foliage", blend=unreal.BlendMode.BLEND_MASKED, shading=unreal.MaterialShadingModel.MSM_TWO_SIDED_FOLIAGE, two_sided=True)
     bc = g.texp("BaseColorTex", WHITE, S_COLOR)
-    al = g.texp("AlphaTex", WHITE, S_GRAY)
+    al = g.texp("AlphaTex", FLAT_ARM, S_GRAY)
     nm = g.texp("NormalTex", FLAT_N, S_NORMAL)
     arm = g.texp("ARMTex", FLAT_ARM, S_MASKS)
     col = g.mul((bc, "RGB"), g.vec("Tint", (1, 1, 1)))
@@ -398,9 +410,9 @@ def build_shade_body():
     g.link(uvn, pan, "Coordinate")
     nz = g.texs(tex("T_InkNoise"), S_GRAY, (pan, ""))
     nzr = (nz, "R")
-    rim = g.fresnel(2.6, 0.0)
-    ink = g.mul(g.vec("InkColor", (0.004, 0.0035, 0.009)), g.lerp(g.const(0.6), g.const(1.4), nzr))
-    rimc = g.mul(g.mul(rim, g.vec("RimColor", (0.09, 0.06, 0.26))), g.add(g.const(0.75), g.mul(g.scalar("Pulse", 0.5), g.const(0.5))))
+    rim = g.fresnel(4.0, 0.0)
+    ink = g.mul(g.vec("InkColor", (0.0012, 0.001, 0.0028)), g.lerp(g.const(0.6), g.const(1.4), nzr))
+    rimc = g.mul(g.mul(rim, g.vec("RimColor", (0.022, 0.014, 0.06))), g.add(g.const(0.75), g.mul(g.scalar("Pulse", 0.5), g.const(0.5))))
     rimc = g.mul(rimc, g.mul(g.scalar("Glow", 1.0), g.lerp(g.const(0.5), g.const(1.4), nzr)))
     # Burn: an ember front creeps across the body as exposure rises.
     burn = g.scalar("Burn", 0.0)
@@ -408,11 +420,23 @@ def build_shade_body():
     edge = g.sat(g.sub(g.const(1.0), g.mul(g.absv(g.sub(nzr, front)), g.const(7.0))))
     ember = g.mul(g.mul(edge, g.vec("EmberColor", (6.0, 1.6, 0.25))), g.sat(g.mul(burn, g.const(3.0))))
     charred = g.mul(g.sat(g.mul(g.sub(nzr, front), g.const(6.0))), g.mul(burn, g.const3((0.25, 0.08, 0.02))))
-    g.out(g.add(g.add(g.add(ink, rimc), ember), charred), MP.MP_EMISSIVE_COLOR)
+    body = g.add(g.add(g.add(ink, rimc), ember), charred)
+    # Eyes live in the same section: vertex alpha is 0 on the eyeballs. Amber glow with a slit pupil.
+    # Eyeballs are painted pure blue in the vertex colours; no coat colour is ever bluer than it is red.
+    vce = (g.node(unreal.MaterialExpressionVertexColor), "")
+    eye = g.sat(g.mul(g.sub(g.mask(vce, b=True), g.mask(vce, r=True)), g.const(4.0)))
+    tc = (g.node(unreal.MaterialExpressionTextureCoordinate), "")
+    slit = g.node(unreal.MaterialExpressionDistance)
+    g.link(g.mul(g.sub(tc, (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")), (g.node(unreal.MaterialExpressionConstant2Vector, r=3.4, g=1.0), "")), slit, "A")
+    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), slit, "B")
+    pupil = g.sat(g.mul(g.sub((slit, ""), g.const(0.36)), g.const(18.0)))
+    ecol = g.lerp(g.vec("EyeColor", (1.0, 0.55, 0.12)), g.const3((1.0, 0.95, 0.8)), burn)
+    eyes = g.mul(g.mul(g.mul(ecol, g.scalar("EyeIntensity", 1.6)), g.scalar("EyeGlow", 1.0)), g.lerp(g.const(0.04), g.const(1.0), pupil))
+    g.out(g.lerp(body, eyes, eye), MP.MP_EMISSIVE_COLOR)
     # Dissolve (evaporate / merge).
     dis = g.scalar("Dissolve", 0.0)
     g.out(g.add(g.sub(nzr, g.mul(dis, g.const(1.2))), g.const(0.5)), MP.MP_OPACITY_MASK)
-    return g.finish(clip=0.5)
+    return g.finish(clip=0.5, skeletal=True)
 
 
 def build_shade_eye():
@@ -425,7 +449,7 @@ def build_shade_eye():
     glow = g.scalar("Glow", 1.0)
     col = g.lerp(g.vec("EyeColor", (1.0, 0.55, 0.12)), g.vec("HotColor", (1.0, 0.95, 0.8)), g.scalar("Burn", 0.0))
     g.out(g.mul(g.mul(g.mul(col, g.scalar("Intensity", 9.0)), glow), g.lerp(g.const(0.05), g.const(1.0), pupil)), MP.MP_EMISSIVE_COLOR)
-    return g.finish()
+    return g.finish(skeletal=True)
 
 
 def build_cat_fur():
@@ -434,17 +458,29 @@ def build_cat_fur():
     vc3 = g.mask(vc, r=True, g=True, b=True)
     lin = g.pow(vc3, g.const(2.2))  # vertex colours were authored as sRGB bytes
     coat = g.mul(g.desat(lin, g.scalar("CoatDesat", 0.0)), g.vec("CoatTint", (1, 1, 1)))
-    coat = g.mul(coat, g.lerp(g.const(1.0), g.const(0.18), g.scalar("CoatDark", 0.0)))
+    coat = g.mul(g.mul(coat, g.const(0.72)), g.lerp(g.const(1.0), g.const(0.18), g.scalar("CoatDark", 0.0)))
     nm = g.texs(tex("T_FurNormal"), S_NORMAL, g.uv(g.const(1.5)))
     sheen = g.fresnel(2.2, 0.0)
     col = g.lerp(coat, g.add(g.mul(coat, g.const(1.5)), g.const3((0.04, 0.035, 0.03))), g.mul(sheen, g.const(0.45)))
-    g.out(col, MP.MP_BASE_COLOR)
-    g.out(g.const(0.78), MP.MP_ROUGHNESS)
-    g.out(g.const(0.35), MP.MP_SPECULAR)
-    g.out(g.lerp(g.const3((0, 0, 1)), (nm, "RGB"), g.const(0.6)), MP.MP_NORMAL)
-    g.out(g.mul(coat, g.const(0.7)), MP.MP_SUBSURFACE_COLOR)
-    g.out(g.const(0.4), MP.MP_OPACITY)
-    return g.finish()
+    eye = g.sat(g.mul(g.sub(g.mask(vc, b=True), g.mask(vc, r=True)), g.const(4.0)))
+    tc = (g.node(unreal.MaterialExpressionTextureCoordinate), "")
+    c2 = (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), "")
+    dd = g.node(unreal.MaterialExpressionDistance)
+    g.link(tc, dd, "A")
+    g.link(c2, dd, "B")
+    slit = g.node(unreal.MaterialExpressionDistance)
+    g.link(g.mul(g.sub(tc, c2), (g.node(unreal.MaterialExpressionConstant2Vector, r=2.6, g=1.0), "")), slit, "A")
+    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), ""), slit, "B")
+    pupil = g.sat(g.mul(g.sub((slit, ""), g.const(0.3)), g.const(16.0)))
+    ring = g.sat(g.mul(g.sub((dd, ""), g.const(0.25)), g.const(9.0)))
+    iris = g.mul(g.lerp(g.vec("IrisInner", (0.62, 0.42, 0.04)), g.vec("IrisOuter", (0.28, 0.34, 0.04)), ring), pupil)
+    g.out(g.lerp(col, iris, eye), MP.MP_BASE_COLOR)
+    g.out(g.lerp(g.const(0.88), g.const(0.05), eye), MP.MP_ROUGHNESS)
+    g.out(g.lerp(g.const(0.18), g.const(1.0), eye), MP.MP_SPECULAR)
+    g.out(g.lerp(g.lerp(g.const3((0, 0, 1)), (nm, "RGB"), g.const(0.25)), g.const3((0, 0, 1)), eye), MP.MP_NORMAL)
+    g.out(g.mul(coat, g.const(0.45)), MP.MP_SUBSURFACE_COLOR)
+    g.out(g.const(0.2), MP.MP_OPACITY)
+    return g.finish(skeletal=True)
 
 
 def build_cat_eye():
@@ -465,7 +501,7 @@ def build_cat_eye():
     g.out(g.const(0.04), MP.MP_ROUGHNESS)
     g.out(g.const(1.0), MP.MP_SPECULAR)
     g.out(g.mul(col, g.const(0.15)), MP.MP_EMISSIVE_COLOR)
-    return g.finish()
+    return g.finish(skeletal=True)
 
 
 def build_wisp():
@@ -507,13 +543,13 @@ def build_instances(M):
     wall = {"DirtAmount": 0.75, "DirtHeight": 110, "MacroAmount": 0.16, "Tiling": 1.4}
     # Positano palette: whitewash, cream, peach, salmon, ochre, lemon; aged plaster; dry stone.
     mi("MI_Wall_White", S, wall, {"Tint": (1.0, 0.985, 0.95)}, surf("white_stucco"))
-    mi("MI_Wall_Cream", S, wall, {"Tint": (1.0, 0.92, 0.78)}, surf("white_stucco"))
-    mi("MI_Wall_Peach", S, wall, {"Tint": (1.0, 0.83, 0.66)}, surf("white_stucco_02"))
-    mi("MI_Wall_Salmon", S, wall, {"Tint": (1.0, 0.7, 0.56)}, surf("white_stucco"))
-    mi("MI_Wall_Lemon", S, wall, {"Tint": (1.0, 0.86, 0.5)}, surf("white_stucco_02"))
-    mi("MI_Wall_Ochre", S, wall, {"Tint": (1.0, 0.8, 0.46)}, surf("white_stucco_02"))
-    mi("MI_Wall_Rose", S, wall, {"Tint": (1.0, 0.72, 0.7)}, surf("white_stucco"))
-    mi("MI_Wall_Sky", S, dict(wall, Tiling=1.0), {"Tint": (1.05, 1.12, 1.12), "Brightness": 1.1}, surf("blue_plaster_weathered"))
+    mi("MI_Wall_Cream", S, wall, {"Tint": (1.0, 0.9, 0.72)}, surf("white_stucco"))
+    mi("MI_Wall_Peach", S, wall, {"Tint": (1.0, 0.76, 0.56)}, surf("white_stucco_02"))
+    mi("MI_Wall_Salmon", S, wall, {"Tint": (1.0, 0.6, 0.47)}, surf("white_stucco"))
+    mi("MI_Wall_Lemon", S, wall, {"Tint": (1.0, 0.84, 0.36)}, surf("white_stucco_02"))
+    mi("MI_Wall_Ochre", S, wall, {"Tint": (1.0, 0.66, 0.3)}, surf("white_stucco_02"))
+    mi("MI_Wall_Rose", S, wall, {"Tint": (1.0, 0.64, 0.66)}, surf("white_stucco"))
+    mi("MI_Wall_Sky", S, dict(wall, Tiling=1.0, Brightness=1.1), {"Tint": (1.05, 1.12, 1.12)}, surf("blue_plaster_weathered"))
     mi("MI_Wall_Aged", S, dict(wall, Tiling=1.0), {"Tint": (1.0, 0.96, 0.9)}, surf("white_rough_plaster"))
     mi("MI_Wall_Beige", S, dict(wall, Tiling=1.0), {"Tint": (1.0, 0.95, 0.86)}, surf("painted_plaster_wall"))
     mi("MI_Wall_Stone", S, {"Tiling": 0.9, "DirtAmount": 0.4, "MacroAmount": 0.15}, {"Tint": (1.0, 0.95, 0.88)}, surf("rustic_stone_wall"))

@@ -234,6 +234,8 @@ CREAM = Vector((0.98, 0.93, 0.84))
 PINK = Vector((0.93, 0.55, 0.55))
 
 col = me.color_attributes.new("Col", 'BYTE_COLOR', 'POINT')
+# Eyeballs are painted pure blue so one material section can shade both fur and eyes (see M_CatFur / M_ShadeBody).
+EYE_VERTS = {vi for p in me.polygons if p.material_index == 1 for vi in p.vertices}
 for v in me.vertices:
     p = v.co
     c = GINGER.copy()
@@ -262,7 +264,7 @@ for v in me.vertices:
     c = c.lerp(PINK, nose)
     if p.z > 0.345 and abs(p.x) > 0.02 and p.y < -0.245:
         c = c.lerp(PINK, 0.55)
-    col.data[v.index].color = (c.x, c.y, c.z, 1.0)
+    col.data[v.index].color = (0.0, 0.0, 1.0, 1.0) if v.index in EYE_VERTS else (c.x, c.y, c.z, 1.0)
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Armature

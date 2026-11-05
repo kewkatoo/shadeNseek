@@ -102,7 +102,7 @@ def kind_for(filename):
     if any(k in f for k in ("_arm", "rough", "_r.png", "flatarm")):
         return "linear"
     if any(k in f for k in ("alpha", "wearmask", "t_wisp", "inknoise")):
-        return "gray"
+        return "linear"  # single-channel maps are sampled as Masks everywhere
     return "color"
 
 
@@ -131,7 +131,8 @@ def import_models():
         gltf = glob.glob(os.path.join(mdir, "*.gltf"))
         if not gltf:
             continue
-        if not eal.does_directory_have_assets(dest + "/Mesh"):
+        merged = eal.does_directory_exist(dest) and any(x.split("/")[-1].startswith("SM_") for x in eal.list_assets(dest, recursive=False, include_folder=False))
+        if not merged and not eal.does_directory_have_assets(dest + "/Mesh"):
             paths = import_file(gltf[0], dest + "/Mesh")
             log("model", mid, len(paths), "objects")
         for f in sorted(glob.glob(os.path.join(mdir, "textures", "*.jpg"))):
@@ -148,12 +149,8 @@ def import_models():
 
 
 def import_cat():
-    fbx = os.path.join(LIB, "Models", "generated", "SK_Cat.fbx")
-    paths = import_file(fbx, "/Game/Shade/Characters")
-    log("cat", paths)
-    for p in paths:
-        a = load(p)
-        log("cat asset", p, type(a).__name__ if a else None)
+    # The legacy FBX importer keeps the baked tabby vertex colours (Interchange drops them): see sns_cat_reimport.py
+    exec(open(os.path.join(os.path.dirname(__file__), "sns_cat_reimport.py"), encoding="utf-8").read(), {"__file__": os.path.join(os.path.dirname(__file__), "sns_cat_reimport.py")})
 
 
 if want("audio"):

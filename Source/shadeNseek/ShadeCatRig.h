@@ -92,6 +92,8 @@ public:
 
 	/** Yaw (deg) to apply to the mesh component so the cat faces +X of its owner. */
 	float GetFacingYaw() const { return FacingYaw; }
+	/** Centimetres per mesh unit (1 for a cm-scaled import, 100 if the FBX came in as metres). Owners scale the mesh by it. */
+	float GetUnitScale() const { return UnitScale; }
 	float GetGaitPhase() const { return Phase; }
 	float GetBreath() const { return Breath; }
 
@@ -105,7 +107,7 @@ private:
 	void PoseSit(FCatPoseSample& S) const;
 	void Apply(const FCatPoseSample& S);
 	FQuat ToQuat(const FVector& PYR) const;
-	FVector CatToMesh(const FVector& FRU) const { return AxF * FRU.X + AxR * FRU.Y + AxU * FRU.Z; }
+	FVector CatToMesh(const FVector& FRU) const { return (AxF * FRU.X + AxR * FRU.Y + AxU * FRU.Z) / UnitScale; }
 
 	TWeakObjectPtr<UPoseableMeshComponent> Mesh;
 	bool bReady = false;
@@ -119,6 +121,7 @@ private:
 	FVector AxU = FVector::UpVector;
 	FVector PitchAxis, YawAxis, RollAxis;
 	float FacingYaw = 0.f;
+	float UnitScale = 1.f;
 
 	float Time = 0.f;
 	float Phase = 0.f;

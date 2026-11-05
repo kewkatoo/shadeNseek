@@ -87,9 +87,9 @@ AShadeCharacter::AShadeCharacter()
 	EyeLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("EyeLight"));
 	EyeLight->SetupAttachment(Body);
 	EyeLight->SetIntensityUnits(ELightUnits::Lumens);
-	EyeLight->SetIntensity(5.f);
+	EyeLight->SetIntensity(2.5f);
 	EyeLight->SetLightColor(FLinearColor(1.f, 0.62f, 0.2f));
-	EyeLight->SetAttenuationRadius(48.f);
+	EyeLight->SetAttenuationRadius(34.f);
 	EyeLight->SetCastShadows(false);
 	EyeLight->SetSourceRadius(2.f);
 }
@@ -116,7 +116,7 @@ void AShadeCharacter::BeginPlay()
 	Rig->MeshScale = GMeshScale;
 	Rig->Excitement = 0.55f;
 	Body->SetRelativeRotation(FRotator(0.f, Rig->GetFacingYaw(), 0.f));
-	Body->SetRelativeScale3D(FVector(GMeshScale));
+	Body->SetRelativeScale3D(FVector(GMeshScale * Rig->GetUnitScale()));
 	if (Rig->IsReady())
 	{
 		// Eye glow rides on the head bone.
@@ -610,13 +610,15 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 		BodyMID->SetScalarParameterValue(TEXT("Burn"), Exposure);
 		BodyMID->SetScalarParameterValue(TEXT("Dissolve"), FMath::Max(EvapAlpha, MergeAlpha * 0.9f));
 		BodyMID->SetScalarParameterValue(TEXT("Pulse"), Pulse);
+		// Eyes share the body section (vertex alpha); they flare white-hot as Shade burns.
+		BodyMID->SetScalarParameterValue(TEXT("EyeGlow"), (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 1.5f * Exposure));
 	}
 	if (EyeMID)
 	{
 		EyeMID->SetScalarParameterValue(TEXT("Glow"), (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 1.5f * Exposure));
 		EyeMID->SetScalarParameterValue(TEXT("Burn"), Exposure);
 	}
-	EyeLight->SetIntensity(5.f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 2.f * Exposure));
+	EyeLight->SetIntensity(2.5f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 2.f * Exposure));
 	EyeLight->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.62f, 0.2f), FLinearColor(1.f, 0.9f, 0.7f), Exposure));
 
 	// Squash into the ground while evaporating; pour flat while merging.
@@ -629,7 +631,8 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 		SetActorLocation(Loc, false);
 		FlatZ = FMath::Lerp(1.f, 0.04f, A);
 	}
-	Body->SetRelativeScale3D(FVector(GMeshScale * (1.f + 0.2f * EvapAlpha), GMeshScale * (1.f + 0.2f * EvapAlpha), GMeshScale * FlatZ));
+	const float U = GMeshScale * Rig->GetUnitScale();
+	Body->SetRelativeScale3D(FVector(U * (1.f + 0.2f * EvapAlpha), U * (1.f + 0.2f * EvapAlpha), U * FlatZ));
 	Body->SetVisibility(EvapState != 2 && MergeAlpha < 0.999f);
 	if (bMerging && MergeAlpha >= 1.f)
 	{

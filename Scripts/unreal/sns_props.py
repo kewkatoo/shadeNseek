@@ -108,7 +108,8 @@ def merge_model(mid, foliage, prop):
         texs = {"BaseColorTex": m["diff"], "NormalTex": m["nor_dx"], "ARMTex": m["arm"]}
         if alpha:
             texs["AlphaTex"] = alpha
-        sc = {"WindAmp": 1.2 if "tree" in mid else 1.8} if alpha else None
+        # Nanite trees stay still: WPO on million-triangle masked foliage invalidates virtual shadow maps every frame.
+        sc = {"WindAmp": 0.0 if "tree" in mid else 1.8} if alpha else None
         materials.append(mi(f"MI_{name}", foliage if alpha else prop, texs, f"{folder}/Materials", sc))
 
     tris = GQ.get_num_triangle_i_ds(combined) if hasattr(GQ, "get_num_triangle_i_ds") else 0

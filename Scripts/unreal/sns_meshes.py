@@ -108,7 +108,8 @@ def lemon_cart():
         return c
 
     tops = []
-    for (cx, cy, cz, r) in ((-48, 2, 43, 3.0), (32, -3, 43, -4.0), (-10, 0, 72, 8.0)):
+    # A heavy load: three crates on the bed, two stacked on top, so the cart throws a long, generous shadow.
+    for (cx, cy, cz, r) in ((-64, 2, 43, 3.0), (0, -3, 43, -4.0), (64, 2, 43, 2.0), (-33, 0, 72, 8.0), (33, 1, 72, -6.0)):
         append(m, crate(cx, cy, cz, r))
         tops.append((cx, cy, cz + 18))
     # lemons heaped in each crate (real scanned lemon geometry)

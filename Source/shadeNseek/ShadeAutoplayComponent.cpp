@@ -351,6 +351,11 @@ void UShadeAutoplayComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		break;
 	}
 	case EShadeAutoStep::WaitEvent:
+		// While waiting, look down the terrace at Biscotto so the sweeping shadow is in frame.
+		if (AActor* Cat = FindTagged(TEXT("Dev_Biscotto")))
+		{
+			SteerCamera(Cat->GetActorLocation(), Dt, 1.2f, -24.f);
+		}
 		if (G->HasEvent(St.Tag) || StepTime > St.Time)
 		{
 			NextStep();

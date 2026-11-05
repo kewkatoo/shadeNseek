@@ -192,9 +192,11 @@ namespace
 		/** A glazed-tile card: cream body, terracotta rim, painted corner diamonds. */
 		void Tile(const FVector2D& Pos, const FVector2D& Sz, float Alpha, const FLinearColor& Rim = UI::Terracotta) const
 		{
+			// Solid layers (outline brushes tint their fill too): shadow, cream body, thin inset glaze line, cream centre.
 			Box(Pos + FVector2D(3.f, 5.f), Sz, A(FLinearColor(0.f, 0.f, 0.02f, 1.f), 0.28f * Alpha), &GRound14, 0);
-			Box(Pos, Sz, A(UI::Cream, 0.96f * Alpha), &GRound14, 1);
-			Box(Pos + FVector2D(5.f, 5.f), Sz - FVector2D(10.f, 10.f), A(Rim, 0.85f * Alpha), &GOutline14, 2);
+			Box(Pos, Sz, A(UI::Cream, 0.97f * Alpha), &GRound14, 1);
+			Box(Pos + FVector2D(6.f, 6.f), Sz - FVector2D(12.f, 12.f), A(Rim, 0.9f * Alpha), &GRound14, 2);
+			Box(Pos + FVector2D(8.f, 8.f), Sz - FVector2D(16.f, 16.f), A(UI::Cream, 0.98f * Alpha), &GRound14, 2);
 			const float R = 5.f;
 			for (const FVector2D& Corner : { Pos + FVector2D(14, 14), Pos + FVector2D(Sz.X - 14, 14), Pos + FVector2D(14, Sz.Y - 14), Pos + Sz - FVector2D(14, 14) })
 			{
@@ -209,9 +211,9 @@ namespace
 			const FVector2D T = Measure(Label, Font);
 			const float W = FMath::Max(Height, static_cast<float>(T.X) + 18.f);
 			Box(Pos + FVector2D(0.f, 3.f), FVector2D(W, Height), A(UI::Ink, 0.55f * Alpha), &GRound6, 3);
-			Box(Pos, FVector2D(W, Height), A(UI::Paper, Alpha), &GRound6, 4);
-			Box(Pos, FVector2D(W, Height), A(UI::Ink, 0.75f * Alpha), &GOutline6, 5);
-			Text(Label, Pos + FVector2D(W * 0.5f, Height * 0.5f), Font, A(UI::Ink, Alpha), 0.5f, 0.5f, 0.f, 6);
+			Box(Pos, FVector2D(W, Height), A(UI::Ink, 0.8f * Alpha), &GRound6, 4);
+			Box(Pos + FVector2D(1.5f, 1.5f), FVector2D(W - 3.f, Height - 3.f), A(UI::Paper, Alpha), &GRound6, 5);
+			Text(Label, Pos + FVector2D(W * 0.5f, Height * 0.5f), Font, A(UI::Ink, Alpha), 0.5f, 0.5f, 0.f, 7);
 			return W;
 		}
 
@@ -476,14 +478,17 @@ void SShadeOverlay::PaintObjective(const FPainter& P, double Now) const
 		}
 		if (!Cur.IsEmpty()) { Lines.Add(Cur); }
 	}
-	const float H = 108.f + Lines.Num() * 26.f;
+	const float TitleH = P.Measure(O->Title.ToString(), Title).Y;
+	const float LineH = P.Measure(TEXT("Ag"), Hint).Y * 0.92f;
+	const float HintY = 44.f + TitleH + 2.f;
+	const float H = HintY + Lines.Num() * LineH + 26.f;
 	const FVector2D Pos(UI::Margin - (1.f - In) * 40.f, UI::Margin);
 	P.Tile(Pos, FVector2D(W, H), Al);
-	P.Text(TEXT("ON THE WAY HOME"), Pos + FVector2D(32.f, 26.f), Head, A(UI::Terracotta, Al), 0.f, 0.f, 0.f, 5);
+	P.Text(TEXT("ON THE WAY HOME"), Pos + FVector2D(32.f, 24.f), Head, A(UI::Terracotta, Al), 0.f, 0.f, 0.f, 5);
 	P.Text(O->Title.ToString(), Pos + FVector2D(30.f, 42.f), Title, A(UI::Ink, Al), 0.f, 0.f, 0.f, 5);
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
-		P.Text(Lines[i], Pos + FVector2D(32.f, 86.f + i * 26.f), Hint, A(UI::InkSoft, Al), 0.f, 0.f, 0.f, 5);
+		P.Text(Lines[i], Pos + FVector2D(32.f, HintY + i * LineH), Hint, A(UI::InkSoft, Al), 0.f, 0.f, 0.f, 5);
 	}
 	// Progress: one painted dot per step.
 	const int32 N = G->GetObjectiveCount();
@@ -498,7 +503,7 @@ void SShadeOverlay::PaintObjective(const FPainter& P, double Now) const
 	if (Since < 1.2f)
 	{
 		const float Sh = ShadeEase::Bump(Since, 0.f, 1.2f);
-		P.Box(Pos - FVector2D(4.f, 4.f), FVector2D(W + 8.f, H + 8.f), A(UI::Lemon, 0.6f * Sh), &GOutline14, 6);
+		P.Box(Pos - FVector2D(5.f, 5.f), FVector2D(W + 10.f, H + 10.f), A(UI::Lemon, 0.55f * Sh), &GRound14, 0);
 	}
 }
 

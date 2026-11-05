@@ -87,6 +87,12 @@ def place(sm, loc, rot=(0, 0, 0), scale=1.0, folder="World", tags=(), mats=None,
             comp.set_material(i, m)
     if not shadow:
         comp.set_cast_shadow(False)
+    if "island_tree" in sm.get_name():
+        # Heavy Nanite foliage: never evaluate WPO (keeps virtual shadow map pages cached).
+        try:
+            comp.set_editor_property("evaluate_world_position_offset", False)
+        except Exception as e:
+            log("wpo flag", e)
     if not collision:
         comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
     elif not sun:
@@ -535,6 +541,10 @@ plant.set_static_mesh(tree)
 ts = 190.0 / height_of(tree)
 plant.set_editor_property("relative_scale3d", V(ts, ts, ts))
 plant.set_editor_property("relative_location", V(0, 0, 50))
+try:
+    plant.set_editor_property("evaluate_world_position_offset", False)
+except Exception as e:
+    log("wpo flag", e)
 canopy = pot.get_editor_property("canopy_shade")
 canopy.set_editor_property("box_extent", V(85, 85, 55))
 canopy.set_editor_property("relative_location", V(0, 0, 150))
@@ -554,11 +564,11 @@ for (tag, x, y, z) in (("OBJ_Lane", 300, -60, 40), ("OBJ_Cart", 420, 95, 110), (
                        ("OBJ_Wait", 3760, -100, 360), ("OBJ_Biscotto", 3894, -430, 420)):
     target(tag, x, y, z)
 target("SunFinale", 0, 0, 3000, SUN_FINALE)
-target("Gallery", 300, -40, 0, (0, 0, 0))
+target("Gallery", 2100, 180, 0, (0, 0, 0))
 
 # Autoplay route (all points are in shade at the moment they're used)
 for (tag, x, y, z) in (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), ("AP_SunBack", 780, -60, 0), ("AP_CartGrab", 400, 95, 0),
-                       ("AP_Alley1", 840, -70, 0), ("AP_Alley2", 1000, -75, 0), ("AP_Alley3", 1220, -60, 0), ("AP_Cord", 1672, 58, 0),
+                       ("AP_Alley1", 840, -15, 0), ("AP_Alley2", 1000, -12, 0), ("AP_Alley3", 1220, -30, 0), ("AP_Cord", 1672, 58, 0),
                        ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0), ("AP_Steps2", 2900, -40, 110),
                        ("AP_Steps3", 3250, -40, 270), ("AP_WallJump", 3420, 45, 300), ("AP_WallTop", 3420, 128, 380), ("AP_PotNudge", 3442, 130, 380),
                        ("AP_WallDown", 3400, 30, 300), ("AP_Terrace", 3480, -150, 300), ("AP_Porch", 3760, -100, 300), ("AP_Biscotto", 3880, -372, 300)):
@@ -568,9 +578,9 @@ for (tag, x, y, z) in (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), 
 tc = spawn(unreal.CameraActor, (1650, 5200, -560), (0, 0, 0), "Cinematic", tags=("TitleCam",))
 tc.set_actor_rotation(unreal.MathLibrary.make_rot_from_x(V(1650 - 1650, -400 - 5200, 450 + 560)), False)
 tc.camera_component.set_editor_property("field_of_view", 48.0)
-ec = spawn(unreal.CameraActor, (3420, 820, 980), (0, 0, 0), "Cinematic", tags=("EndCam",))
-ec.set_actor_rotation(unreal.MathLibrary.make_rot_from_x(V(3950 - 3420, -560 - 820, 650 - 980)), False)
-ec.camera_component.set_editor_property("field_of_view", 55.0)
+ec = spawn(unreal.CameraActor, (3150, 2900, 700), (0, 0, 0), "Cinematic", tags=("EndCam",))
+ec.set_actor_rotation(unreal.MathLibrary.make_rot_from_x(V(3800 - 3150, -500 - 2900, 650 - 700)), False)
+ec.camera_component.set_editor_property("field_of_view", 50.0)
 
 def warm_light(loc, lumens, radius, color=(1.0, 0.68, 0.38), folder="Lighting/Warm"):
     a = spawn(unreal.PointLight, loc, (0, 0, 0), folder)
@@ -742,11 +752,10 @@ fill_row("U3_", -2400, 5200, -3300, -2550, 1560, 500, 750, detail=0.3)
 slab(-3000, 5600, -1700, -950, 420, 1400, "MI_Wall_Stone")
 slab(-3000, 5600, -2500, -1700, 980, 1600, "MI_Wall_Stone")
 slab(-3000, 5600, -3300, -2500, 1560, 1800, "MI_Wall_Stone")
-for k in range(10):
-    place(prop("island_tree_0" + str(R.choice([1, 2]))), (R.uniform(-2500, 5000), R.uniform(-3200, -1000), 0), (0, R.uniform(0, 360), 0),
-          R.uniform(0.3, 0.55), "Trees", collision=False)
-for (x, y, z) in [(R.uniform(-2400, 5000), R.uniform(950, 1450), -620) for _ in range(5)] + [(R.uniform(-2400, 5000), R.uniform(1750, 2250), -1180) for _ in range(5)]:
-    place(prop("island_tree_0" + str(R.choice([1, 2]))), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.3, 0.5), "Trees", collision=False)
+# A few olive-like trees on the terraces (Nanite, still, no shadow casting in the distance to keep the GPU budget sane).
+for (x, y, z) in ((-1800, -1250, 420), (1200, -1300, 420), (4300, -1250, 420), (-600, -2100, 980), (2600, -2150, 980),
+                  (-1500, 1150, -620), (2200, 1100, -620), (4200, 1900, -1180)):
+    place(prop("island_tree_0" + str(R.choice([1, 2]))), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.32, 0.45), "Trees", collision=False, shadow=False)
 # mountains behind, headlands either side
 mt = prop("mountainside")
 for (x, y, s, yaw) in ((-1500, -6200, 9.0, 0), (3500, -6800, 11.0, 20), (8500, -5200, 9.0, -40), (-6500, -4200, 8.0, 50)):
@@ -775,18 +784,37 @@ place(ssm, (0, 150000, -1250), folder="Coast", collision=False, shadow=False)
 F = "Lighting"
 sun = spawn(unreal.DirectionalLight, (0, 0, 3000), SUN_ROT, F)
 sc = sun.get_component_by_class(unreal.DirectionalLightComponent)
-sc.set_editor_property("intensity", 10.0)
+sc.set_editor_property("intensity", 16.0)
 sc.set_editor_property("light_color", unreal.Color(255, 216, 172, 255))
 sc.set_editor_property("atmosphere_sun_light", True)
 sc.set_editor_property("cast_shadows", True)
 sc.set_editor_property("light_source_angle", 0.5357)
 sc.set_editor_property("volumetric_scattering_intensity", 1.5)
 sc.set_mobility(unreal.ComponentMobility.MOVABLE)
+# Cascaded shadow maps (sharp near the cat) + distance-field shadows for the far town: much lighter than VSM.
+for k, v in (("dynamic_shadow_distance_movable_light", 6500.0), ("dynamic_shadow_cascades", 4), ("cascade_distribution_exponent", 3.0),
+             ("cascade_transition_fraction", 0.15), ("shadow_distance_fadeout_fraction", 0.15), ("use_ray_traced_distance_field_shadows", True),
+             ("distance_field_shadow_distance", 60000.0)):
+    try:
+        sc.set_editor_property(k, v)
+    except Exception as e:
+        log("sun prop", k, e)
 spawn(unreal.SkyAtmosphere, (0, 0, 0), (0, 0, 0), F)
+# Warm "bounce card": a shadowless low fill from the land side, standing in for light reflected off sunlit
+# whitewash into the lanes (keeps the shade cosy instead of sky-blue). Not the atmosphere sun, so gameplay ignores it.
+fill = spawn(unreal.DirectionalLight, (0, 0, 3200), (-18.0, 100.0, 0.0), F)
+flc = fill.get_component_by_class(unreal.DirectionalLightComponent)
+flc.set_editor_property("intensity", 1.6)
+flc.set_editor_property("light_color", unreal.Color(255, 186, 132, 255))
+flc.set_editor_property("atmosphere_sun_light", False)
+flc.set_editor_property("cast_shadows", False)
+flc.set_editor_property("affects_world", True)
+flc.set_mobility(unreal.ComponentMobility.MOVABLE)
 sky = spawn(unreal.SkyLight, (0, 0, 1000), (0, 0, 0), F)
 slc = sky.get_component_by_class(unreal.SkyLightComponent)
 slc.set_editor_property("real_time_capture", True)
-slc.set_editor_property("intensity", 1.7)
+slc.set_editor_property("intensity", 0.45)
+slc.set_editor_property("light_color", unreal.Color(255, 200, 160, 255))
 slc.set_mobility(unreal.ComponentMobility.MOVABLE)
 fog = spawn(unreal.ExponentialHeightFog, (0, 0, -1300), (0, 0, 0), F)
 fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
@@ -795,7 +823,7 @@ fc.set_editor_property("fog_height_falloff", 0.06)
 fc.set_editor_property("start_distance", 3000.0)
 fc.set_editor_property("directional_inscattering_exponent", 8.0)
 fc.set_editor_property("directional_inscattering_luminance", unreal.LinearColor(1.0, 0.62, 0.36, 1))
-fc.set_editor_property("fog_inscattering_luminance", unreal.LinearColor(0.42, 0.5, 0.62, 1))
+fc.set_editor_property("fog_inscattering_luminance", unreal.LinearColor(0.5, 0.5, 0.52, 1))
 fc.set_editor_property("enable_volumetric_fog", True)
 fc.set_editor_property("volumetric_fog_scattering_distribution", 0.6)
 fc.set_editor_property("volumetric_fog_extinction_scale", 0.5)
@@ -811,23 +839,24 @@ def pp(name, value):
 
 
 pp("auto_exposure_method", unreal.AutoExposureMethod.AEM_HISTOGRAM)
-pp("auto_exposure_min_brightness", -0.6)
-pp("auto_exposure_max_brightness", 2.4)
+pp("auto_exposure_min_brightness", 0.5)
+pp("auto_exposure_max_brightness", 2.9)
 pp("auto_exposure_bias", 0.25)
 pp("auto_exposure_speed_up", 2.0)
 pp("auto_exposure_speed_down", 1.5)
 pp("bloom_intensity", 0.55)
 pp("vignette_intensity", 0.32)
 pp("film_grain_intensity", 0.06)
-pp("color_saturation", unreal.Vector4(1.0, 1.0, 1.0, 1.08))
+pp("color_saturation", unreal.Vector4(1.0, 1.0, 1.0, 1.12))
+pp("color_gain_midtones", unreal.Vector4(1.05, 1.0, 0.93, 1.0))
 pp("color_contrast", unreal.Vector4(1.0, 1.0, 1.0, 1.06))
-pp("color_gain_shadows", unreal.Vector4(0.94, 1.0, 1.08, 1.0))
+pp("color_gain_shadows", unreal.Vector4(1.06, 1.0, 0.92, 1.0))
 pp("color_gain_highlights", unreal.Vector4(1.05, 1.0, 0.93, 1.0))
-pp("white_temp", 6100.0)
+pp("white_temp", 7400.0)
 pp("motion_blur_amount", 0.12)
 pp("lumen_scene_lighting_quality", 1.0)
 pp("lumen_final_gather_quality", 1.5)
-pp("indirect_lighting_intensity", 1.45)
+pp("indirect_lighting_intensity", 1.9)
 ppv.set_editor_property("settings", s)
 
 # Ambience: gulls over the bay.

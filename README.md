@@ -14,7 +14,7 @@ shadowless, so you can slip back into place.
 - **Self-playing demo:** `UnrealEditor.exe shadeNseek.uproject -game -autoplay`
   - `-autoplayexit` quits when the run ends (unattended capture), `-autoplayshots` saves a screenshot every 2.5 s to `Saved/Shots`
   - QA: `-sunmap` writes `Saved/SunMap.png` (+ `_finale`) - a top-down map of gameplay shade; `-catgallery` screenshots the cat rig poses
-- `Scripts/run_game.ps1` launches a standalone game window with any of those flags.
+- `Scripts/run_game.ps1` launches a standalone game window with any of those flags. Recording guide: `Docs/PLAYTHROUGH.md`.
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
@@ -50,8 +50,10 @@ Everything in `Content/Shade` is rebuilt from `asset-library/` by scripts:
 2. `python -I Scripts/gen_audio.py asset-library/Audio/generated` - all music, ambience and SFX (synthesised)
 3. `python -I Scripts/gen_textures.py .` - awning stripes, majolica tiles, bougainvillea cards, signs, fabrics…
 4. `blender -b --factory-startup --python Scripts/blender/make_cat.py -- .` - the cat mesh + skeleton (FBX)
-5. inside UE (`Scripts/run_ue_python.ps1 -Script <file>`): `unreal/sns_import.py` → `sns_materials.py` → `sns_props.py` →
-   `sns_cleanup.py` → `sns_meshes.py` → `sns_level.py` (houses are generated with GeometryScript, windows cut with booleans)
+5. inside UE (`Scripts/run_ue_python.ps1 -Script <file>`): `unreal/sns_import.py` (runs `sns_cat_reimport.py` for the cat) →
+   `sns_fix_masks.py` → `sns_materials.py` (add `-WithRHI` to see shader compile errors) → `sns_props.py` → `sns_fix_trees.py` →
+   `sns_meshes.py` → `sns_level.py` (houses are generated with GeometryScript, windows cut with booleans).
+   After `sns_props.py` the raw Interchange imports in `Content/Shade/Props/*/Mesh` are unreferenced and can be deleted.
 6. `python -I Scripts/make_credits.py .` - `asset-library/CREDITS.md` + `manifest.json`
 
 Third-party assets: Poly Haven (CC0) models/textures and Google Fonts (OFL). See `asset-library/CREDITS.md`.

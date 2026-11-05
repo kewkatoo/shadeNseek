@@ -513,7 +513,7 @@ void AShadeNapCat::BeginPlay()
 	}
 	Rig->Init(Mesh);
 	Mesh->SetRelativeRotation(FRotator(0.f, Rig->GetFacingYaw(), 0.f));
-	Mesh->SetRelativeScale3D(FVector(CatScale));
+	Mesh->SetRelativeScale3D(FVector(CatScale * Rig->GetUnitScale()));
 	Rig->MeshScale = CatScale;
 	Rig->SetPose(ECatPose::Sleep, 0.01f);
 	Rig->Excitement = 0.2f;
