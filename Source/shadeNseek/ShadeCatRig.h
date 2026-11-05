@@ -21,40 +21,80 @@ namespace CatBone
 {
 	enum Type : int32
 	{
-		Root, Pelvis, Spine1, Spine2, Neck, Head, EarL, EarR,
-		UArmL, FArmL, HandL, UArmR, FArmR, HandR,
-		ThighL, CalfL, FootL, ThighR, CalfR, FootR,
-		Tail1, Tail2, Tail3, Tail4, Tail5,
+		Root, Pelvis, Spine1, Spine2, Spine3, Neck, Head, EarL, EarR,
+		ScapL, UArmL, FArmL, HandL, FingL,
+		ScapR, UArmR, FArmR, HandR, FingR,
+		ThighL, CalfL, FootL, ToeL,
+		ThighR, CalfR, FootR, ToeR,
+		Tail1, Tail2, Tail3, Tail4, Tail5, Tail6, Tail7, Tail8,
 		Count
 	};
 }
 
-/** One evaluated pose: per-bone (pitch, yaw, roll) in degrees in cat space + pelvis offset (cm, cat space F/R/U). */
-struct FCatPoseSample
+/**
+ * One body configuration in rig space (X forward, Y right, Z up, centimetres, origin on the ground under the cat).
+ * Poses (walk cycle, sit, sleep, push, air) are blended in this space and then solved with IK, so a blend between
+ * two poses is always a valid body instead of an average of bone angles.
+ */
+struct FCatPoseParams
 {
-	FVector Ang[CatBone::Count];
-	FVector Pelvis = FVector::ZeroVector;
+	FVector PelvisOffset = FVector::ZeroVector;
+	float BodyPitch = 0.f;
+	float BodyRoll = 0.f;
+	float SpineYaw[4] = { 0.f, 0.f, 0.f, 0.f };    // increments for pelvis, spine_01, spine_02, spine_03 (deg)
+	float SpinePitch[4] = { 0.f, 0.f, 0.f, 0.f };  // + arches the chest up
+	float NeckPitch = 0.f;
+	float HeadPitch = 0.f;    // gaze relative to the level rig frame
+	float HeadYaw = 0.f;
+	float HeadRoll = 0.f;
+	FVector Ball[4];          // paw ball (metacarpal / metatarsal end) targets: FL, FR, HL, HR
+	float Meta[4] = { 0.f, 0.f, 0.f, 0.f };     // metacarpal / metatarsal angle from vertical, + = lower end forward
+	float Curl[4] = { 0.f, 0.f, 0.f, 0.f };     // toe curl, deg downward from flat
+	float Scap[2] = { 0.f, 0.f };               // shoulder-blade swing, + = shoulder forward
+	float TailPitch[8];       // target direction per tail segment: elevation above "straight back"
+	float TailYaw[8];         // + curls toward the cat's right
+	float EarBack = 0.f;
+	float EarOut = 0.f;
+	float Lid = 0.f;
 
-	FCatPoseSample() { Reset(); }
-	void Reset()
-	{
-		for (FVector& A : Ang) { A = FVector::ZeroVector; }
-		Pelvis = FVector::ZeroVector;
-	}
-	void AddScaled(const FCatPoseSample& O, float W)
-	{
-		for (int32 i = 0; i < CatBone::Count; ++i) { Ang[i] += O.Ang[i] * W; }
-		Pelvis += O.Pelvis * W;
-	}
+	FCatPoseParams() { Zero(); }
+	void Zero();
+	void Add(const FCatPoseParams& O, float W);
+};
+
+/** Per-leg gait state. Paw positions are kept in world space so planted paws never skate. */
+struct FCatLeg
+{
+	bool bFront = true;
+	float Side = 1.f;            // +1 right, -1 left (rig Y)
+	FVector Home = FVector::ZeroVector;  // rest ball position (rig, unit scale, z = ball height)
+	bool bPlanted = true;
+	bool bInit = false;
+	FVector PlantWorld = FVector::ZeroVector;
+	FVector SwingFrom = FVector::ZeroVector;
+	FVector SwingTo = FVector::ZeroVector;
+	FVector BallWorld = FVector::ZeroVector;
+	float SwingT = 1.f;
+	float SwingDur = 0.3f;
+	float SwingLift = 4.f;
+	bool bSettleStep = false;
+	float PrevPhase = 0.f;
+	float GroundZ = 0.f;         // rig-space ground height under this paw
 };
 
 /**
- * Procedural quadruped animation for the cat skeleton (shared by Shade and Biscotto), driven entirely from C++.
+ * Procedural quadruped animation for the cat skeleton (shared by Shade and the real cats), driven entirely from C++.
  *
- * The mesh is a UPoseableMeshComponent; every frame we write local bone transforms as
- *   Local = (ParentRest^-1 * Q * ParentRest) * LocalRest
- * where Q is a rotation expressed in "cat space" (forward/right/up derived from the rest skeleton itself, so the
- * rig is independent of how the FBX axes were converted). Pitch is positive nose-up / paw-forward.
+ *  - Gait: lateral-sequence walk / diagonal trot chosen from ground speed, stride and duty factor scale with speed.
+ *    Each paw is planted in the world during stance (traced onto the ground, stairs included) and swings on an arc
+ *    to a predicted landing spot, so the feet never slide. Standing still, the cat re-steps any paw that drifted.
+ *  - Legs: digitigrade IK (shoulder blade -> humerus -> forearm -> metacarpus -> toes; hip -> femur -> tibia ->
+ *    metatarsus -> toes), elbows bend back and knees forward, pasterns flex through the stride.
+ *  - Body: pelvis / chest heights follow the paws (pitching on slopes), the spine bends into turns, bobs with the gait,
+ *    crouches before a jump, stretches in the air and absorbs landings on a spring. The head stays level and looks
+ *    at points of interest; ears are springs with idle twitches; eyelids blink.
+ *  - Tail: a Verlet chain with gravity, inertia and a pose-dependent carriage, so it swings when the cat turns, runs,
+ *    jumps or stops.
  */
 UCLASS(ClassGroup = (Shade))
 class SHADENSEEK_API UShadeCatRig : public UActorComponent
@@ -70,44 +110,59 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	// --- Inputs, written by the owner every frame ------------------------------------------------------------------
-	float Speed = 0.f;          // cm/s along the ground
-	float TurnRate = 0.f;       // deg/s
+	FVector Velocity = FVector::ZeroVector;  // world cm/s
+	float TurnRate = 0.f;       // deg/s, + = turning right
 	bool bGrounded = true;
-	float VerticalSpeed = 0.f;
 	float Excitement = 0.4f;    // tail carriage / ear alertness
+	float Crouch = 0.f;         // 0..1 jump wind-up
 	bool bHasLook = false;
 	FVector LookAtWorld = FVector::ZeroVector;
-	/** Mesh world scale (used to keep the stride in sync with ground speed). */
+	/** Size of the cat relative to the authored model (1 = 34 cm pelvis-to-head). */
 	float MeshScale = 1.f;
+	/** QA: animate a gait in place as if walking at this speed (cm/s) on a moving floor. */
+	float TreadmillSpeed = 0.f;
 
 	void SetPose(ECatPose Pose, float BlendTime = 0.45f);
 	ECatPose GetPose() const { return TargetPose; }
 	float GetPoseWeight(ECatPose Pose) const { return PoseW[static_cast<int32>(Pose)]; }
 	void Land(float Strength);
-	/** Short "wake up" head lift + yawn used by Biscotto. */
+	/** Wake-up: big yawn and stretch (Biscotto). */
 	void Yawn() { YawnTime = 0.f; }
+	/** Forget planted paws / tail state (after a teleport). */
+	void ResetDynamics();
 
 	/** Fires when a paw plants: 0 FL, 1 FR, 2 HL, 3 HR. */
 	TFunction<void(int32)> OnFootPlant;
 
 	/** Yaw (deg) to apply to the mesh component so the cat faces +X of its owner. */
 	float GetFacingYaw() const { return FacingYaw; }
-	/** Centimetres per mesh unit (1 for a cm-scaled import, 100 if the FBX came in as metres). Owners scale the mesh by it. */
+	/** Centimetres per mesh unit of the imported asset. Owners scale the mesh by GetUnitScale() * MeshScale. */
 	float GetUnitScale() const { return UnitScale; }
-	float GetGaitPhase() const { return Phase; }
 	float GetBreath() const { return Breath; }
-
-	/** Mesh-space location of a bone in the rest pose (cm). */
-	FVector GetRestBoneLocation(CatBone::Type Bone) const;
+	/** 0 open .. 1 closed (blinks, sleep). Owners feed it to the eye material. */
+	float GetEyeLid() const { return EyeLid; }
 
 private:
-	void Evaluate(float Dt, FCatPoseSample& Out);
-	void PoseLocomote(float Dt, FCatPoseSample& S, float StrideScale);
-	void PoseSleep(FCatPoseSample& S) const;
-	void PoseSit(FCatPoseSample& S) const;
-	void Apply(const FCatPoseSample& S);
-	FQuat ToQuat(const FVector& PYR) const;
-	FVector CatToMesh(const FVector& FRU) const { return (AxF * FRU.X + AxR * FRU.Y + AxU * FRU.Z) / UnitScale; }
+	struct FBoneOut
+	{
+		FVector Pos = FVector::ZeroVector;
+		FQuat Rot = FQuat::Identity;
+		bool bSet = false;
+	};
+
+	void ComputeLocomotion(float Dt, FCatPoseParams& P);
+	void ComputeSit(FCatPoseParams& P) const;
+	void ComputeSleep(FCatPoseParams& P) const;
+	void UpdateGait(float Dt, float SpeedN, const FVector& VelRig, const FVector& VelWorld);
+	void UpdateTail(float Dt, const FCatPoseParams& P, const FVector& RootRig, const FQuat& PelvisQ);
+	void Solve(const FCatPoseParams& P);
+	void Apply();
+	float TraceGround(const FVector& World, float Fallback) const;
+
+	FQuat Aim(int32 Bone, const FVector& Dir, const FVector& SideHint) const;
+	FVector RP(int32 Bone) const { return RestPos[Bone] * MeshScale; }
+	FVector ToRig(const FVector& World) const { return RigToWorld.InverseTransformPosition(World); }
+	FVector ToWorld(const FVector& Rig) const { return RigToWorld.TransformPosition(Rig); }
 
 	TWeakObjectPtr<UPoseableMeshComponent> Mesh;
 	bool bReady = false;
@@ -115,31 +170,54 @@ private:
 	TArray<FTransform> RefLocal;
 	TArray<FTransform> RefComp;
 	TArray<int32> Parents;
+	TArray<FTransform> CompPose;
 
-	FVector AxF = FVector::ForwardVector;
-	FVector AxR = FVector::RightVector;
-	FVector AxU = FVector::UpVector;
-	FVector PitchAxis, YawAxis, RollAxis;
+	// Rest skeleton in rig space (unit scale cm)
+	FVector RestPos[CatBone::Count];
+	FQuat RestRot[CatBone::Count];
+	FVector RestDir[CatBone::Count];
+	float BoneLen[CatBone::Count];
+	FQuat RigToComp = FQuat::Identity;   // rotation taking rig axes to component axes
+	FVector AxF = FVector::ForwardVector, AxR = FVector::RightVector, AxU = FVector::UpVector;
 	float FacingYaw = 0.f;
 	float UnitScale = 1.f;
+	FTransform RigToWorld = FTransform::Identity;
+	FBoneOut Out[CatBone::Count];
 
-	float Time = 0.f;
+	// Gait
+	FCatLeg Legs[4];
 	float Phase = 0.f;
-	float Amp = 0.f;
-	float Sprint = 0.f;
-	float Air = 0.f;
-	float Breath = 0.f;
-	float PrevLegPhase[4] = { 0.f, 0.f, 0.f, 0.f };
+	bool bTrot = false;
+	float Duty = 0.65f;
+	float Freq = 0.f;
+	float StepCooldown = 0.f;
+	bool bWasGrounded = true;
+	FVector PrevVelRig = FVector::ZeroVector;
 
+	// Body springs
+	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS;
+	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;
+	float SmoothSpeed = 0.f;
+
+	// Tail (world-space Verlet)
+	FVector TailX[9];
+	FVector TailPrev[9];
+	bool bTailInit = false;
+	FVector TailRootRig = FVector::ZeroVector;
+	FQuat TailPelvisDelta = FQuat::Identity;
+
+	// Pose blend
 	ECatPose TargetPose = ECatPose::Locomote;
 	float PoseW[static_cast<int32>(ECatPose::Count)] = { 1.f, 0.f, 0.f, 0.f };
 	float BlendRate = 3.f;
 
-	FShadeSpring Squash;
-	FShadeSpring Lean;
-	FShadeSpring HeadYaw;
-	FShadeSpring HeadPitch;
+	float Time = 0.f;
+	float Breath = 0.f;
+	float EyeLid = 0.f;
+	float BlinkTimer = 2.5f;
+	float BlinkT = 1.f;
 	float EarTimer = 2.f;
-	float EarTwitch[2] = { 0.f, 0.f };
+	FShadeSpring EarTwitch[2];
 	float YawnTime = 100.f;
+	float LookWander = 0.f;
 };

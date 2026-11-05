@@ -1,7 +1,7 @@
 """Stage A - import raw sources from asset-library/ into /Game/Shade.
 
 Run headless:  Scripts/run_ue_python.ps1 -Script Scripts/unreal/sns_import.py
-Pass SNS_ONLY=audio,textures,models,cat via environment to run a subset.
+Pass SNS_ONLY=audio,textures,gentex,models,cat via environment to run a subset (gentex = generated textures only).
 """
 import glob
 import os
@@ -101,13 +101,13 @@ def kind_for(filename):
         return "normal"
     if any(k in f for k in ("_arm", "rough", "_r.png", "flatarm")):
         return "linear"
-    if any(k in f for k in ("alpha", "wearmask", "t_wisp", "inknoise")):
+    if any(k in f for k in ("alpha", "wearmask", "t_wisp", "inknoise", "furstrands")):
         return "linear"  # single-channel maps are sampled as Masks everywhere
     return "color"
 
 
-def import_textures():
-    for set_dir in sorted(glob.glob(os.path.join(LIB, "Textures", "polyhaven", "*"))):
+def import_textures(polyhaven=True):
+    for set_dir in sorted(glob.glob(os.path.join(LIB, "Textures", "polyhaven", "*"))) if polyhaven else []:
         sid = os.path.basename(set_dir)
         for f in sorted(glob.glob(os.path.join(set_dir, "*.jpg"))):
             mp = os.path.basename(f).replace(sid + "_", "").rsplit("_", 1)[0]  # diff / nor_dx / arm
@@ -157,6 +157,8 @@ if want("audio"):
     import_audio()
 if want("textures"):
     import_textures()
+elif "gentex" in ONLY:
+    import_textures(polyhaven=False)
 if want("cat"):
     import_cat()
 if want("models"):

@@ -288,6 +288,19 @@ def utility():
     streak = (streak - streak.min()) / (streak.max() - streak.min())
     save(height_to_normal(streak, 2.2), "T_FurNormal")
     save(tile_noise(512, 5, 0.6, 2, seed=44), "T_InkNoise")
+    # Fur shells: tileable strand map. R = strand length (0..1) with a tapered round cross-section, 0 between strands;
+    # a shell at height h keeps the texels whose strand is longer than h, so strands thin out toward the tips.
+    W = 512
+    fur = np.zeros((W, W))
+    oy, ox = np.mgrid[-3:4, -3:4]
+    rr = np.sqrt(ox ** 2 + oy ** 2)
+    for _ in range(11000):
+        cx, cy = rng.integers(0, W, 2)
+        length = rng.uniform(0.4, 1.0)
+        prof = np.clip(1 - rr / rng.uniform(1.3, 2.6), 0, 1) ** 0.7
+        ys_, xs_ = (cy + oy) % W, (cx + ox) % W
+        fur[ys_, xs_] = np.maximum(fur[ys_, xs_], length * prof)
+    save(fur, "T_FurStrands")
     # Neutral defaults for materials whose maps are optional.
     flat = np.zeros((16, 16, 3), np.uint8)
     flat[..., 0], flat[..., 1], flat[..., 2] = 255, 190, 0

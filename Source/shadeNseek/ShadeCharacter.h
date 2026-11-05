@@ -88,13 +88,13 @@ public:
 	USpringArmComponent* GetBoom() const { return CameraBoom; }
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float WalkSpeed = 330.f;
+	float WalkSpeed = 135.f;
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float SprintSpeed = 560.f;
+	float SprintSpeed = 300.f;
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float PushSpeed = 120.f;
+	float PushSpeed = 95.f;
 
 	/** Seconds of full exposure until Shade evaporates. */
 	UPROPERTY(EditAnywhere, Category = "Shade")
@@ -142,6 +142,12 @@ protected:
 	TObjectPtr<UMaterialInstanceDynamic> EyeMID;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WhiskerMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ShellMID;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UAudioComponent> SizzleAudio;
 
 	TArray<FShadeWisp> Wisps;
@@ -158,6 +164,7 @@ protected:
 	bool bControlEnabled = false;
 	bool bSprint = false;
 	bool bInvulnerable = false;
+	float JumpWindup = 0.f;
 
 	// Sun
 	float Exposure = 0.f;

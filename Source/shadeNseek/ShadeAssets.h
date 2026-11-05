@@ -25,6 +25,11 @@ namespace ShadeAssets
 
 	/** Creates a dynamic instance of the named material (or of the slot's current material) on the given slot. */
 	SHADENSEEK_API UMaterialInstanceDynamic* MakeMID(UPrimitiveComponent* Comp, int32 Slot = 0, const TCHAR* MaterialName = nullptr);
+	/**
+	 * Cat mesh slots (M_CatBody 0, M_CatEye 1, M_CatWhisker 2, M_CatShell 3): puts a dynamic instance of the named
+	 * material on the slot imported under SlotName (falls back to the authored index).
+	 */
+	SHADENSEEK_API UMaterialInstanceDynamic* SetCatMaterial(UPrimitiveComponent* Comp, const TCHAR* SlotName, int32 Fallback, const TCHAR* MaterialName);
 
 	SHADENSEEK_API void Play2D(const UObject* WorldContext, const TCHAR* Name, float Volume = 1.f, float Pitch = 1.f);
 	SHADENSEEK_API void PlayAt(const UObject* WorldContext, const TCHAR* Name, const FVector& Location, float Volume = 1.f, float Pitch = 1.f);

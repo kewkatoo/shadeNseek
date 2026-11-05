@@ -304,6 +304,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAudioComponent> Purr;
 
+	UPROPERTY(Transient)
+	TObjectPtr<class UMaterialInstanceDynamic> EyeMID;
+
 	bool bAwake = false;
 	float WakeTime = 0.f;
 	float PurrTarget = 0.f;

@@ -63,6 +63,24 @@ UMaterialInstanceDynamic* ShadeAssets::MakeMID(UPrimitiveComponent* Comp, int32 
 	return MID;
 }
 
+UMaterialInstanceDynamic* ShadeAssets::SetCatMaterial(UPrimitiveComponent* Comp, const TCHAR* SlotName, int32 Fallback, const TCHAR* MaterialName)
+{
+	if (!Comp)
+	{
+		return nullptr;
+	}
+	int32 Slot = Comp->GetMaterialIndex(FName(SlotName));
+	if (Slot == INDEX_NONE)
+	{
+		Slot = Fallback;
+	}
+	if (Slot < 0 || Slot >= Comp->GetNumMaterials())
+	{
+		return nullptr;
+	}
+	return MakeMID(Comp, Slot, MaterialName);
+}
+
 void ShadeAssets::Play2D(const UObject* WorldContext, const TCHAR* Name, float Volume, float Pitch)
 {
 	if (USoundBase* S = Sound(Name))

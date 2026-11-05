@@ -504,12 +504,20 @@ void AShadeNapCat::BeginPlay()
 	{
 		Mesh->SetSkinnedAssetAndUpdate(ShadeAssets::Skeletal(TEXT("SK_Cat")));
 	}
-	Mesh->SetMaterial(0, ShadeAssets::Material(TEXT("MI_CatFur")));
-	Mesh->SetMaterial(1, ShadeAssets::Material(TEXT("MI_CatEye")));
-	if (UMaterialInstanceDynamic* MID = ShadeAssets::MakeMID(Mesh, 0))
+	for (UMaterialInstanceDynamic* MID : { ShadeAssets::SetCatMaterial(Mesh, TEXT("M_CatBody"), 0, TEXT("MI_CatFur")),
+										   ShadeAssets::SetCatMaterial(Mesh, TEXT("M_CatShell"), 3, TEXT("MI_CatShell")) })
 	{
-		MID->SetVectorParameterValue(TEXT("CoatTint"), CoatTint);
-		MID->SetScalarParameterValue(TEXT("CoatDark"), CoatDark);
+		if (MID)
+		{
+			MID->SetVectorParameterValue(TEXT("CoatTint"), CoatTint);
+			MID->SetScalarParameterValue(TEXT("CoatDark"), CoatDark);
+		}
+	}
+	EyeMID = ShadeAssets::SetCatMaterial(Mesh, TEXT("M_CatEye"), 1, TEXT("MI_CatEye"));
+	ShadeAssets::SetCatMaterial(Mesh, TEXT("M_CatWhisker"), 2, TEXT("MI_CatWhisker"));
+	if (EyeMID)
+	{
+		EyeMID->SetVectorParameterValue(TEXT("LidColor"), CoatTint * FLinearColor(0.6f, 0.26f, 0.075f) * (1.f - 0.82f * CoatDark));
 	}
 	Rig->Init(Mesh);
 	Mesh->SetRelativeRotation(FRotator(0.f, Rig->GetFacingYaw(), 0.f));
@@ -580,6 +588,10 @@ void AShadeNapCat::Tick(float DeltaSeconds)
 		}
 	}
 	PurrLevel = ShadeEase::Approach(PurrLevel, PurrTarget, 2.f, Dt);
+	if (EyeMID)
+	{
+		EyeMID->SetScalarParameterValue(TEXT("Lid"), Rig->GetEyeLid());
+	}
 	if (Purr)
 	{
 		// Purr swells with each breath.

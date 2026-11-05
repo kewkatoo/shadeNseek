@@ -46,11 +46,11 @@ AShadeCharacter::AShadeCharacter()
 
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	Move->bOrientRotationToMovement = true;
-	Move->RotationRate = FRotator(0.f, 620.f, 0.f);
+	Move->RotationRate = FRotator(0.f, 360.f, 0.f);
 	Move->MaxWalkSpeed = WalkSpeed;
-	Move->MaxAcceleration = 1700.f;
-	Move->BrakingDecelerationWalking = 1500.f;
-	Move->GroundFriction = 9.f;
+	Move->MaxAcceleration = 720.f;
+	Move->BrakingDecelerationWalking = 950.f;
+	Move->GroundFriction = 7.f;
 	Move->JumpZVelocity = 560.f;
 	Move->AirControl = 0.65f;
 	Move->MaxStepHeight = 26.f;
@@ -87,9 +87,9 @@ AShadeCharacter::AShadeCharacter()
 	EyeLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("EyeLight"));
 	EyeLight->SetupAttachment(Body);
 	EyeLight->SetIntensityUnits(ELightUnits::Lumens);
-	EyeLight->SetIntensity(2.5f);
+	EyeLight->SetIntensity(0.4f);
 	EyeLight->SetLightColor(FLinearColor(1.f, 0.62f, 0.2f));
-	EyeLight->SetAttenuationRadius(34.f);
+	EyeLight->SetAttenuationRadius(26.f);
 	EyeLight->SetCastShadows(false);
 	EyeLight->SetSourceRadius(2.f);
 }
@@ -108,10 +108,10 @@ void AShadeCharacter::BeginPlay()
 	{
 		Body->SetSkinnedAssetAndUpdate(Cat);
 	}
-	Body->SetMaterial(0, ShadeAssets::Material(TEXT("M_ShadeBody")));
-	Body->SetMaterial(1, ShadeAssets::Material(TEXT("M_ShadeEye")));
-	BodyMID = ShadeAssets::MakeMID(Body, 0);
-	EyeMID = ShadeAssets::MakeMID(Body, 1);
+	BodyMID = ShadeAssets::SetCatMaterial(Body, TEXT("M_CatBody"), 0, TEXT("M_ShadeBody"));
+	EyeMID = ShadeAssets::SetCatMaterial(Body, TEXT("M_CatEye"), 1, TEXT("M_ShadeEye"));
+	WhiskerMID = ShadeAssets::SetCatMaterial(Body, TEXT("M_CatWhisker"), 2, TEXT("M_ShadeWhisker"));
+	ShellMID = ShadeAssets::SetCatMaterial(Body, TEXT("M_CatShell"), 3, TEXT("M_ShadeShell"));
 	Rig->Init(Body);
 	Rig->MeshScale = GMeshScale;
 	Rig->Excitement = 0.55f;
@@ -125,7 +125,7 @@ void AShadeCharacter::BeginPlay()
 	Rig->OnFootPlant = [this](int32 Leg)
 	{
 		const float Sp = GetVelocity().Size2D();
-		ShadeAssets::PlayVariantAt(this, TEXT("SFX_Paw"), 6, GetActorLocation() - FVector(0, 0, GCapsuleHalf), FMath::Clamp(Sp / 500.f, 0.12f, 0.5f), 0.1f);
+		ShadeAssets::PlayVariantAt(this, TEXT("SFX_Paw"), 6, GetActorLocation() - FVector(0, 0, GCapsuleHalf), FMath::Clamp(Sp / 300.f, 0.15f, 0.5f), 0.1f);
 	};
 
 	UStaticMesh* Quad = ShadeAssets::Mesh(TEXT("SM_WispQuad"));
@@ -200,7 +200,11 @@ void AShadeCharacter::JumpInput()
 	{
 		return;
 	}
-	Jump();
+	// Cats gather themselves before they spring: a short crouch, then the jump.
+	if (JumpWindup <= 0.f && !GetCharacterMovement()->IsFalling())
+	{
+		JumpWindup = 0.11f;
+	}
 }
 
 void AShadeCharacter::SetSprint(bool bInSprint)
@@ -310,6 +314,14 @@ void AShadeCharacter::Tick(float DeltaSeconds)
 	NoiseTime += Dt;
 
 	GetCharacterMovement()->MaxWalkSpeed = (bSprint && !Grabbed.IsValid()) ? SprintSpeed : WalkSpeed;
+	if (JumpWindup > 0.f)
+	{
+		JumpWindup -= Dt;
+		if (JumpWindup <= 0.f && bControlEnabled && EvapState == 0)
+		{
+			Jump();
+		}
+	}
 
 	UpdateGrab(Dt);
 	UpdateHold(Dt);
@@ -443,6 +455,7 @@ void AShadeCharacter::UpdateEvaporation(float Dt)
 			}
 			SetActorLocation(Best.Loc, false, nullptr, ETeleportType::TeleportPhysics);
 			SetActorRotation(Best.Rot);
+			Rig->ResetDynamics();
 			if (AController* C = GetController())
 			{
 				C->SetControlRotation(FRotator(-14.f, Best.Rot.Yaw, 0.f));
@@ -588,11 +601,11 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 	const float TurnRate = FMath::FindDeltaAngleDegrees(LastYaw, Yaw) / FMath::Max(Dt, 1e-4f);
 	LastYaw = Yaw;
 
-	Rig->Speed = V.Size2D();
+	Rig->Velocity = V;
 	Rig->TurnRate = TurnRate;
 	Rig->bGrounded = !GetCharacterMovement()->IsFalling();
-	Rig->VerticalSpeed = V.Z;
-	Rig->Excitement = FMath::Lerp(0.55f, 0.1f, Exposure);
+	Rig->Excitement = FMath::Lerp(0.6f, 0.05f, Exposure);
+	Rig->Crouch = JumpWindup > 0.f ? 1.f : 0.f;
 	if (AShadeInteractable* F = Focused.Get())
 	{
 		Rig->bHasLook = true;
@@ -605,20 +618,24 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 
 	// Body material: ember edges while burning, dissolve while evaporating or merging.
 	const float Pulse = 0.5f + 0.5f * FMath::Sin(NoiseTime * 2.2f);
-	if (BodyMID)
+	const float Dissolve = FMath::Max(EvapAlpha, MergeAlpha * 0.9f);
+	for (UMaterialInstanceDynamic* MID : { BodyMID.Get(), ShellMID.Get(), WhiskerMID.Get() })
 	{
-		BodyMID->SetScalarParameterValue(TEXT("Burn"), Exposure);
-		BodyMID->SetScalarParameterValue(TEXT("Dissolve"), FMath::Max(EvapAlpha, MergeAlpha * 0.9f));
-		BodyMID->SetScalarParameterValue(TEXT("Pulse"), Pulse);
-		// Eyes share the body section (vertex alpha); they flare white-hot as Shade burns.
-		BodyMID->SetScalarParameterValue(TEXT("EyeGlow"), (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 1.5f * Exposure));
+		if (MID)
+		{
+			MID->SetScalarParameterValue(TEXT("Burn"), Exposure);
+			MID->SetScalarParameterValue(TEXT("Dissolve"), Dissolve);
+			MID->SetScalarParameterValue(TEXT("Pulse"), Pulse);
+		}
 	}
 	if (EyeMID)
 	{
+		// The eyes flare white-hot as Shade burns, and blink.
 		EyeMID->SetScalarParameterValue(TEXT("Glow"), (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 1.5f * Exposure));
 		EyeMID->SetScalarParameterValue(TEXT("Burn"), Exposure);
+		EyeMID->SetScalarParameterValue(TEXT("Lid"), FMath::Max(Rig->GetEyeLid(), Exposure > 0.6f ? 0.45f : 0.f));
 	}
-	EyeLight->SetIntensity(2.5f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 2.f * Exposure));
+	EyeLight->SetIntensity(0.4f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 3.f * Exposure));
 	EyeLight->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.62f, 0.2f), FLinearColor(1.f, 0.9f, 0.7f), Exposure));
 
 	// Squash into the ground while evaporating; pour flat while merging.
@@ -738,6 +755,9 @@ void AShadeCharacter::UpdateCamera(float Dt)
 	// Pull the camera in a touch while pushing / tugging so the interaction reads.
 	const float WantArm = (Grabbed.IsValid() || HoldTarget.IsValid()) ? 270.f : 300.f;
 	CameraBoom->TargetArmLength = ShadeEase::Approach(CameraBoom->TargetArmLength, WantArm, 3.f, Dt);
+	// Keep the (gentle) depth of field focused on Shade however far the boom is pushed in.
+	FollowCamera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = true;
+	FollowCamera->PostProcessSettings.DepthOfFieldFocalDistance = FMath::Max(60.f, FVector::Dist(FollowCamera->GetComponentLocation(), GetActorLocation()));
 }
 
 void AShadeCharacter::Landed(const FHitResult& Hit)

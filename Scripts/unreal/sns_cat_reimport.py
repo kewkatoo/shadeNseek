@@ -1,4 +1,7 @@
-"""Re-import SK_Cat with the legacy FBX importer so its baked tabby vertex colours are kept (Interchange drops them)."""
+"""Re-import SK_Cat with the legacy FBX importer so its baked tabby vertex colours are kept (Interchange drops them).
+
+Materials are imported as placeholders only so the four sections keep their slot names
+(M_CatBody, M_CatEye, M_CatWhisker, M_CatShell); the game assigns the real materials by slot name."""
 import os
 
 import unreal
@@ -15,7 +18,7 @@ def log(*a):
 
 
 unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
-for n in ("SK_Cat", "SK_Cat_PhysicsAsset", "SK_Cat_Skeleton", "M_CatBody", "M_CatEye"):
+for n in ("SK_Cat", "SK_Cat_PhysicsAsset", "SK_Cat_Skeleton", "M_CatBody", "M_CatEye", "M_CatWhisker", "M_CatShell"):
     p = f"{DEST}/{n}"
     if eal.does_asset_exist(p):
         log("delete", n, eal.delete_asset(p))
@@ -26,7 +29,7 @@ ui.set_editor_property("import_as_skeletal", True)
 ui.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
 ui.set_editor_property("import_animations", False)
 ui.set_editor_property("create_physics_asset", False)
-ui.set_editor_property("import_materials", False)
+ui.set_editor_property("import_materials", True)
 ui.set_editor_property("import_textures", False)
 sk = ui.get_editor_property("skeletal_mesh_import_data")
 sk.set_editor_property("vertex_color_import_option", unreal.VertexColorImportOption.REPLACE)
@@ -47,5 +50,7 @@ log("imported", list(task.imported_object_paths or []))
 m = eal.load_asset(f"{DEST}/SK_Cat")
 if m:
     log("bones", m.get_editor_property("skeleton").get_name() if m.get_editor_property("skeleton") else None)
+    log("slots", [str(x.get_editor_property("material_slot_name")) for x in m.get_editor_property("materials")])
+    log("bounds", m.get_bounds().box_extent if hasattr(m, "get_bounds") else "?")
 eal.save_directory(DEST, only_if_is_dirty=True, recursive=True)
 log("ALL DONE")
