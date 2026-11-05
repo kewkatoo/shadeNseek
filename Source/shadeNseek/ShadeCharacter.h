@@ -185,7 +185,7 @@ protected:
 	float LastYaw = 0.f;
 	float WispTimer = 0.f;
 	float SmokeTimer = 0.f;
-	float BaseFOV = 74.f;
+	float BaseFOV = 78.f;
 	float CamPitchHelp = 0.f;
 	float LookIdle = 0.f;
 };

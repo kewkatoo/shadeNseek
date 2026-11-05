@@ -188,7 +188,8 @@ void UShadeAutoplayComponent::DriveToward(const FVector& Target, float Dt, bool 
 	const float Mag = FMath::Clamp(To.Size2D() / 80.f, 0.35f, 1.f);
 	S->SetSprint(bSprint);
 	S->MoveInput(FVector2D(FVector::DotProduct(Dir, Right), FVector::DotProduct(Dir, Fwd)) * Mag);
-	SteerCamera(Target + Dir * 300.f, Dt, 2.2f, -14.f);
+	// Look where we're going, a touch above the horizon so the sunlit upper facades stay in frame.
+	SteerCamera(Target + Dir * 400.f + FVector(0.f, 0.f, 60.f), Dt, 2.0f, 1.f);
 }
 
 void UShadeAutoplayComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -240,6 +241,17 @@ void UShadeAutoplayComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		}
 		if (S->IsEvaporating())
 		{
+			break;
+		}
+		if (!bStepStarted)
+		{
+			bStepStarted = true;
+			StepEvaporations = S->GetEvaporations();
+		}
+		if (S->GetEvaporations() - StepEvaporations >= 2)
+		{
+			UE_LOG(LogShade, Warning, TEXT("SHADE_AP burnt twice on the way to %s, skipping"), *St.Tag.ToString());
+			NextStep();
 			break;
 		}
 		const FVector Target = T->GetActorLocation();

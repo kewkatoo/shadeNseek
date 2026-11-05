@@ -174,6 +174,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Awning")
 	float StartExtension = 0.06f;
 
+	/** Where Shade stands to tug, relative to the cord handle (actor space). */
+	UPROPERTY(EditAnywhere, Category = "Awning")
+	FVector InteractOffset = FVector(30.f, 0.f, 0.f);
+
+	UPROPERTY(EditAnywhere, Category = "Awning")
+	bool bShowArms = true;
+
 	UPROPERTY(VisibleAnywhere, Category = "Awning")
 	TObjectPtr<UStaticMeshComponent> Roller;
 

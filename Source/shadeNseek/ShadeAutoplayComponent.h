@@ -70,4 +70,5 @@ private:
 	FVector LastProgressPos = FVector::ZeroVector;
 	float StuckTimer = 0.f;
 	int32 StuckJumps = 0;
+	int32 StepEvaporations = 0;
 };

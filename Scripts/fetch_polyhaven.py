@@ -1,4 +1,4 @@
-"""Download the CC0 Poly Haven sources used by Shade and Seek into asset-library/.
+﻿"""Download the CC0 Poly Haven sources used by Shade and Seek into asset-library/.
 
 Every Poly Haven asset is CC0 1.0 (public domain, no attribution needed, no AI/redistribution restriction).
 We still record source URL + author per asset in asset-library/CREDITS.md and manifest.json.
@@ -24,7 +24,7 @@ TEXTURES = {
     "clay_roof_tiles_02": "2k", "cobblestone_floor_08": "2k", "grey_stone_path": "2k", "stone_pathway": "2k",
     "rustic_stone_wall": "2k", "stacked_stone_wall": "2k", "terracotta_floor_tiles": "2k",
     "blue_painted_planks": "2k", "distressed_painted_planks": "2k", "weathered_planks": "2k",
-    "fabric_pattern_07": "1k", "fabric_pattern_05": "1k", "terry_cloth": "1k", "coast_sand_01": "2k",
+    "fabric_pattern_07": "1k", "terry_cloth": "1k", "coast_sand_01": "2k",
     "marble_cliff_02": "2k",
 }
 TEX_MAPS = ["Diffuse", "nor_dx", "arm"]
@@ -80,9 +80,13 @@ def jobs_for_texture(tid, res):
     files = get_json(f"{API}/files/{tid}")
     out = []
     for m in TEX_MAPS:
-        e = files.get(m, {}).get(res, {}).get("jpg")
+        key = m if m in files else ("col_1" if m == "Diffuse" and "col_1" in files else m)
+        e = files.get(key, {}).get(res, {}).get("jpg")
         if e:
-            out.append((e["url"], os.path.join(LIB, "Textures", "polyhaven", tid, os.path.basename(e["url"])), e.get("md5")))
+            name = os.path.basename(e["url"])
+            if key != m:  # patterned fabrics ship colourways (col_1..); we use col_1 as the diffuse
+                name = f"{tid}_diff_{res}.jpg"
+            out.append((e["url"], os.path.join(LIB, "Textures", "polyhaven", tid, name), e.get("md5")))
     return out
 
 

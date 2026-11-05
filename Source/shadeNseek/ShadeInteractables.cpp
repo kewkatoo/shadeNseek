@@ -271,12 +271,14 @@ void AShadeAwning::BeginPlay()
 	DefaultMesh(Cord, TEXT("SM_Cord"));
 	DefaultMesh(Handle, TEXT("SM_CordHandle"));
 	Extension = StartExtension;
+	ArmL->SetVisibility(bShowArms);
+	ArmR->SetVisibility(bShowArms);
 	UpdateGeometry();
 }
 
 FVector AShadeAwning::GetInteractLocation() const
 {
-	return GetActorTransform().TransformPosition(FVector(CordLocal.X + 30.f, CordLocal.Y, CordLocal.Z));
+	return GetActorTransform().TransformPosition(CordLocal + InteractOffset);
 }
 
 FVector AShadeAwning::GetFocusLocation() const

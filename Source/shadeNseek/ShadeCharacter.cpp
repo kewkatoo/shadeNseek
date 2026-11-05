@@ -60,9 +60,9 @@ AShadeCharacter::AShadeCharacter()
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 285.f;
-	CameraBoom->SocketOffset = FVector(0.f, 0.f, 42.f);
-	CameraBoom->TargetOffset = FVector(0.f, 0.f, 18.f);
+	CameraBoom->TargetArmLength = 300.f;
+	CameraBoom->SocketOffset = FVector(0.f, 0.f, 58.f);
+	CameraBoom->TargetOffset = FVector(0.f, 0.f, 22.f);
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 9.f;
@@ -87,9 +87,9 @@ AShadeCharacter::AShadeCharacter()
 	EyeLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("EyeLight"));
 	EyeLight->SetupAttachment(Body);
 	EyeLight->SetIntensityUnits(ELightUnits::Lumens);
-	EyeLight->SetIntensity(18.f);
+	EyeLight->SetIntensity(5.f);
 	EyeLight->SetLightColor(FLinearColor(1.f, 0.62f, 0.2f));
-	EyeLight->SetAttenuationRadius(70.f);
+	EyeLight->SetAttenuationRadius(48.f);
 	EyeLight->SetCastShadows(false);
 	EyeLight->SetSourceRadius(2.f);
 }
@@ -616,7 +616,7 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 		EyeMID->SetScalarParameterValue(TEXT("Glow"), (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 1.5f * Exposure));
 		EyeMID->SetScalarParameterValue(TEXT("Burn"), Exposure);
 	}
-	EyeLight->SetIntensity(18.f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 2.f * Exposure));
+	EyeLight->SetIntensity(5.f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 2.f * Exposure));
 	EyeLight->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.62f, 0.2f), FLinearColor(1.f, 0.9f, 0.7f), Exposure));
 
 	// Squash into the ground while evaporating; pour flat while merging.
@@ -733,7 +733,7 @@ void AShadeCharacter::UpdateCamera(float Dt)
 	const float SprintFov = FMath::Clamp((Sp - WalkSpeed) / (SprintSpeed - WalkSpeed), 0.f, 1.f) * 6.f;
 	FollowCamera->SetFieldOfView(ShadeEase::Approach(FollowCamera->FieldOfView, BaseFOV + SprintFov - 3.f * Exposure, 4.f, Dt));
 	// Pull the camera in a touch while pushing / tugging so the interaction reads.
-	const float WantArm = (Grabbed.IsValid() || HoldTarget.IsValid()) ? 250.f : 285.f;
+	const float WantArm = (Grabbed.IsValid() || HoldTarget.IsValid()) ? 270.f : 300.f;
 	CameraBoom->TargetArmLength = ShadeEase::Approach(CameraBoom->TargetArmLength, WantArm, 3.f, Dt);
 }
 
