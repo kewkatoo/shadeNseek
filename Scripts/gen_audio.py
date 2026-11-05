@@ -1,8 +1,9 @@
 """Procedural sound design + music for Shade and Seek.
 
 Every sound effect, ambience and the score are synthesised here from scratch (no samples, no third-party audio), so
-the audio is original and licence-free. Plucked strings use Karplus-Strong via scipy.lfilter (fast), the accordion
-is a musette-tuned reed model, bells are inharmonic partial stacks.
+the audio is original and licence-free. The score is a slow ambient piece: an additive felt-piano model, detuned
+bowed-string ensembles, a distant demi-musette accordion, a breathy flute and celesta. Bells are inharmonic partial
+stacks; Karplus-Strong is only used for small wood/foley sounds.
 
 Output: 48 kHz 16-bit WAV (stereo for music/ambience, mono for 3D SFX) into asset-library/Audio/generated/.
 Run:  python -I Scripts/gen_audio.py <output_dir>
@@ -271,49 +272,132 @@ def shaker(vel=0.3):
 
 
 # =====================================================================================================================
-# Score: an original waltz in G major, 3/4, 96 bpm (6 eighths per bar)
+# Score: "Vellara, late afternoon" - slow Mediterranean ambient in D major, 62 bpm, 4/4.
+# Felt piano, a warm string pad, a cafÃ© accordion heard from down the lane, a soft wooden flute and celesta glints.
+# No plucked strings, no percussion, nothing modal/exotic: diatonic major-seventh and add9 harmony throughout.
 # =====================================================================================================================
-BPM = 96.0
-EIGHTH = 60.0 / BPM / 2.0
-BAR = EIGHTH * 6
+BPM = 62.0
+BEAT = 60.0 / BPM
+BAR = BEAT * 4
 
-CHORDS = {
-    "G": [43, 50, 55, 59, 62], "Em": [40, 47, 52, 55, 59], "C": [48, 55, 60, 64, 67], "D": [50, 57, 62, 66, 69],
-    "Am": [45, 52, 57, 60, 64], "D7": [50, 57, 60, 66, 69], "A7": [45, 52, 55, 61, 64], "GB": [47, 50, 55, 59, 62],
-    "B7": [47, 54, 57, 63, 66], "Am7": [45, 52, 55, 60, 64],
-}
-N = {"G4": 67, "A4": 69, "B4": 71, "C5": 72, "C#5": 73, "D5": 74, "E5": 76, "F#5": 78, "G5": 79, "A5": 81, "F#4": 66}
 
-A_CHORDS = ["G", "Em", "C", "D", "G", "Em", ("Am", "D7"), "G"]
-B_CHORDS = ["C", "G", "A7", "D", "C", "GB", ("Am7", "D7"), "G"]
-# (note, start eighth within bar, duration in eighths) per bar
-A_MEL = [
-    [("D5", 0, 2), ("B4", 2, 2), ("G4", 4, 2)],
-    [("E5", 0, 3), ("D5", 3, 1), ("B4", 4, 2)],
-    [("C5", 0, 2), ("E5", 2, 2), ("G5", 4, 2)],
-    [("F#5", 0, 4), ("E5", 4, 1), ("D5", 5, 1)],
-    [("D5", 0, 2), ("B4", 2, 2), ("D5", 4, 2)],
-    [("G5", 0, 3), ("F#5", 3, 1), ("E5", 4, 2)],
-    [("C5", 0, 2), ("E5", 2, 1), ("D5", 3, 1), ("A4", 4, 2)],
-    [("G4", 0, 6)],
-]
-B_MEL = [
-    [("E5", 0, 2), ("G5", 2, 2), ("E5", 4, 2)],
-    [("D5", 0, 3), ("B4", 3, 1), ("G4", 4, 2)],
-    [("C#5", 0, 2), ("E5", 2, 2), ("G5", 4, 2)],
-    [("F#5", 0, 6)],
-    [("G5", 0, 2), ("E5", 2, 2), ("C5", 4, 2)],
-    [("D5", 0, 3), ("B4", 3, 1), ("D5", 4, 2)],
-    [("C5", 0, 2), ("A4", 2, 1), ("B4", 3, 1), ("C5", 4, 1), ("A4", 5, 1)],
-    [("G4", 0, 4), ("B4", 4, 1), ("D5", 5, 1)],
-]
+def piano(freq, dur, vel=0.4, release=0.5):
+    """Felt piano: three detuned strings, stiff-string partials, two-stage decay, muffled hammer, damper on release."""
+    ring = dur + release
+    n = n_of(ring + 0.05)
+    t = np.arange(n) / SR
+    B = 0.00022 * (freq / 261.6) ** 0.7
+    cutoff = 1500 + 3800 * vel
+    tau = 3.4 * (261.6 / freq) ** 0.5
+    out = np.zeros(n)
+    for k in range(1, 30):
+        fk = k * freq * np.sqrt(1 + B * k * k)
+        if fk > 8000:
+            break
+        amp = (1.0 / k ** 1.05) * np.exp(-fk / cutoff) * (0.25 if k % 8 == 0 else 1.0)
+        if amp < 0.0015:
+            break
+        tk = tau / (1 + 0.45 * (k - 1))
+        dec = 0.6 * np.exp(-t / (tk * 0.16)) + 0.4 * np.exp(-t / tk)
+        for det in (-0.45, 0.05, 0.5):
+            out += amp * dec * np.sin(2 * np.pi * fk * 2 ** (det / 1200) * t + RNG.uniform(0, 2 * np.pi))
+    out /= 3
+    ri = n_of(dur)
+    if ri < n:
+        out[ri:] *= np.exp(-(t[ri:] - dur) / (release * 0.35))
+    thump = lp(noise(0.04), 220 + 500 * vel) * env_exp(n_of(0.04), 0.008)
+    out[: len(thump)] += thump * 0.12 * vel
+    felt = lp(noise(0.02), 2500) * env_exp(n_of(0.02), 0.003) * 0.02
+    out[: len(felt)] += felt
+    return out * env_ar(n, 0.003, 0.06) * vel
+
+
+def saw_voice(freq, n, bright, vib_rate, vib_depth=0.0022):
+    t = np.arange(n) / SR
+    f = freq * (1 + vib_depth * np.sin(2 * np.pi * vib_rate * t + RNG.uniform(0, 6)))
+    ph = 2 * np.pi * np.cumsum(f) / SR + RNG.uniform(0, 6)
+    x = np.zeros(n)
+    k = 1
+    while k * freq < bright * 3 and k < 40:
+        x += np.sin(k * ph) / k * np.exp(-(k * freq) / bright)
+        k += 1
+    return x
+
+
+def string_pad(freqs, dur, vel=0.35, attack=1.8, release=2.6, bright=2300):
+    """Ensemble strings: three detuned bowed voices per note spread across the stereo field, slow swell."""
+    n = n_of(dur + release)
+    L = np.zeros(n)
+    R = np.zeros(n)
+    for f in freqs:
+        for det, pan in ((-6.0, -0.7), (0.0, 0.0), (5.0, 0.7)):
+            x = saw_voice(f * 2 ** (det / 1200), n, bright, RNG.uniform(4.3, 5.2))
+            L += x * np.cos((pan + 1) * np.pi / 4)
+            R += x * np.sin((pan + 1) * np.pi / 4)
+    e = env_ar(n, attack, release) ** 1.5
+    sw = 0.85 + 0.15 * np.sin(np.linspace(0, np.pi, n))
+    g = vel / (len(freqs) * 3) * e * sw
+    return lp(hp(L * g, 140), bright * 1.8), lp(hp(R * g, 140), bright * 1.8)
+
+
+def cello(freq, dur, vel=0.4):
+    """Soft bowed bass: sine-rich low voice with a slow bow swell."""
+    n = n_of(dur + 1.5)
+    t = np.arange(n) / SR
+    f = freq * (1 + 0.002 * np.sin(2 * np.pi * 4.8 * t))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    x = np.sin(ph) + 0.45 * np.sin(2 * ph) + 0.2 * np.sin(3 * ph) + 0.08 * np.sin(4 * ph)
+    return lp(x, 700) * env_ar(n, 1.1, 1.5) ** 1.3 * vel
+
+
+def flute(freq, dur, vel=0.4):
+    """Wooden flute: near-sine tone, breath, delayed vibrato."""
+    n = n_of(dur + 0.45)
+    t = np.arange(n) / SR
+    vd = 0.0045 * np.clip((t - 0.3) / 0.6, 0, 1)
+    f = freq * (1 + vd * np.sin(2 * np.pi * 4.9 * t))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    tone = np.sin(ph) + 0.18 * np.sin(2 * ph) + 0.06 * np.sin(3 * ph)
+    breath = bp(noise(dur + 0.45), freq * 0.92, min(freq * 2.6, 9000), 2) * 0.022
+    e = env_ar(n, 0.11, 0.38)
+    e *= 0.9 + 0.1 * np.sin(np.linspace(0, np.pi, n))
+    chiff = bp(noise(0.06), freq * 2, min(freq * 4, 11000)) * env_exp(n_of(0.06), 0.012) * 0.05
+    y = (tone + breath) * e
+    y[: len(chiff)] += chiff
+    return lp(y, 5000) * vel
+
+
+def celesta(freq, dur=2.6, vel=0.25):
+    n = n_of(dur)
+    t = np.arange(n) / SR
+    y = (np.sin(2 * np.pi * freq * t) * np.exp(-t / 1.1) + 0.3 * np.sin(2 * np.pi * freq * 2 * t) * np.exp(-t / 0.45)
+         + 0.1 * np.sin(2 * np.pi * freq * 4.02 * t) * np.exp(-t / 0.18))
+    y[: n_of(0.01)] += bp(noise(0.01), 2000, 8000) * 0.05
+    return y * env_ar(n, 0.001, 0.2) * vel
+
+
+def accordion_far(freqs, dur, vel=0.3):
+    """The cafÃ© accordion down the lane: demi-musette reeds, heavily softened by distance."""
+    n = n_of(dur)
+    t = np.arange(n) / SR
+    out = np.zeros(n)
+    for f in freqs:
+        for cents in (-5.0, 0.0, 6.0):
+            ff = f * 2 ** (cents / 1200)
+            ph = (ff * t + RNG.uniform()) % 1.0
+            out += np.where(ph < 0.35, 1.0, -0.54) * (0.8 if cents == 0 else 0.5)
+    out = lp(out, 1300, 2)
+    out = hp(out, 180, 1)
+    bellows = env_ar(n, 0.9, 1.2) * (0.8 + 0.2 * np.sin(2 * np.pi * 0.21 * t + RNG.uniform(0, 6)))
+    return out * bellows * vel / (len(freqs) * 2.5)
 
 
 def master(x):
-    """Warm, soft top end: gentle low-mid lift, high shelf down, low-pass."""
-    x = peak(x, 240, 0.8, 2.0)
-    x = peak(x, 4500, 0.7, -4.0)
-    return lp(x, 7000, 2)
+    """Warm, soft top end."""
+    x = peak(x, 250, 0.9, -2.0)
+    x = peak(x, 2800, 0.8, 2.5)
+    x = peak(x, 7500, 0.7, -2.0)
+    return lp(x, 12000, 2)
 
 
 class Track:
@@ -323,141 +407,165 @@ class Track:
         self.R = np.zeros(self.n)
 
     def add(self, x, t, pan=0.0, gain=1.0):
-        i = n_of(t)
+        i = n_of(max(t, 0.0))
         if i >= self.n:
             return
         seg = x[: self.n - i] * gain
-        l = np.cos((pan + 1) * np.pi / 4)
-        r = np.sin((pan + 1) * np.pi / 4)
-        self.L[i:i + len(seg)] += seg * l
-        self.R[i:i + len(seg)] += seg * r
+        self.L[i:i + len(seg)] += seg * np.cos((pan + 1) * np.pi / 4)
+        self.R[i:i + len(seg)] += seg * np.sin((pan + 1) * np.pi / 4)
+
+    def add_st(self, L, R, t, gain=1.0):
+        i = n_of(max(t, 0.0))
+        if i >= self.n:
+            return
+        m = min(len(L), self.n - i)
+        self.L[i:i + m] += L[:m] * gain
+        self.R[i:i + m] += R[:m] * gain
 
 
-def bar_chords(entry):
-    return [entry] if isinstance(entry, str) else list(entry)
+# Chords: bass root (MIDI), pad voicing, piano pitch classes.
+CH = {
+    "D":    (38, [57, 61, 64, 66], [2, 6, 9, 1, 4]),        # Dmaj9
+    "G/D":  (38, [55, 59, 62, 66], [7, 11, 2, 6]),          # Gmaj7 over D
+    "Bm9":  (35, [54, 57, 61, 62], [11, 2, 6, 9, 1]),
+    "Gma9": (31, [59, 62, 66, 69], [7, 11, 2, 6, 9]),
+    "Asus": (33, [57, 62, 64, 66], [9, 2, 4, 11]),
+    "A":    (33, [57, 61, 64, 69], [9, 1, 4, 11]),
+    "Em9":  (40, [55, 59, 62, 66], [4, 7, 11, 2, 6]),
+    "F#m7": (42, [57, 61, 64, 69], [6, 9, 1, 4]),
+}
+# (chord, bars)
+PROG = [
+    ("D", 2), ("G/D", 2), ("Bm9", 2), ("Gma9", 1), ("Asus", 0.5), ("A", 0.5),     # A: piano alone over the pad
+    ("Em9", 2), ("F#m7", 2), ("Gma9", 2), ("Asus", 1), ("A", 1),                   # B: the flute sings
+    ("D", 2), ("Bm9", 2), ("Gma9", 2), ("Em9", 1), ("Asus", 0.5), ("A", 0.5),     # C: piano melody, cafÃ© accordion
+]
+# Melodies: (midi, start beat within section, beats)
+FLUTE_B = [(78, 0, 3), (76, 3, 1), (74, 4, 2), (71, 6, 2), (73, 8, 3), (69, 11, 1), (76, 12, 4),
+           (74, 16, 2), (78, 18, 1), (81, 19, 1), (79, 20, 2), (78, 22, 2), (76, 24, 3), (74, 27, 1), (73, 28, 2), (76, 30, 2)]
+PIANO_C = [(81, 0, 1.5), (78, 1.5, 0.5), (76, 2, 1), (74, 3, 1), (78, 4, 4),
+           (74, 8, 1.5), (73, 9.5, 0.5), (71, 10, 1), (78, 11, 1), (76, 12, 4),
+           (71, 16, 1.5), (74, 17.5, 0.5), (78, 18, 1), (81, 19, 1), (79, 20, 2), (78, 22, 2),
+           (76, 24, 2), (71, 26, 2), (73, 28, 2), (69, 30, 1), (76, 31, 1)]
 
 
-def guitar_bar(tr, t0, entry, vel=0.7, pattern="arp"):
-    chords = bar_chords(entry)
-    for half, ch in enumerate(chords):
-        v = CHORDS[ch]
-        span = 6 // len(chords)
-        steps = [0, 2, 3, 4, 3, 2][:span] if len(chords) == 1 else [0, 3, 4][:span]
-        for k, idx in enumerate(steps):
-            t = t0 + (half * span + k) * EIGHTH + RNG.uniform(-0.006, 0.006)
-            f = midi_hz(v[idx])
-            vv = vel * (1.0 if k == 0 else 0.72) * RNG.uniform(0.9, 1.05)
-            tr.add(nylon(f, 2.2 if k == 0 else 1.4, vv), t, pan=-0.25 + 0.08 * idx, gain=0.9)
+def chord_tones(pcs, lo, hi):
+    return sorted(m for m in range(lo, hi + 1) if m % 12 in pcs)
 
 
-def bass_bar(tr, t0, entry, vel=0.7):
-    chords = bar_chords(entry)
-    for half, ch in enumerate(chords):
-        v = CHORDS[ch]
-        root = v[0] - 12 if v[0] >= 45 else v[0]
-        tr.add(pizz_bass(midi_hz(root), 1.3, vel), t0 + half * 3 * EIGHTH, pan=0.0, gain=1.0)
-        if len(chords) == 1:
-            tr.add(pizz_bass(midi_hz(root + 7), 0.9, vel * 0.55), t0 + 4 * EIGHTH, pan=0.0, gain=0.8)
+def piano_arp(tr, t0, beats, pcs, vel, lo=62, hi=79, density=1.0):
+    """Unhurried broken chord with the pedal down until the next chord."""
+    tones = chord_tones(pcs, lo, hi)
+    pattern = [0.0, 1.0, 1.5, 2.5, 3.0] if density >= 1 else [0.0, 1.5, 3.0]
+    order = [0, 2, 3, 4, 3, 2, 1, 3]
+    k = 0
+    b = 0.0
+    while b < beats - 0.01:
+        for pb in pattern:
+            if b + pb >= beats - 0.01:
+                break
+            m = tones[0] if k == 0 else tones[order[k % len(order)] % len(tones)]
+            t = t0 + (b + pb) * BEAT + RNG.uniform(-0.012, 0.018)
+            hold = (beats - b - pb) * BEAT + 0.4
+            v = vel * (1.0 if pb == 0 else 0.78) * RNG.uniform(0.88, 1.05)
+            tr.add(piano(midi_hz(m), hold, v, 0.8), t, pan=-0.3 + 0.6 * (m - lo) / max(1, hi - lo), gain=1.0)
+            k += 1
+        b += 4
 
 
-def melody_bar(tr, t0, notes, vel=0.75, octave=0, tremolo_from=3):
-    for name, st, du in notes:
-        f = midi_hz(N[name] + 12 * octave)
-        t = t0 + st * EIGHTH + RNG.uniform(-0.004, 0.008)
-        dur = du * EIGHTH
-        if du >= tremolo_from:
-            x = mandolin_tremolo(f, dur + 0.05, vel)
-        else:
-            x = mandolin_note(f, dur + 0.6, vel)
-        tr.add(x, t, pan=0.22, gain=1.0)
-
-
-def accordion_bar(tr, t0, entry, vel=0.45):
-    chords = bar_chords(entry)
-    span = BAR / len(chords)
-    for half, ch in enumerate(chords):
-        v = CHORDS[ch]
-        freqs = [midi_hz(m) for m in v[2:5]]
-        tr.add(accordion(freqs, span + 0.25, vel), t0 + half * span, pan=-0.35, gain=1.0)
-
-
-def perc_bar(tr, t0, vel=0.5, shakers=True):
-    tr.add(tambourine(vel * 0.55), t0 + 2 * EIGHTH, pan=0.45)
-    tr.add(tambourine(vel * 0.45), t0 + 4 * EIGHTH, pan=0.45)
-    if shakers:
-        for k in range(6):
-            tr.add(shaker(vel * (0.35 if k % 2 else 0.5)), t0 + k * EIGHTH + 0.01, pan=0.55)
+def render_prog(tr, prog, t_start, *, sections, slow=1.0):
+    """Pad + bass for every chord; sections(i, chord, t, beats, beat) adds the other layers."""
+    t = t_start
+    beat = BEAT * slow
+    for i, (name, bars) in enumerate(prog):
+        bass, pad, pcs = CH[name]
+        beats = bars * 4
+        dur = beats * beat
+        L, R = string_pad([midi_hz(m) for m in pad], dur + 0.4, 0.3, attack=1.4 if bars >= 1 else 0.6, release=2.2)
+        tr.add_st(L, R, t - 0.25)
+        tr.add(cello(midi_hz(bass + 12), dur + 0.2, 0.17), t - 0.1, pan=0.05)
+        tr.add(piano(midi_hz(bass + 12), dur, 0.3, 1.0), t + 0.01, pan=-0.1, gain=0.45)
+        sections(i, name, t, beats, beat)
+        t += dur
+    return t
 
 
 def make_theme():
-    sections = (
-        [("intro", "A", i) for i in range(4)]
-        + [("A1", "A", i) for i in range(8)]
-        + [("A2", "A", i) for i in range(8)]
-        + [("B", "B", i) for i in range(8)]
-        + [("A3", "A", i) for i in range(8)]
-    )
-    total = len(sections) * BAR
-    tr = Track(total + 3.0)
-    for bi, (sec, kind, i) in enumerate(sections):
-        t0 = bi * BAR
-        chords = A_CHORDS if kind == "A" else B_CHORDS
-        entry = chords[i]
-        guitar_bar(tr, t0, entry, 0.62 if sec == "intro" else 0.7)
-        if sec != "intro":
-            bass_bar(tr, t0, entry, 0.65)
-        if sec in ("A1", "A3"):
-            melody_bar(tr, t0, A_MEL[i], 0.72 if sec == "A1" else 0.8)
-        if sec == "A2":
-            # second time: melody up an octave, lighter, glock doubles the downbeats
-            melody_bar(tr, t0, A_MEL[i], 0.55, octave=0)
-            note = A_MEL[i][0]
-            tr.add(bell(midi_hz(N[note[0]] + 12), 2.0, 0.18, 1.1), t0, pan=0.4)
-        if sec == "B":
-            melody_bar(tr, t0, B_MEL[i], 0.78)
-            accordion_bar(tr, t0, entry, 0.5)
-        if sec == "A3":
-            accordion_bar(tr, t0, entry, 0.32)
-        if sec in ("A2", "B", "A3"):
-            perc_bar(tr, t0, 0.5, shakers=sec != "A2")
-        elif sec == "A1" and i >= 4:
-            perc_bar(tr, t0, 0.35, shakers=False)
-    L, R = reverb_stereo(tr.L, tr.R, size=2.2, mix=0.2, damp=3800)
+    total = sum(b for _, b in PROG) * BAR
+    tr = Track(total + 8.0)
+    sec_start = {}
+    acc = 0.0
+    for i, (name, bars) in enumerate(PROG):
+        sec_start[i] = acc
+        acc += bars * BAR
+    tB = sec_start[6]
+    tC = sec_start[11]
+
+    def layers(i, name, t, beats, beat):
+        _, _, pcs = CH[name]
+        if i < 6:
+            piano_arp(tr, t, beats, pcs, 0.46)
+            if i in (1, 3):
+                for j, m in enumerate(chord_tones(pcs, 81, 93)[:3]):
+                    tr.add(celesta(midi_hz(m), 2.6, 0.12), t + (2.5 + j * 0.75) * BEAT, pan=0.45)
+        elif i < 11:
+            piano_arp(tr, t, beats, pcs, 0.26, lo=57, hi=74, density=0.5)
+            if i >= 8:
+                tr.add(accordion_far([midi_hz(m) for m in CH[name][1][1:]], beats * BEAT + 0.6, 0.22), t, pan=-0.55)
+        else:
+            piano_arp(tr, t, beats, pcs, 0.22, lo=55, hi=71, density=0.5)
+            tr.add(accordion_far([midi_hz(m) for m in CH[name][1][1:]], beats * BEAT + 0.6, 0.3), t, pan=-0.55)
+            if i == 13:
+                for j, m in enumerate(chord_tones(pcs, 83, 93)[:4]):
+                    tr.add(celesta(midi_hz(m), 2.6, 0.1), t + (4 + j * 0.5) * BEAT, pan=0.5)
+
+    render_prog(tr, PROG, 0.0, sections=layers)
+    for m, st, du in FLUTE_B:
+        tr.add(flute(midi_hz(m), du * BEAT * 0.98, 0.27), tB + st * BEAT + RNG.uniform(-0.01, 0.02), pan=0.25)
+    for m, st, du in PIANO_C:
+        tr.add(piano(midi_hz(m), du * BEAT + 0.3, 0.62, 0.9), tC + st * BEAT + RNG.uniform(-0.01, 0.02), pan=0.15)
+    L, R = reverb_stereo(tr.L, tr.R, size=3.6, mix=0.34, damp=4200, predelay=0.03)
     L, R = master(L), master(R)
-    # Loop: fold the ringing tail back into the start.
     n = n_of(total)
-    tail = n_of(2.5)
+    tail = n_of(7.0)
     L2, R2 = L[:n].copy(), R[:n].copy()
-    L2[:tail] += L[n:n + tail] * np.linspace(1, 0, tail)
-    R2[:tail] += R[n:n + tail] * np.linspace(1, 0, tail)
-    write("MUS_Theme", L2, R2, 0.8)
+    L2[:tail] += L[n:n + tail]
+    R2[:tail] += R[n:n + tail]
+    write("MUS_Theme", L2, R2, 0.78)
 
 
 def make_reunion():
-    """Tender reprise: melody on tremolo mandolin, held accordion, ends on a ringing G with bells."""
-    slow = 1.18
-    global EIGHTH, BAR
-    e0, b0 = EIGHTH, BAR
-    EIGHTH, BAR = EIGHTH * slow, BAR * slow
-    bars = 8
-    tr = Track(bars * BAR + 6.0)
-    for i in range(bars):
-        t0 = i * BAR
-        entry = A_CHORDS[i]
-        guitar_bar(tr, t0, entry, 0.55)
-        bass_bar(tr, t0, entry, 0.5)
-        accordion_bar(tr, t0, entry, 0.3)
-        melody_bar(tr, t0, A_MEL[i], 0.7, tremolo_from=2)
-    end = bars * BAR
-    for k, m in enumerate([67, 71, 74, 79, 83]):
-        tr.add(bell(midi_hz(m + 12), 4.0, 0.22, 1.8), end - BAR + k * 0.12, pan=-0.3 + 0.15 * k)
-    for m in CHORDS["G"]:
-        tr.add(nylon(midi_hz(m), 4.5, 0.6), end + 0.02 * (m - 43))
-    tr.add(accordion([midi_hz(m) for m in (59, 62, 67)], 4.0, 0.3), end, pan=-0.3)
-    EIGHTH, BAR = e0, b0
-    L, R = reverb_stereo(tr.L, tr.R, size=2.6, mix=0.26, damp=3800)
+    """Tender reprise: the piano melody over the strings, then a long resolving Dmaj9 with celesta."""
+    slow = 1.12
+    prog = [("D", 2), ("Bm9", 2), ("Gma9", 2), ("Asus", 1), ("A", 1)]
+    beat = BEAT * slow
+    total = sum(b for _, b in prog) * 4 * beat
+    tr = Track(total + 14.0)
+
+    def layers(i, name, t, beats, b):
+        _, _, pcs = CH[name]
+        tones = chord_tones(pcs, 55, 71)
+        for bb in range(0, int(beats), 4):
+            for k, pb in enumerate((0.0, 1.5, 3.0)):
+                if bb + pb < beats:
+                    tr.add(piano(midi_hz(tones[(k * 2) % len(tones)]), (beats - bb - pb) * b + 0.4, 0.2, 0.9), t + (bb + pb) * b, pan=-0.2)
+        if i >= 2:
+            tr.add(accordion_far([midi_hz(m) for m in CH[name][1][1:]], beats * b + 0.6, 0.18), t, pan=-0.55)
+
+    render_prog(tr, prog, 0.0, sections=layers, slow=slow)
+    for m, st, du in PIANO_C[:16]:
+        tr.add(piano(midi_hz(m), du * beat + 0.3, 0.6, 0.9), st * beat + RNG.uniform(-0.01, 0.02), pan=0.15)
+    end = total
+    L, R = string_pad([midi_hz(m) for m in (57, 61, 64, 66, 69)], 9.0, 0.34, attack=1.2, release=4.0)
+    tr.add_st(L, R, end - 0.2)
+    tr.add(cello(midi_hz(50), 9.0, 0.18), end - 0.1)
+    for k, m in enumerate((62, 66, 69, 73, 76)):
+        tr.add(piano(midi_hz(m), 8.0, 0.32, 2.0), end + 0.12 * k, pan=-0.3 + 0.15 * k)
+    for k, m in enumerate((81, 85, 88, 90, 93)):
+        tr.add(celesta(midi_hz(m), 3.5, 0.14), end + 1.2 + 0.22 * k, pan=-0.4 + 0.2 * k)
+    L, R = reverb_stereo(tr.L, tr.R, size=4.0, mix=0.38, damp=4000, predelay=0.03)
     L, R = master(L), master(R)
-    write("MUS_Reunion", fade(L, 0.01, 1.5), fade(R, 0.01, 1.5), 0.8)
+    write("MUS_Reunion", fade(L, 0.01, 3.0), fade(R, 0.01, 3.0), 0.78)
 
 
 # =====================================================================================================================
@@ -696,20 +804,20 @@ def make_sfx():
 
     # UI + stingers.
     write("SFX_UI_Move", fade(knock(900, 0.06, 0.2)), peak_level=0.35)
-    write("SFX_UI_Select", fade(mandolin_note(midi_hz(79), 0.8, 0.8) + mandolin_note(midi_hz(86), 0.8, 0.5)), peak_level=0.5)
+    write("SFX_UI_Select", fade(reverb(pad_to(celesta(midi_hz(86), 1.4, 0.6), n_of(1.4)) + pad_to(piano(midi_hz(74), 0.8, 0.5, 0.5), n_of(1.4)), 1.4, 0.3)), peak_level=0.5)
     d = 0.35
     sw = bp(noise(d), 800, 5000) * np.sin(np.linspace(0, np.pi, n_of(d))) ** 2
     write("SFX_UI_Open", sw, peak_level=0.3)
     write("SFX_UI_Close", sw[::-1].copy(), peak_level=0.3)
     obj = np.zeros(n_of(1.4))
-    for i, m in enumerate((74, 79)):
-        x = mandolin_note(midi_hz(m), 1.2, 0.8)
+    for i, m in enumerate((74, 81)):
+        x = pad_to(piano(midi_hz(m), 0.9, 0.55, 0.4), n_of(1.2)) + pad_to(celesta(midi_hz(m + 12), 1.2, 0.25), n_of(1.2))
         j = n_of(i * 0.14)
         obj[j:j + len(x)] += x[: len(obj) - j]
     write("SFX_Objective", reverb(obj, 1.2, 0.25), peak_level=0.5)
     solve = np.zeros(n_of(2.6))
-    for i, m in enumerate((67, 71, 74, 79, 83)):
-        x = bell(midi_hz(m + 12), 2.0, 0.5, 1.0) + pad_to(mandolin_note(midi_hz(m), 1.0, 0.35), n_of(2.0))
+    for i, m in enumerate((62, 66, 69, 74, 78)):
+        x = pad_to(celesta(midi_hz(m + 12), 2.0, 0.5), n_of(2.0)) + pad_to(piano(midi_hz(m), 1.0, 0.4, 0.8), n_of(2.0))
         j = n_of(i * 0.09)
         solve[j:j + len(x)] += x[: len(solve) - j]
     write("SFX_Solve", reverb(solve, 1.6, 0.3), peak_level=0.6)
