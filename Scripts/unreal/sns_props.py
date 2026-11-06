@@ -2,6 +2,7 @@
 
 Interchange imports one StaticMesh per glTF node, so the pieces are combined with GeometryScript, material slots are
 remapped, and the Interchange materials are swapped for instances of M_Foliage (alpha-tested) or M_Prop.
+SNS_MISSING_ONLY=1 merges only props that have no SM_ yet (after re-importing their raw glTF).
 """
 import os
 import sys
@@ -190,10 +191,15 @@ mids = sorted({a.split("/")[4] for a in eal.list_assets(ROOT, recursive=True, in
 for mid in mids:
     if only and mid not in only:
         continue
+    if os.environ.get("SNS_MISSING_ONLY") and any(x.split("/")[-1].startswith("SM_") for x in eal.list_assets(f"{ROOT}/{mid}", recursive=False, include_folder=False)):
+        continue
     try:
         merge_model(mid, foliage, prop)
     except Exception as e:
         import traceback
         log("ERROR", mid, e, traceback.format_exc())
+    # Free the DynamicMeshes of this model: letting them pile up trips GeometryScript's pool limit (that once
+    # killed the run halfway through the alphabet and silently left ~28 props unmerged).
+    unreal.SystemLibrary.collect_garbage()
 eal.save_directory(ROOT, only_if_is_dirty=True, recursive=True)
 log("ALL DONE")
