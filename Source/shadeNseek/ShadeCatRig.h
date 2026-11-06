@@ -205,6 +205,7 @@ private:
 	bool bTailInit = false;
 	FVector TailRootRig = FVector::ZeroVector;
 	FQuat TailPelvisDelta = FQuat::Identity;
+	FQuat TailFrame = FQuat::Identity;
 
 	// Pose blend
 	ECatPose TargetPose = ECatPose::Locomote;

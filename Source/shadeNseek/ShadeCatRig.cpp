@@ -25,6 +25,12 @@ namespace
 	};
 
 	float Frac(float X) { return X - FMath::FloorToFloat(X); }
+
+	/**
+	 * Full stride length (unit-scale cm) for a speed. Cats quicken their cadence rather than lengthen their stride, so
+	 * the stance sweep stays within the legs' reach (long strides over-extended the legs and stretched the body).
+	 */
+	float StrideFor(float SpeedN) { return FMath::Clamp(22.f + 0.13f * SpeedN, 24.f, 58.f); }
 	float Sat(float X) { return FMath::Clamp(X, 0.f, 1.f); }
 	FQuat PY(float Pitch, float Yaw) { return FRotator(Pitch, Yaw, 0.f).Quaternion(); }
 	FQuat Frame(const FVector& X, const FVector& Y) { return FRotationMatrix::MakeFromXY(X, Y).ToQuat(); }
@@ -366,11 +372,11 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, const FVector& VelWorld)
 {
 	const float M = MeshScale;
-	const float StrideN = FMath::Clamp(30.f + 0.22f * SpeedN, 34.f, 95.f);
+	const float StrideN = StrideFor(SpeedN);
 	Freq = SpeedN > 6.f ? SpeedN / StrideN : 0.f;
-	Duty = FMath::Lerp(0.68f, 0.45f, Sat((SpeedN - 120.f) / 140.f));
-	if (!bTrot && SpeedN > 205.f) { bTrot = true; }
-	else if (bTrot && SpeedN < 175.f) { bTrot = false; }
+	Duty = FMath::Lerp(0.62f, 0.45f, Sat((SpeedN - 110.f) / 130.f));
+	if (!bTrot && SpeedN > 180.f) { bTrot = true; }
+	else if (bTrot && SpeedN < 155.f) { bTrot = false; }
 	// Lateral-sequence walk: HL, FL, HR, FR. Trot: diagonal pairs.
 	static const float WalkOff[4] = { 0.25f, 0.75f, 0.0f, 0.5f };
 	static const float TrotOff[4] = { 0.0f, 0.5f, 0.5f, 0.0f };
@@ -522,7 +528,7 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 
 	const float Moving = Sat(SmoothSpeed / 60.f);
 	const float Sprint = Sat((SmoothSpeed - 140.f) / 120.f);
-	const float StrideCm = FMath::Clamp(30.f + 0.22f * SpeedN, 34.f, 95.f) * M;
+	const float StrideCm = StrideFor(SpeedN) * M;
 	const float Cyc = Phase * 2.f * PI;
 
 	// Heights follow the paws: the pelvis rides the hind feet, the chest the front feet (stairs pitch the body).
@@ -630,14 +636,14 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 			if (L.bFront)
 			{
 				const FVector Tuck = FVector(L.Home.X + 3.f, L.Home.Y, 8.5f) * M;
-				const FVector Reach = FVector(L.Home.X + 7.f, L.Home.Y, 2.f) * M;
+				const FVector Reach = FVector(L.Home.X + 5.f, L.Home.Y, 2.f) * M;
 				A = FMath::Lerp(Tuck, Reach, Down);
 				MetaA = FMath::Lerp(-55.f, 18.f, Down);
 				CurlA = FMath::Lerp(55.f, 10.f, Down);
 			}
 			else
 			{
-				const FVector Push = FVector(L.Home.X - 9.f, L.Home.Y, 3.f) * M;
+				const FVector Push = FVector(L.Home.X - 6.f, L.Home.Y, 3.f) * M;
 				const FVector Tuck = FVector(L.Home.X + 2.f, L.Home.Y, 6.f) * M;
 				const FVector Reach = FVector(L.Home.X, L.Home.Y, 2.5f) * M;
 				A = Up > 0.3f ? FMath::Lerp(Tuck, Push, Sat((Up - 0.3f) / 0.7f)) : FMath::Lerp(Tuck, Reach, Down);
@@ -667,8 +673,8 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 		Pt += (Ex - 0.5f) * (i < 3 ? 28.f : 16.f);
 		Pt = FMath::Lerp(Pt, AirP[i], Air);
 		P.TailPitch[i] = Pt;
-		const float Sway = FMath::Sin(Time * 1.5f + i * 0.55f) * (1.5f + i * 1.6f) * (1.f - 0.6f * Moving)
-			+ FMath::Sin(Cyc + i * 0.45f) * 2.5f * Moving + (1.f - Moving) * (4.f + i * 3.f);
+		const float Sway = FMath::Sin(Time * 1.3f + i * 0.5f) * (1.2f + i * 1.2f) * (1.f - 0.75f * Moving)
+			+ FMath::Sin(Cyc + i * 0.4f) * 1.2f * Moving + (1.f - Moving) * (4.f + i * 3.f);
 		P.TailYaw[i] = Sway;
 	}
 
@@ -839,7 +845,7 @@ void UShadeCatRig::Solve(const FCatPoseParams& P)
 	}
 	// Legs that cannot reach lower the body a touch (and it rises back when they can).
 	const float Want = Over > 0.f ? LowerFix.Value - Over : FMath::Min(0.f, LowerFix.Value + 0.5f * M);
-	LowerFix.Value = FMath::Lerp(LowerFix.Value, FMath::Clamp(Want, -6.f * M, 0.f), 0.2f);
+	LowerFix.Value = FMath::Lerp(LowerFix.Value, FMath::Clamp(Want, -2.5f * M, 0.f), 0.12f);
 }
 
 void UShadeCatRig::UpdateTail(float Dt, const FCatPoseParams& P, const FVector& RootRig, const FQuat& PelvisDelta)
@@ -851,10 +857,11 @@ void UShadeCatRig::UpdateTail(float Dt, const FCatPoseParams& P, const FVector& 
 	for (int32 i = 0; i < 8; ++i) { Len[i] = BoneLen[Tail1 + i] * M; }
 	auto TargetDirW = [&](int32 i)
 	{
-		return RigToWorld.TransformVectorNoScale(PelvisDelta.RotateVector(TailDir(P.TailPitch[i], P.TailYaw[i])));
+		return RigToWorld.TransformVectorNoScale(TailFrame.RotateVector(TailDir(P.TailPitch[i], P.TailYaw[i])));
 	};
 	if (!bTailInit || FVector::Dist(RootW, TailX[0]) > 60.f * M)
 	{
+		TailFrame = PelvisDelta;
 		TailX[0] = TailPrev[0] = RootW;
 		for (int32 i = 1; i < 9; ++i)
 		{
@@ -863,7 +870,9 @@ void UShadeCatRig::UpdateTail(float Dt, const FCatPoseParams& P, const FVector& 
 		bTailInit = true;
 	}
 	TailX[0] = TailPrev[0] = RootW;
-	const int32 Sub = 2;
+	// Targets follow a smoothed pelvis so gait wiggle doesn't whip the tail.
+	TailFrame = FQuat::Slerp(TailFrame, PelvisDelta, 1.f - FMath::Exp(-10.f * Dt));
+	const int32 Sub = 3;
 	const float H = Dt / Sub;
 	const FVector Grav(0.f, 0.f, -260.f * M);
 	const float Damp = FMath::Exp(-8.f * H);
@@ -890,13 +899,21 @@ void UShadeCatRig::UpdateTail(float Dt, const FCatPoseParams& P, const FVector& 
 			}
 		}
 	}
-	const FVector Right = FVector::RightVector;
+	// Twist is carried down the chain (parallel transport) so a tail curling sideways never flips its roll.
+	FVector Side = PelvisDelta.RotateVector(FVector::RightVector);
 	for (int32 i = 0; i < 8; ++i)
 	{
 		const FVector A = ToRig(TailX[i]);
 		const FVector B = ToRig(TailX[i + 1]);
+		const FVector D = (B - A).GetSafeNormal(UE_SMALL_NUMBER, FVector::BackwardVector);
+		FVector S2 = Side - D * FVector::DotProduct(Side, D);
+		if (!S2.Normalize())
+		{
+			S2 = FVector::CrossProduct(FVector::UpVector, D).GetSafeNormal(UE_SMALL_NUMBER, FVector::RightVector);
+		}
+		Side = S2;
 		Out[Tail1 + i].Pos = A;
-		Out[Tail1 + i].Rot = Aim(Tail1 + i, B - A, PelvisDelta.RotateVector(Right));
+		Out[Tail1 + i].Rot = Aim(Tail1 + i, D, Side);
 		Out[Tail1 + i].bSet = true;
 	}
 }

@@ -12,6 +12,8 @@ Close other GPU-heavy apps (another Unreal instance especially): the scene uses 
 To watch the intended route first, run the same command with `-autoplay` (it finishes the game in ~1:40).
 
 Shade walks at an unhurried cat pace; hold **Shift** to trot on the long straights if you want to tighten the take.
+Watch the **SHADOW LEFT** tile (bottom-left): it drains with time and quickly in sunlight and never refills - if it
+empties, the walk restarts from the passage. A clean take ends with about two thirds left.
 
 | Time | Beat | What to do |
 |---|---|---|

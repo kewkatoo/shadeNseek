@@ -444,11 +444,11 @@ def no_shadow(g, mask):
     return (cu, "")
 
 
-def ink_noise(g, scale=34.0, speed=(0.05, 0.08)):
-    wp = g.wpos()
-    uvn = g.div(g.add(g.mask(wp, r=True, g=True), g.mask(wp, b=True)), g.const(scale))
+def ink_noise(g, tiling=2.2, speed=(0.006, 0.01)):
+    """Ink swirl in the cat's own UV space: it travels with the body (world-space noise crawled over a moving cat
+    and read as flicker) and drifts only very slowly."""
     pan = g.node(unreal.MaterialExpressionPanner, speed_x=speed[0], speed_y=speed[1])
-    g.link(uvn, pan, "Coordinate")
+    g.link(g.uv(g.const(tiling)), pan, "Coordinate")
     return (g.texs(tex("T_InkNoise"), S_GRAY, (pan, "")), "R")
 
 
@@ -500,7 +500,8 @@ def build_shade_body():
     rim = g.mul(g.fresnel(3.2, 0.0), g.vec("RimColor", (0.008, 0.007, 0.013)))
     rim = g.mul(rim, g.mul(g.add(g.const(0.75), g.mul(g.scalar("Pulse", 0.5), g.const(0.5))), g.lerp(g.const(0.5), g.const(1.4), nzr)))
     g.out(g.add(rim, burn_terms(g, nzr)), MP.MP_EMISSIVE_COLOR)
-    g.out(g.add(g.sub(nzr, g.mul(g.scalar("Dissolve", 0.0), g.const(1.2))), g.const(0.5)), MP.MP_OPACITY_MASK)
+    # Solid until Dissolve rises (the old nzr + 0.5 sat exactly on the clip value where the noise hit 0 -> holes).
+    g.out(g.sub(g.add(g.mul(nzr, g.const(0.5)), g.const(0.62)), g.mul(g.scalar("Dissolve", 0.0), g.const(1.4))), MP.MP_OPACITY_MASK)
     return g.finish(clip=0.5, skeletal=True)
 
 
@@ -508,9 +509,9 @@ def build_shade_shell():
     """Smoky fur: shells thin out into drifting ink at the tips."""
     g = Graph("M_ShadeShell", blend=unreal.BlendMode.BLEND_MASKED)
     h = shell_height(g)
-    nzr = ink_noise(g, 22.0, (0.09, 0.13))
+    nzr = ink_noise(g, 3.0, (0.0, 0.0))
     strands = fur_strands(g, h)
-    wisp = g.mul(g.sub(nzr, g.const(0.5)), g.mul(h, g.const(1.6)))
+    wisp = g.mul(g.sub(nzr, g.const(0.5)), g.mul(h, g.const(0.7)))
     mask = g.add(g.add(strands, wisp), g.mul(g.scalar("Dissolve", 0.0), g.const(-30.0)))
     g.out(no_shadow(g, mask), MP.MP_OPACITY_MASK)
     ink = g.mul(g.vec("InkColor", (0.0042, 0.004, 0.0048)), g.lerp(g.const(0.6), g.const(1.4), h))
@@ -658,6 +659,7 @@ def build_instances(M):
     mi("MI_Terracotta", S, dict(ground, Tiling=1.6), None, surf("terracotta_floor_tiles"))
     mi("MI_Sand", S, dict(ground, Tiling=0.6), None, surf("coast_sand_01"))
     mi("MI_Cliff", S, {"Tiling": 0.35, "MacroAmount": 0.25}, {"Tint": (0.95, 0.9, 0.84)}, surf("marble_cliff_02"))
+    mi("MI_Soil", S, {"Tiling": 3.0, "MacroAmount": 0.3, "DirtAmount": 0.0, "RoughMul": 1.1}, {"Tint": (0.36, 0.25, 0.17)}, surf("coast_sand_01"))
     mi("MI_RoofTiles", S, {"Tiling": 1.4, "MacroAmount": 0.2, "DirtAmount": 0.0}, None, surf("clay_roof_tiles_02"))
 
     P = M["M_Paint"]

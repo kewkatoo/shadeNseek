@@ -10,7 +10,8 @@ Source: Parsewave UE Games contract, submission and asset guidelines, mentor ann
 
 ## Engine & code
 - ✅ UE 5.8, `EngineAssociation: "5.8"`, project name `shadeNseek` (letters only)
-- ✅ Real C++ gameplay in `Source/shadeNseek` (character, sun exposure, procedural cat rig, puzzles, game flow, HUD, autoplay); no Blueprints
+- ✅ Real C++ gameplay in `Source/shadeNseek` (character, sun exposure + a draining shadow meter with fail/retry, procedural cat rig,
+  puzzles, game flow, HUD, autoplay); no Blueprints
 - ✅ `-autoplay` in `Source/` (`ShadeAutoplayComponent`) driving the same Shade API as player input; `-autoplayexit`, `-autoplayshots`
 - ✅ `shadeNseek.Target.cs` + `shadeNseekEditor.Target.cs`; `Config/DefaultEngine.ini`, `Config/DefaultInput.ini`
 

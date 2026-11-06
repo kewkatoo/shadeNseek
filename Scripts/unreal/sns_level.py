@@ -541,6 +541,15 @@ plant.set_static_mesh(tree)
 ts = 190.0 / height_of(tree)
 plant.set_editor_property("relative_scale3d", V(ts, ts, ts))
 plant.set_editor_property("relative_location", V(0, 0, 50))
+# The lemon tree stands in the terracotta pot: a disc of earth just under the rim hides the trunk's base.
+pot_h = 62.0
+pot_r = (width_of(pot_mesh) * (62.0 / height_of(pot_mesh))) / 2
+soil = pot.get_editor_property("soil")
+soil.set_static_mesh(eal.load_asset("/Engine/BasicShapes/Cylinder"))
+soil.set_material(0, mat("MI_Soil"))
+soil.set_editor_property("relative_scale3d", V(pot_r * 1.72 / 100.0, pot_r * 1.72 / 100.0, 0.03))
+soil.set_editor_property("relative_location", V(0, 0, pot_h - 7.0))
+log("pot", "radius", round(pot_r), "tree height", 190)
 try:
     plant.set_editor_property("evaluate_world_position_offset", False)
 except Exception as e:

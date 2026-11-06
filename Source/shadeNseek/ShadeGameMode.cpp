@@ -55,7 +55,9 @@ bool AShadeGameMode::IsAutoplayExit()
 void AShadeGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
-	bSkipTitle = HasParam(TEXT("skiptitle"));
+	// A retry after Shade faded comes straight back into the lane (no title).
+	bRetry = UGameplayStatics::HasOption(Options, TEXT("retry"));
+	bSkipTitle = HasParam(TEXT("skiptitle")) || bRetry;
 	BuildObjectives();
 }
 
@@ -209,7 +211,37 @@ void AShadeGameMode::StartGame()
 			PC->SetControlRotation(FRotator(-12.f, S->GetActorRotation().Yaw, 0.f));
 		}
 	}
-	Say(LOCTEXT("Intro1", "Biscotto dozed off in the noon sun... and his shadow slipped away."), 4.6f);
+	if (bRetry)
+	{
+		Say(LOCTEXT("Retry1", "Back in the cool of the passage. Mind the sun this time."), 3.6f);
+	}
+	else
+	{
+		Say(LOCTEXT("Intro1", "Biscotto dozed off in the noon sun... and his shadow slipped away."), 4.6f);
+	}
+}
+
+void AShadeGameMode::ShadeFaded()
+{
+	// Out of shadow: Shade is gone. Fade out and start the walk again from the passage.
+	if (bFading || Phase == EShadePhase::Reunion || Phase == EShadePhase::Ended)
+	{
+		return;
+	}
+	bFading = true;
+	UE_LOG(LogShade, Log, TEXT("SHADE_EVENT faded t=%.1f"), RunTime);
+	Say(LOCTEXT("Faded", "The sun drank the last of Shade... Back to the cool of the passage."), 3.2f);
+	FadeTo(1.f, 1.4f, FLinearColor(0.02f, 0.015f, 0.03f), 1.2f);
+	MusicTarget = 0.f;
+	FTimerHandle H;
+	TWeakObjectPtr<AShadeGameMode> Self(this);
+	GetWorldTimerManager().SetTimer(H, [Self]()
+	{
+		if (Self.IsValid())
+		{
+			UGameplayStatics::OpenLevel(Self.Get(), FName(*UGameplayStatics::GetCurrentLevelName(Self.Get())), true, IsAutoplay() ? TEXT("?retry?autoplay") : TEXT("?retry"));
+		}
+	}, 3.0f, false);
 }
 
 void AShadeGameMode::RestartRun()
@@ -402,7 +434,10 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 		if (PhaseTime > (bSkipTitle ? 0.1f : 2.8f))
 		{
 			SetPhase(EShadePhase::Playing);
-			Say(LOCTEXT("Intro2", "Now the sun is low and the streets are blazing. Keep to the shade."), 4.6f);
+			if (!bRetry)
+			{
+				Say(LOCTEXT("Intro2", "Now the sun is low and the streets are blazing. Keep to the shade."), 4.6f);
+			}
 			ObjectiveChangeTime = FPlatformTime::Seconds();
 		}
 		break;

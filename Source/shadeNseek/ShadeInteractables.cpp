@@ -386,6 +386,8 @@ AShadeFlowerPot::AShadeFlowerPot()
 	Pot->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	Plant = MakeMesh(this, TEXT("Plant"), Pivot);
 	NoCollision(Plant);
+	Soil = MakeMesh(this, TEXT("Soil"), Pivot);
+	NoCollision(Soil);
 	CanopyShade = CreateDefaultSubobject<UBoxComponent>(TEXT("CanopyShade"));
 	CanopyShade->SetupAttachment(Pivot);
 	CanopyShade->SetBoxExtent(FVector(48.f, 48.f, 38.f));

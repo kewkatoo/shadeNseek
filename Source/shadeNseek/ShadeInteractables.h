@@ -247,6 +247,10 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Pot")
 	TObjectPtr<UStaticMeshComponent> Plant;
 
+	/** Earth filling the pot around the trunk. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pot")
+	TObjectPtr<UStaticMeshComponent> Soil;
+
 	/** Invisible box matching the dense part of the foliage: it blocks only the Sunlight channel. */
 	UPROPERTY(VisibleAnywhere, Category = "Pot")
 	TObjectPtr<UBoxComponent> CanopyShade;

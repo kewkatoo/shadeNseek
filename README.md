@@ -33,6 +33,10 @@ canopy, the bell tower - casts gameplay shade that matches the rendered shadow, 
 builds while lit (0.42 s at full exposure) and Shade evaporates, re-forming at the last spot that was comfortably in
 shade. Shade itself never blocks sunlight.
 
+On top of that short burn, Shade has a **shadow meter** (bottom-left tile) that never refills: it drains slowly with
+time, fast in sunlight and by a chunk on every evaporation. When it runs out Shade is gone, the screen fades and the
+walk restarts from the passage (`?retry`, no title). A clean run finishes with roughly two thirds left.
+
 ## Code map (`Source/shadeNseek`)
 | File | Role |
 |---|---|

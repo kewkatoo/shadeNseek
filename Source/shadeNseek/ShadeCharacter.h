@@ -60,6 +60,9 @@ public:
 
 	// --- State for HUD / game mode ---------------------------------------------------------------------------------
 	float GetExposure() const { return Exposure; }
+	/** 1 = full shadow, 0 = gone. Drains slowly over time and fast in sunlight; it never refills. */
+	float GetHealth() const { return Health; }
+	bool IsFaded() const { return bFaded; }
 	float GetSunFraction() const { return SunFraction; }
 	bool IsEvaporating() const { return EvapState != 0; }
 	float GetEvapAlpha() const { return EvapAlpha; }
@@ -88,7 +91,7 @@ public:
 	USpringArmComponent* GetBoom() const { return CameraBoom; }
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float WalkSpeed = 135.f;
+	float WalkSpeed = 120.f;
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
 	float SprintSpeed = 300.f;
@@ -103,6 +106,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Shade")
 	float CoolTime = 0.7f;
 
+	/** Shadow lost per second just by being out in the afternoon heat (the walk has a time limit). */
+	UPROPERTY(EditAnywhere, Category = "Shade")
+	float IdleDrain = 0.0038f;
+
+	/** Shadow lost per second in full sunlight (on top of the burn-up exposure). */
+	UPROPERTY(EditAnywhere, Category = "Shade")
+	float SunDrain = 0.17f;
+
+	/** Shadow lost each time Shade evaporates. */
+	UPROPERTY(EditAnywhere, Category = "Shade")
+	float EvaporateCost = 0.22f;
+
 protected:
 	void UpdateSun(float Dt);
 	void UpdateFocus(float Dt);
@@ -113,6 +128,7 @@ protected:
 	void UpdateWisps(float Dt);
 	void UpdateCamera(float Dt);
 	void Evaporate();
+	void Fade();
 	void SpawnWisp(const FVector& P, const FVector& V, float Size0, float Size1, float Life, float Heat, float Alpha);
 	void GetSunPoints(TArray<FVector>& Out) const;
 	class AShadeGameMode* GetShadeGameMode() const;
@@ -168,6 +184,8 @@ protected:
 
 	// Sun
 	float Exposure = 0.f;
+	float Health = 1.f;
+	bool bFaded = false;
 	float SunFraction = 0.f;
 	float TimeSinceSafe = 0.f;
 	float SafeSampleTimer = 0.f;

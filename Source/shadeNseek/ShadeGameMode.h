@@ -60,6 +60,9 @@ public:
 	float GetPhaseTime() const { return PhaseTime; }
 	void StartGame();
 	void RestartRun();
+	/** Health ran out: fade and reload straight into the lane. */
+	void ShadeFaded();
+	bool IsRetry() const { return bRetry; }
 	void QuitGame();
 
 	// --- Story ----------------------------------------------------------------------------------------------------
@@ -133,6 +136,8 @@ protected:
 	float RunTime = 0.f;
 	int32 PuzzlesSolved = 0;
 	bool bSkipTitle = false;
+	bool bRetry = false;
+	bool bFading = false;
 	bool bSunMapPending = false;
 	float SunMapTimer = 0.f;
 	float ShotTimer = 0.f;

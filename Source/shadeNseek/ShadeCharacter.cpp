@@ -358,6 +358,15 @@ void AShadeCharacter::UpdateSun(float Dt)
 
 	const AShadeGameMode* G = GetShadeGameMode();
 	const bool bLive = bControlEnabled && !bInvulnerable && (!G || G->GetPhase() == EShadePhase::Playing || G->GetPhase() == EShadePhase::Finale);
+	if (bLive)
+	{
+		Health = FMath::Max(0.f, Health - Dt * (IdleDrain + SunDrain * SunFraction));
+		if (Health <= 0.f)
+		{
+			Fade();
+			return;
+		}
+	}
 	if (bLive && SunFraction > 0.f)
 	{
 		Exposure += Dt * SunFraction / FMath::Max(BurnTime, 0.05f);
@@ -404,6 +413,25 @@ void AShadeCharacter::UpdateSun(float Dt)
 	}
 }
 
+void AShadeCharacter::Fade()
+{
+	// Out of shadow entirely: dissolve for good; the game mode reloads the walk.
+	if (bFaded)
+	{
+		return;
+	}
+	bFaded = true;
+	Health = 0.f;
+	if (EvapState == 0)
+	{
+		Evaporate();
+	}
+	if (AShadeGameMode* G = GetShadeGameMode())
+	{
+		G->ShadeFaded();
+	}
+}
+
 void AShadeCharacter::Evaporate()
 {
 	if (EvapState != 0)
@@ -413,6 +441,15 @@ void AShadeCharacter::Evaporate()
 	EvapState = 1;
 	EvapTimer = 0.f;
 	++Evaporations;
+	Health = FMath::Max(0.f, Health - EvaporateCost);
+	if (Health <= 0.f)
+	{
+		bFaded = true;
+		if (AShadeGameMode* G = GetShadeGameMode())
+		{
+			G->ShadeFaded();
+		}
+	}
 	ReleaseGrab();
 	InteractReleased();
 	GetCharacterMovement()->StopMovementImmediately();
@@ -438,7 +475,12 @@ void AShadeCharacter::UpdateEvaporation(float Dt)
 	if (EvapState == 1)
 	{
 		EvapAlpha = ShadeEase::Clamp01(EvapTimer / 0.5f);
-		if (EvapTimer > 0.55f)
+		if (EvapTimer > 0.55f && bFaded)
+		{
+			EvapState = 2;
+			EvapTimer = 0.f;
+		}
+		else if (EvapTimer > 0.55f)
 		{
 			EvapState = 2;
 			EvapTimer = 0.f;
@@ -466,7 +508,7 @@ void AShadeCharacter::UpdateEvaporation(float Dt)
 	else if (EvapState == 2)
 	{
 		EvapAlpha = 1.f;
-		if (EvapTimer > 0.4f)
+		if (EvapTimer > 0.4f && !bFaded)
 		{
 			EvapState = 3;
 			EvapTimer = 0.f;

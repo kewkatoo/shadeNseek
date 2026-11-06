@@ -346,6 +346,7 @@ private:
 	void PaintPrompt(const FPainter& P, double Now) const;
 	void PaintMarker(const FPainter& P, double Now) const;
 	void PaintExposure(const FPainter& P, double Now) const;
+	void PaintHealth(const FPainter& P, double Now) const;
 	void PaintLine(const FPainter& P, double Now) const;
 	void PaintToasts(const FPainter& P, double Now) const;
 	void PaintControls(const FPainter& P, float Alpha, const FVector2D& Origin) const;
@@ -360,6 +361,8 @@ private:
 	float PromptAlpha = 0.f;
 	float MarkerAlpha = 0.f;
 	float ExposureShown = 0.f;
+	float HealthShown = 1.f;
+	float HealthGhost = 1.f;
 	float FlashAlpha = 0.f;
 	bool bWasEvap = false;
 	TWeakObjectPtr<AShadeInteractable> PromptTarget;
@@ -386,6 +389,9 @@ void SShadeOverlay::UpdateSmoothing()
 	PromptAlpha = ShadeEase::Approach(PromptAlpha, bPrompt ? 1.f : 0.f, bPrompt ? 10.f : 7.f, Dt);
 	MarkerAlpha = ShadeEase::Approach(MarkerAlpha, (bPlay && !bPrompt) ? 1.f : 0.f, 4.f, Dt);
 	ExposureShown = ShadeEase::Approach(ExposureShown, K->GetExposure(), 14.f, Dt);
+	HealthShown = ShadeEase::Approach(HealthShown, K->GetHealth(), 14.f, Dt);
+	// The lost chunk lingers in sun-gold for a moment, then drains away after it.
+	HealthGhost = HealthGhost > HealthShown ? ShadeEase::Approach(HealthGhost, HealthShown, 1.6f, Dt) : HealthShown;
 	if (K->IsEvaporating() && !bWasEvap)
 	{
 		FlashAlpha = 1.f;
@@ -441,6 +447,7 @@ int32 SShadeOverlay::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const
 	if (HudAlpha > 0.01f)
 	{
 		PaintObjective(P, Now);
+		PaintHealth(P, Now);
 		PaintMarker(P, Now);
 		PaintPrompt(P, Now);
 		PaintToasts(P, Now);
@@ -613,6 +620,40 @@ void SShadeOverlay::PaintPrompt(const FPainter& P, double Now) const
 	const float TX = C.X + R + 14.f;
 	P.Text(Verb, FVector2D(TX, C.Y - 2.f), VerbF, A(UI::Cream, Al), 0.f, 1.f, 0.6f, 6);
 	P.Text(Label, FVector2D(TX, C.Y - 1.f), LabelF, A(UI::Cream, 0.78f * Al), 0.f, 0.f, 0.55f, 6);
+}
+
+void SShadeOverlay::PaintHealth(const FPainter& P, double Now) const
+{
+	AShadeCharacter* K = Shade();
+	const float Al = HudAlpha;
+	if (!K || Al < 0.01f)
+	{
+		return;
+	}
+	const float Hp = FMath::Clamp(HealthShown, 0.f, 1.f);
+	const float Ghost = FMath::Clamp(HealthGhost, Hp, 1.f);
+	const bool bLow = Hp < 0.3f;
+	const float Pulse = bLow ? 0.5f + 0.5f * FMath::Sin(static_cast<float>(Now) * 7.f) : 0.f;
+	const float W = 300.f, H = 60.f;
+	const FVector2D Pos(UI::Margin, P.Size.Y - UI::Margin - H - 54.f);
+	P.Tile(Pos, FVector2D(W, H), 0.96f * Al);
+	const FSlateFontInfo Head = F(TEXT("Black"), 11, 260, P.S);
+	const FSlateFontInfo Num = F(TEXT("Black"), 11, 120, P.S);
+	P.Text(bLow ? TEXT("FADING") : TEXT("SHADOW LEFT"), Pos + FVector2D(26.f, 15.f), Head, A(bLow ? FMath::Lerp(UI::Terracotta, UI::Sun, Pulse) : UI::Terracotta, Al), 0.f, 0.f, 0.f, 5);
+	P.Text(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Hp * 100.f)), Pos + FVector2D(W - 26.f, 15.f), Num, A(UI::InkSoft, Al), 1.f, 0.f, 0.f, 5);
+	const FVector2D BP = Pos + FVector2D(26.f, 35.f);
+	const float BW = W - 52.f, BH = 9.f;
+	P.Box(BP, FVector2D(BW, BH), A(UI::Ink, 0.14f * Al), &GRound6, 5);
+	if (Ghost > Hp + 0.002f)
+	{
+		P.Box(BP, FVector2D(BW * Ghost, BH), A(UI::Sun, 0.9f * Al), &GRound6, 6);
+	}
+	if (Hp > 0.002f)
+	{
+		const FLinearColor Fill = bLow ? FMath::Lerp(UI::Violet, UI::Terracotta, 0.45f + 0.45f * Pulse) : UI::Violet;
+		P.Box(BP, FVector2D(FMath::Max(BW * Hp, BH), BH), A(Fill, Al), &GRound6, 7);
+		P.Box(BP + FVector2D(3.f, 1.5f), FVector2D(FMath::Max(BW * Hp - 6.f, 0.f), 2.f), A(UI::Cream, 0.22f * Al), &GRound6, 8);
+	}
 }
 
 void SShadeOverlay::PaintExposure(const FPainter& P, double Now) const
