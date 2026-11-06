@@ -15,7 +15,13 @@ shadowless, so you can slip back into place.
   - `-autoplayexit` quits when the run ends (unattended capture), `-autoplayshots` saves a screenshot every 2.5 s to `Saved/Shots`
   - QA: `-sunmap` writes `Saved/SunMap.png` (+ `_finale`) - a top-down map of gameplay shade; `-catgallery` screenshots the cat rig poses
     (sleep, sit, walk, trot, stand); `-camshots` screenshots every `CamCandidate_*` camera placed by `sns_lighting.py`
+  - Motion QA: `-motioncap=follow|side|title -benchmark -fps=30` drives a scripted walk / veer / stop / about-turn / trot /
+    hop (or the title-to-game transition), saves every frame to `Saved/MotionCap/<mode>/` with bone + camera tracks, and
+    `python -I Scripts/qa_motion.py . <mode>` turns them into numbers (tail spin, joint snaps, paw slip, camera pops;
+    `--flicker a:b` maps shimmer, `--sheet a:b:step` makes a contact sheet)
 - `Scripts/run_game.ps1` launches a standalone game window with any of those flags. Recording guide: `Docs/PLAYTHROUGH.md`.
+- **Packaged build:** `Scripts/package_game.ps1` cooks a standalone Windows game into `Dist/Packaged/Windows/`
+  (run `shadeNseek.exe`, same flags work). `Scripts/make_submission.ps1` builds the source + asset-library zips in `Dist/`.
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
@@ -41,7 +47,8 @@ walk restarts from the passage (`?retry`, no title). A clean run finishes with r
 | File | Role |
 |---|---|
 | `ShadeCharacter` | Shade: movement, camera, sun exposure / evaporation / respawn, interaction focus, cart pushing, ink-wisp particles |
-| `ShadeCatRig` | Procedural quadruped animation on a `UPoseableMeshComponent`: paws planted in the world and traced onto the ground (stairs too), digitigrade leg IK with shoulder blades, walk / trot gaits from ground speed, idle re-stepping, spine bending into turns and slopes, jump crouch / air pose / landing squash, a Verlet-physics tail, sprung ears, blinking, look-at; sit and sleep are blended in the same pose space |
+| `ShadeCatRig` | Procedural quadruped animation on a `UPoseableMeshComponent`: paws planted in the world and traced onto the ground (stairs too), digitigrade leg IK with shoulder blades, walk / trot gaits from ground speed, idle re-stepping, a lowered carriage and rolling shoulder blades on the move, spine bending into turns and slopes, jump crouch / air pose / landing squash, a tail of independent damped angular springs (lags and swings, never resonates), sprung ears, blinking, look-at; sit and sleep are blended in the same pose space |
+| `ShadeSpringArm` | Follow-camera boom that pulls in fast and eases out slowly on collisions (no popping); small props never block the camera |
 | `ShadeSunSubsystem` | Sun queries + `-sunmap` QA image |
 | `ShadeInteractables` | Lemon cart (push), café awning (hold to tug), flower pot (nudge off a ledge), nap cats / Biscotto, zones, sound scatter |
 | `ShadeGameMode` | Run flow (title, intro, play, bell-tower finale with the moving sun, reunion cinematic, end), objectives, narration, music |

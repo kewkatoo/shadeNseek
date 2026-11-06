@@ -26,12 +26,17 @@ namespace
 
 	float Frac(float X) { return X - FMath::FloorToFloat(X); }
 
-	/**
-	 * Full stride length (unit-scale cm) for a speed. Cats quicken their cadence rather than lengthen their stride, so
-	 * the stance sweep stays within the legs' reach (long strides over-extended the legs and stretched the body).
-	 */
-	float StrideFor(float SpeedN) { return FMath::Clamp(22.f + 0.13f * SpeedN, 24.f, 58.f); }
 	float Sat(float X) { return FMath::Clamp(X, 0.f, 1.f); }
+
+	/**
+	 * Gait timing (unit-scale cm and s). The stance sweep (stride x duty) is what the legs must reach while a paw is
+	 * planted; the front legs are nearly straight at rest, so it is budgeted at ~23 cm (about +-11.5 around the
+	 * shoulder, with the chest carried lower and the shoulder blades rolling). Within that budget the stride is as
+	 * long as possible so the cadence stays calm (~2.3 Hz walking, ~3.6 Hz trotting) and each swing lasts long enough
+	 * (~0.2 s) to read as a step, not a flicker.
+	 */
+	float StrideFor(float SpeedN) { return FMath::Clamp(24.f + 0.18f * SpeedN, 26.f, 66.f); }
+	float DutyFor(float SpeedN) { return FMath::Lerp(FMath::Lerp(0.6f, 0.5f, Sat((SpeedN - 40.f) / 70.f)), 0.36f, Sat((SpeedN - 120.f) / 110.f)); }
 	FQuat PY(float Pitch, float Yaw) { return FRotator(Pitch, Yaw, 0.f).Quaternion(); }
 	FQuat Frame(const FVector& X, const FVector& Y) { return FRotationMatrix::MakeFromXY(X, Y).ToQuat(); }
 
@@ -374,9 +379,9 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 	const float M = MeshScale;
 	const float StrideN = StrideFor(SpeedN);
 	Freq = SpeedN > 6.f ? SpeedN / StrideN : 0.f;
-	Duty = FMath::Lerp(0.62f, 0.45f, Sat((SpeedN - 110.f) / 130.f));
-	if (!bTrot && SpeedN > 180.f) { bTrot = true; }
-	else if (bTrot && SpeedN < 155.f) { bTrot = false; }
+	Duty = DutyFor(SpeedN);
+	if (!bTrot && SpeedN > 165.f) { bTrot = true; }
+	else if (bTrot && SpeedN < 140.f) { bTrot = false; }
 	// Lateral-sequence walk: HL, FL, HR, FR. Trot: diagonal pairs.
 	static const float WalkOff[4] = { 0.25f, 0.75f, 0.0f, 0.5f };
 	static const float TrotOff[4] = { 0.0f, 0.5f, 0.5f, 0.0f };
@@ -433,7 +438,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		L.SwingT = 0.f;
 		L.SwingDur = Dur;
 		L.bSettleStep = bSettle;
-		const float Base = L.bFront ? 4.6f : 3.8f;
+		const float Base = L.bFront ? 3.9f : 3.3f;
 		L.SwingLift = (bSettle ? 2.2f : Base * FMath::Lerp(0.7f, 1.35f, Sat((SpeedN - 40.f) / 220.f))) * M;
 	};
 
@@ -451,7 +456,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 			const bool bLate = Rel.X < -0.62f * Stride || FVector2D(Rel.X, Rel.Y).Size() > 0.85f * Stride;
 			if (bCross || bLate)
 			{
-				StartSwing(L, FMath::Clamp((1.f - Duty) / Freq, 0.13f, 0.5f), false);
+				StartSwing(L, FMath::Clamp((1.f - Duty) / Freq, 0.15f, 0.5f), false);
 				++Swinging;
 			}
 		}
@@ -550,10 +555,16 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 	const float Comp = FMath::Max(LandComp.Value, 0.f) * 0.11f;   // cm-ish, sprung
 
 	const float Bob = (0.35f + 0.8f * Sprint) * M * Moving * (0.5f - 0.5f * FMath::Cos(2.f * Cyc));
-	P.PelvisOffset = FVector(-1.2f * CrouchS.Value * M, 0.f, HindZ.Value - Bob - CrouchS.Value * 5.5f * M - Comp * M + LowerFix.Value);
-	P.BodyPitch = FMath::RadiansToDegrees(FMath::Atan2(FrontZ.Value - HindZ.Value, 27.f * M)) + AccelPitch.Value
+	// On the move a cat carries itself a little lower than it stands, the chest lowest. Without that the nearly
+	// straight front legs had no reach left for the stride: they locked straight and the planted paws skated.
+	const float Carry = Moving * (1.f - Air);
+	const float HipDrop = (1.2f + 0.9f * Sprint) * M * Carry;
+	const float ChestDrop = (2.6f + 1.2f * Sprint) * M * Carry;
+	P.PelvisOffset = FVector(-1.2f * CrouchS.Value * M, 0.f, HindZ.Value - Bob - HipDrop - CrouchS.Value * 5.5f * M - Comp * M + LowerFix.Value);
+	P.BodyPitch = FMath::RadiansToDegrees(FMath::Atan2(FrontZ.Value - HindZ.Value - (ChestDrop - HipDrop), 27.f * M)) + AccelPitch.Value
 		+ Air * (8.f * Up - 9.f * Down) - CrouchS.Value * 4.f;
-	P.BodyRoll = 0.f;
+	// A slight weight shift from side to side with the steps.
+	P.BodyRoll = FMath::Sin(Cyc) * 1.1f * Carry * (1.f - Sprint);
 
 	// Spine: bends into turns, wiggles with the walk, flexes with the trot, crouches, stretches in the air.
 	const float Wig = FMath::Sin(Cyc) * 2.2f * Moving * (1.f - Sprint);
@@ -605,10 +616,17 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 			}
 			else
 			{
-				P.Meta[l] = T < 0.45f ? FMath::Lerp(52.f, -72.f, ShadeEase::Smooth(T / 0.45f)) : FMath::Lerp(-72.f, 14.f, ShadeEase::Smooth((T - 0.45f) / 0.55f));
-				P.Curl[l] = FMath::Sin(PI * T) * 60.f;
+				// The wrist folds the paw back as it lifts, then the leg reaches and the paw opens flat for landing.
+				const float Fold = -46.f - 22.f * Sprint;
+				P.Meta[l] = T < 0.45f ? FMath::Lerp(52.f, Fold, ShadeEase::Smooth(T / 0.45f)) : FMath::Lerp(Fold, 14.f, ShadeEase::Smooth((T - 0.45f) / 0.55f));
+				P.Curl[l] = FMath::Sin(PI * T) * (40.f + 18.f * Sprint);
 			}
-			P.Scap[l] = FMath::Clamp(Rel * 11.f, -14.f, 14.f) + (bSwing ? FMath::Sin(PI * T) * 6.f : 0.f);
+			// Shoulder blades roll with the leg: the shoulder joint follows the paw by about a quarter of its travel
+			// (this is most of the visible "cat walk" and gives the leg its reach).
+			const float Dx = P.Ball[l].X - L.Home.X * M;
+			const float ScapLen = BoneLen[GLegBones[l][0]] * M;
+			P.Scap[l] = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(0.27f * Dx / FMath::Max(ScapLen, 1.f), -0.42f, 0.42f)))
+				+ (bSwing ? FMath::Sin(PI * T) * 5.f : 0.f);
 		}
 		else
 		{
@@ -671,10 +689,14 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 	{
 		float Pt = FMath::Lerp(IdleP[i], FMath::Lerp(WalkP[i], TrotP[i], Sprint), Moving);
 		Pt += (Ex - 0.5f) * (i < 3 ? 28.f : 16.f);
+		// A slow wave travelling from the root to the tip keeps a carried tail alive without whipping it.
+		const float Walking = Moving * (1.f - Sprint) * (1.f - Air);
+		Pt += FMath::Sin(Time * 1.1f - i * 0.5f) * (i * 0.8f) * Walking;
 		Pt = FMath::Lerp(Pt, AirP[i], Air);
 		P.TailPitch[i] = Pt;
 		const float Sway = FMath::Sin(Time * 1.3f + i * 0.5f) * (1.2f + i * 1.2f) * (1.f - 0.75f * Moving)
-			+ FMath::Sin(Cyc + i * 0.4f) * 1.2f * Moving + (1.f - Moving) * (4.f + i * 3.f);
+			+ FMath::Sin(Cyc + i * 0.4f) * 1.2f * Moving + (1.f - Moving) * (4.f + i * 3.f)
+			+ FMath::Sin(Time * 1.7f - i * 0.45f) * (0.6f + i * 1.3f) * Walking;
 		P.TailYaw[i] = Sway;
 	}
 
@@ -857,46 +879,69 @@ void UShadeCatRig::UpdateTail(float Dt, const FCatPoseParams& P, const FVector& 
 	for (int32 i = 0; i < 8; ++i) { Len[i] = BoneLen[Tail1 + i] * M; }
 	auto TargetDirW = [&](int32 i)
 	{
-		return RigToWorld.TransformVectorNoScale(TailFrame.RotateVector(TailDir(P.TailPitch[i], P.TailYaw[i])));
+		return RigToWorld.TransformVectorNoScale(TailFrame.RotateVector(TailDir(P.TailPitch[i], P.TailYaw[i]))).GetSafeNormal();
 	};
 	if (!bTailInit || FVector::Dist(RootW, TailX[0]) > 60.f * M)
 	{
 		TailFrame = PelvisDelta;
-		TailX[0] = TailPrev[0] = RootW;
-		for (int32 i = 1; i < 9; ++i)
+		for (int32 i = 0; i < 8; ++i)
 		{
-			TailX[i] = TailPrev[i] = TailX[i - 1] + TargetDirW(i - 1) * Len[i - 1];
+			TailDirW[i] = TargetDirW(i);
+			TailOmega[i] = FVector::ZeroVector;
 		}
+		TailRootVel = TailRootAcc = FVector::ZeroVector;
+		TailX[0] = RootW;
 		bTailInit = true;
 	}
-	TailX[0] = TailPrev[0] = RootW;
-	// Targets follow a smoothed pelvis so gait wiggle doesn't whip the tail.
+	// Root motion -> inertia. Low-passed so the step bob only nudges the tail instead of shaking it.
+	const FVector RootVel = (RootW - TailX[0]) / Dt;
+	const FVector RawAcc = ((RootVel - TailRootVel) / Dt).GetClampedToMaxSize(1400.f * M);
+	TailRootVel = RootVel;
+	TailRootAcc = FMath::Lerp(TailRootAcc, RawAcc, 1.f - FMath::Exp(-9.f * Dt));
+	TailX[0] = RootW;
 	TailFrame = FQuat::Slerp(TailFrame, PelvisDelta, 1.f - FMath::Exp(-10.f * Dt));
+
+	// Every segment's world direction is its own damped angular spring toward the pose direction. Segments do not
+	// chase each other (a chain of followers resonates and whips), so the base stays steady and the tip simply lags
+	// further behind turns and starts / stops - follow-through without any instability.
 	const int32 Sub = 3;
 	const float H = Dt / Sub;
-	const FVector Grav(0.f, 0.f, -260.f * M);
-	const float Damp = FMath::Exp(-8.f * H);
 	for (int32 s = 0; s < Sub; ++s)
 	{
-		for (int32 i = 1; i < 9; ++i)
+		for (int32 i = 0; i < 8; ++i)
 		{
-			const float Stiff = FMath::Lerp(44.f, 19.f, (i - 1) / 7.f);
-			const FVector Target = TailX[i - 1] + TargetDirW(i - 1) * Len[i - 1];
-			const FVector Vel = (TailX[i] - TailPrev[i]) * Damp;
-			TailPrev[i] = TailX[i];
-			TailX[i] += Vel + (Target - TailX[i]) * (1.f - FMath::Exp(-Stiff * H)) + Grav * H * H;
-		}
-		for (int32 i = 1; i < 9; ++i)
-		{
-			const FVector D = (TailX[i] - TailX[i - 1]).GetSafeNormal(UE_SMALL_NUMBER, TargetDirW(i - 1));
-			TailX[i] = TailX[i - 1] + D * Len[i - 1];
-			// Keep the tail above the ground plane under the cat.
-			FVector R = ToRig(TailX[i]);
-			if (R.Z < 1.1f * M)
+			const float A = i / 7.f;
+			const float W0 = FMath::Lerp(17.f, 7.5f, A);
+			const float Zeta = FMath::Lerp(1.f, 0.72f, A);
+			const FVector T = TargetDirW(i);
+			FVector& D = TailDirW[i];
+			FVector& Om = TailOmega[i];
+			const FVector Axis = FVector::CrossProduct(D, T);
+			const float SinA = Axis.Size();
+			const float Ang = FMath::Atan2(SinA, FVector::DotProduct(D, T));
+			const FVector Err = SinA > 1e-6f ? Axis * (Ang / SinA) : FVector::ZeroVector;
+			// Pseudo-force of the accelerating root on the segment's mass, as a pendulum of the segment's distance.
+			const float Arm = (i + 0.5f) * Len[0];
+			const FVector Inertia = FVector::CrossProduct(D, -TailRootAcc) * (0.32f / FMath::Max(Arm, 1.f));
+			Om += (Err * (W0 * W0) - Om * (2.f * Zeta * W0) + Inertia) * H;
+			Om -= D * FVector::DotProduct(Om, D);
+			Om = Om.GetClampedToMaxSize(22.f);
+			const float Turn = Om.Size() * H;
+			if (Turn > 1e-6f)
 			{
-				R.Z = 1.1f * M;
-				TailX[i] = ToWorld(R);
+				D = FQuat(Om / Om.Size(), Turn).RotateVector(D).GetSafeNormal();
 			}
+		}
+	}
+	// Positions from the directions; keep the tail above the ground plane under the cat (output only).
+	for (int32 i = 1; i < 9; ++i)
+	{
+		TailX[i] = TailX[i - 1] + TailDirW[i - 1] * Len[i - 1];
+		FVector R = ToRig(TailX[i]);
+		if (R.Z < 1.1f * M)
+		{
+			R.Z = 1.1f * M;
+			TailX[i] = TailX[i - 1] + (ToWorld(R) - TailX[i - 1]).GetSafeNormal() * Len[i - 1];
 		}
 	}
 	// Twist is carried down the chain (parallel transport) so a tail curling sideways never flips its roll.

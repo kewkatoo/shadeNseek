@@ -4,6 +4,7 @@
 #include "ShadeCatRig.h"
 #include "ShadeGameMode.h"
 #include "ShadeInteractables.h"
+#include "ShadeSpringArm.h"
 #include "ShadeSunSubsystem.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -58,7 +59,7 @@ AShadeCharacter::AShadeCharacter()
 	Move->bCanWalkOffLedgesWhenCrouching = true;
 	Move->PerchRadiusThreshold = 6.f;
 
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom = CreateDefaultSubobject<UShadeSpringArm>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 300.f;
 	CameraBoom->SocketOffset = FVector(0.f, 0.f, 58.f);

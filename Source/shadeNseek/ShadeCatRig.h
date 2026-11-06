@@ -93,8 +93,9 @@ struct FCatLeg
  *  - Body: pelvis / chest heights follow the paws (pitching on slopes), the spine bends into turns, bobs with the gait,
  *    crouches before a jump, stretches in the air and absorbs landings on a spring. The head stays level and looks
  *    at points of interest; ears are springs with idle twitches; eyelids blink.
- *  - Tail: a Verlet chain with gravity, inertia and a pose-dependent carriage, so it swings when the cat turns, runs,
- *    jumps or stops.
+ *  - Tail: every segment's direction is its own damped angular spring toward the pose's carriage, nudged by the root's
+ *    acceleration, with softer springs toward the tip. It swings and lags through turns, starts, stops and jumps, but
+ *    segments never chase each other, so nothing can resonate into a whip (the old Verlet chain spun).
  */
 UCLASS(ClassGroup = (Shade))
 class SHADENSEEK_API UShadeCatRig : public UActorComponent
@@ -199,9 +200,12 @@ private:
 	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;
 	float SmoothSpeed = 0.f;
 
-	// Tail (world-space Verlet)
+	// Tail: per-segment world directions on damped angular springs (positions are derived)
 	FVector TailX[9];
-	FVector TailPrev[9];
+	FVector TailDirW[8];
+	FVector TailOmega[8];
+	FVector TailRootVel = FVector::ZeroVector;
+	FVector TailRootAcc = FVector::ZeroVector;
 	bool bTailInit = false;
 	FVector TailRootRig = FVector::ZeroVector;
 	FQuat TailPelvisDelta = FQuat::Identity;

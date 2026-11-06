@@ -87,14 +87,15 @@ public:
 	void SpawnBurst(const FVector& Center, int32 Count, float Heat, float Speed);
 
 	UShadeCatRig* GetRig() const { return Rig; }
+	UPoseableMeshComponent* GetBody() const { return Body; }
 	UCameraComponent* GetCamera() const { return FollowCamera; }
 	USpringArmComponent* GetBoom() const { return CameraBoom; }
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float WalkSpeed = 120.f;
+	float WalkSpeed = 110.f;
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float SprintSpeed = 300.f;
+	float SprintSpeed = 270.f;
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
 	float PushSpeed = 95.f;

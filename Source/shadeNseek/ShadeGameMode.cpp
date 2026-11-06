@@ -22,7 +22,10 @@
 #include "HAL/PlatformTime.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 
@@ -58,6 +61,10 @@ void AShadeGameMode::InitGame(const FString& MapName, const FString& Options, FS
 	// A retry after Shade faded comes straight back into the lane (no title).
 	bRetry = UGameplayStatics::HasOption(Options, TEXT("retry"));
 	bSkipTitle = HasParam(TEXT("skiptitle")) || bRetry;
+	if (FParse::Value(FCommandLine::Get(), TEXT("motioncap="), MotionCap) && MotionCap != TEXT("title"))
+	{
+		bSkipTitle = true;
+	}
 	BuildObjectives();
 }
 
@@ -96,6 +103,28 @@ void AShadeGameMode::StartPlay()
 	if (APlayerController* PC0 = UGameplayStatics::GetPlayerController(this, 0))
 	{
 		PC0->ConsoleCommand(TEXT("DisableAllScreenMessages"), true);
+	}
+	// Only big structures (houses, walls, ground, the tower) may push the follow camera in. Pots, shutters, sills,
+	// lamps, chairs and the cart used to catch the boom in the narrow lanes and jerk the whole view back and forth.
+	{
+		int32 Freed = 0;
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (Cast<APawn>(*It))
+			{
+				continue;
+			}
+			TInlineComponentArray<UPrimitiveComponent*> Prims(*It);
+			for (UPrimitiveComponent* C : Prims)
+			{
+				if (C && C->IsQueryCollisionEnabled() && C->GetCollisionResponseToChannel(ECC_Camera) != ECR_Ignore && C->Bounds.SphereRadius < 240.f)
+				{
+					C->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+					++Freed;
+				}
+			}
+		}
+		UE_LOG(LogShade, Log, TEXT("SHADE_CAMERA %d small props no longer block the camera"), Freed);
 	}
 	for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
 	{
@@ -207,8 +236,30 @@ void AShadeGameMode::StartGame()
 	{
 		if (AShadeCharacter* S = GetShade())
 		{
-			PC->SetViewTargetWithBlend(S, bSkipTitle ? 0.f : 2.6f, VTBlend_EaseInOut, 2.2f);
 			PC->SetControlRotation(FRotator(-12.f, S->GetActorRotation().Yaw, 0.f));
+			if (bSkipTitle)
+			{
+				PC->SetViewTarget(S);
+			}
+			else
+			{
+				// Dip to black and cut down to Shade. A view-target blend flies in a straight line from the rooftop
+				// shot to the passage - straight through the houses, which flashed walls and rooms past the lens.
+				const FLinearColor Dusk(0.02f, 0.015f, 0.03f);
+				FadeTo(1.f, 0.7f, Dusk);
+				TWeakObjectPtr<AShadeGameMode> Self(this);
+				TWeakObjectPtr<APlayerController> WPC(PC);
+				TWeakObjectPtr<AShadeCharacter> WS(S);
+				FTimerHandle H;
+				GetWorldTimerManager().SetTimer(H, [Self, WPC, WS, Dusk]()
+				{
+					if (Self.IsValid() && WPC.IsValid() && WS.IsValid())
+					{
+						WPC->SetViewTarget(WS.Get());
+						Self->FadeTo(0.f, 1.3f, Dusk);
+					}
+				}, 0.78f, false);
+			}
 		}
 	}
 	if (bRetry)
@@ -431,6 +482,11 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 		TickTitle(Dt);
 		break;
 	case EShadePhase::Intro:
+		// Keep the rooftop shot gently pushing in while it fades out.
+		if (TitleCamera && PhaseTime < 0.8f && !bSkipTitle)
+		{
+			TitleCamera->AddActorWorldOffset(TitleCamera->GetActorForwardVector() * 140.f * Dt);
+		}
 		if (PhaseTime > (bSkipTitle ? 0.1f : 2.8f))
 		{
 			SetPhase(EShadePhase::Playing);
@@ -488,6 +544,10 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 			ShotTimer = 2.5f;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / FString::Printf(TEXT("Shots/auto_%03d.png"), ShotIndex++), true, false);
 		}
+	}
+	if (!MotionCap.IsEmpty())
+	{
+		TickMotionCap(Dt);
 	}
 	if (IsAutoplayExit() && RunTime > 420.f)
 	{
@@ -706,6 +766,129 @@ void AShadeGameMode::WriteSunMap(const TCHAR* Suffix)
 	}
 	const FBox2D Area(FVector2D(Bounds.Min) - FVector2D(700.f), FVector2D(Bounds.Max) + FVector2D(700.f));
 	SS->WriteSunMap(Area, 10.f, Bounds.Max.Z + 1500.f, FPaths::ProjectSavedDir() / FString::Printf(TEXT("SunMap%s.png"), Suffix));
+}
+
+void AShadeGameMode::TickMotionCap(float Dt)
+{
+	AShadeCharacter* S = GetShade();
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!S || !PC)
+	{
+		return;
+	}
+	const bool bTitle = MotionCap == TEXT("title");
+	if (!bTitle && Phase != EShadePhase::Playing)
+	{
+		return;
+	}
+	static const TCHAR* Bones[] = {
+		TEXT("pelvis"), TEXT("spine_03"), TEXT("head"),
+		TEXT("tail_01"), TEXT("tail_02"), TEXT("tail_03"), TEXT("tail_04"), TEXT("tail_05"), TEXT("tail_06"), TEXT("tail_07"), TEXT("tail_08"),
+		TEXT("upperarm_l"), TEXT("forearm_l"), TEXT("hand_l"), TEXT("finger_l"), TEXT("upperarm_r"), TEXT("forearm_r"), TEXT("hand_r"), TEXT("finger_r"),
+		TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("toe_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r"), TEXT("toe_r"),
+	};
+	const FString Dir = FPaths::ProjectSavedDir() / TEXT("MotionCap") / MotionCap;
+	if (!bCapInit)
+	{
+		bCapInit = true;
+		CapStart = S->GetActorLocation();
+		CapFwd = S->GetActorForwardVector().GetSafeNormal2D();
+		CapCamFocus = CapStart;
+		CapCsv = TEXT("frame,t,phase,x,y,z,yaw,speed,camx,camy,camz,campitch,camyaw,camroll,arm");
+		for (const TCHAR* B : Bones)
+		{
+			CapCsv += FString::Printf(TEXT(",%s_px,%s_py,%s_pz,%s_qx,%s_qy,%s_qz,%s_qw"), B, B, B, B, B, B, B);
+		}
+		CapCsv += TEXT("\n");
+		S->SetInvulnerable(true);
+		S->SetControlEnabled(true);
+		if (MotionCap == TEXT("side"))
+		{
+			FActorSpawnParameters P;
+			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			CapCam = GetWorld()->SpawnActor<ACameraActor>(CapStart, FRotator::ZeroRotator, P);
+			if (CapCam)
+			{
+				CapCam->GetCameraComponent()->SetFieldOfView(50.f);
+				CapCam->GetCameraComponent()->bConstrainAspectRatio = false;
+				PC->SetViewTarget(CapCam);
+			}
+		}
+		UE_LOG(LogShade, Log, TEXT("SHADE_MOTIONCAP %s start %s fwd %s"), *MotionCap, *CapStart.ToCompactString(), *CapFwd.ToCompactString());
+	}
+	const float T0 = CapTime;
+	CapTime += Dt;
+	const float T = CapTime;
+	auto Crossed = [T0, T](float At) { return T0 < At && T >= At; };
+	const FVector Up = FVector::UpVector;
+	const FVector Right = FVector::CrossProduct(Up, CapFwd);
+
+	float EndAt = 16.5f;
+	if (bTitle)
+	{
+		// Title crane drift, then "Begin" and the swoop down into the passage.
+		EndAt = 13.f;
+		if (Crossed(6.5f))
+		{
+			StartGame();
+		}
+	}
+	else
+	{
+		// Idle, walk, veer, stop, about-turn, trot, stop, walking hop - the moves a player makes in the first minute.
+		FVector Wish = FVector::ZeroVector;
+		bool bSprintNow = false;
+		if (T >= 1.f && T < 4.5f) { Wish = CapFwd; }
+		else if (T >= 4.5f && T < 6.f) { Wish = CapFwd.RotateAngleAxis(-40.f * FMath::Sin(PI * (T - 4.5f) / 1.5f), Up); }
+		else if (T >= 7.6f && T < 8.8f) { Wish = -CapFwd; }
+		else if (T >= 10.f && T < 11.8f) { Wish = CapFwd; bSprintNow = true; }
+		else if (T >= 13.f && T < 14.6f) { Wish = CapFwd; }
+		if (Crossed(13.5f))
+		{
+			S->JumpInput();
+		}
+		S->SetSprint(bSprintNow);
+		if (!Wish.IsNearlyZero())
+		{
+			S->AddMovementInput(Wish, 1.f);
+		}
+		if (CapCam)
+		{
+			// Three-quarter side view at cat height, following a smoothed focus point.
+			const FVector Focus = S->GetActorLocation() - FVector(0.f, 0.f, 8.f);
+			CapCamFocus = FMath::Lerp(CapCamFocus, Focus, 1.f - FMath::Exp(-10.f * Dt));
+			const FVector CamLoc = CapCamFocus + Right * 150.f - CapFwd * 35.f + Up * 22.f;
+			CapCam->SetActorLocationAndRotation(CamLoc, (CapCamFocus - CamLoc).Rotation());
+		}
+	}
+
+	// Frame + tracks.
+	FScreenshotRequest::RequestScreenshot(Dir / FString::Printf(TEXT("f_%04d.png"), CapFrame), false, false);
+	const FVector L = S->GetActorLocation();
+	const APlayerCameraManager* PCM = PC->PlayerCameraManager;
+	const FVector CL = PCM ? PCM->GetCameraLocation() : FVector::ZeroVector;
+	const FRotator CR = PCM ? PCM->GetCameraRotation() : FRotator::ZeroRotator;
+	const float Arm = S->GetBoom() ? FVector::Dist(S->GetBoom()->GetComponentLocation(), S->GetCamera()->GetComponentLocation()) : 0.f;
+	CapCsv += FString::Printf(TEXT("%d,%.4f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.4f,%.4f,%.3f"), CapFrame, T, static_cast<int32>(Phase),
+		L.X, L.Y, L.Z, S->GetActorRotation().Yaw, S->GetVelocity().Size2D(), CL.X, CL.Y, CL.Z, CR.Pitch, CR.Yaw, CR.Roll, Arm);
+	UPoseableMeshComponent* Body = S->GetBody();
+	for (const TCHAR* B : Bones)
+	{
+		const int32 Bi = Body ? Body->GetBoneIndex(FName(B)) : INDEX_NONE;
+		const FTransform X = Bi != INDEX_NONE ? Body->GetBoneTransform(Bi) : FTransform::Identity;
+		const FVector P = X.GetLocation();
+		const FQuat Q = X.GetRotation();
+		CapCsv += FString::Printf(TEXT(",%.3f,%.3f,%.3f,%.5f,%.5f,%.5f,%.5f"), P.X, P.Y, P.Z, Q.X, Q.Y, Q.Z, Q.W);
+	}
+	CapCsv += TEXT("\n");
+	++CapFrame;
+	if (T >= EndAt)
+	{
+		FFileHelper::SaveStringToFile(CapCsv, *(Dir / TEXT("tracks.csv")));
+		UE_LOG(LogShade, Log, TEXT("SHADE_MOTIONCAP done %d frames"), CapFrame);
+		MotionCap.Empty();
+		QuitGame();
+	}
 }
 
 void AShadeGameMode::RunCamShots()

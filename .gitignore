@@ -3,6 +3,8 @@ Binaries/
 Intermediate/
 Saved/
 DerivedDataCache/
+# Cook/package open-order logs
+Build/Windows/FileOpenOrder/
 .vs/
 .vscode/
 *.sln

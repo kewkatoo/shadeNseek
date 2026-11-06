@@ -5,7 +5,10 @@
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $dist = Join-Path $root "Dist"
 $stage = Join-Path $dist "stage\shadeNseek"
-Remove-Item $dist -Recurse -Force -ErrorAction SilentlyContinue
+# Only clear this script's own outputs (Dist/Packaged holds the cooked game from package_game.ps1).
+foreach ($old in @("stage", "stage_lib", "shadeNseek.zip", "asset-library.zip")) {
+    Remove-Item (Join-Path $dist $old) -Recurse -Force -ErrorAction SilentlyContinue
+}
 New-Item -ItemType Directory -Force $stage | Out-Null
 python -I (Join-Path $root "Scripts\make_credits.py") $root | Out-Null
 
@@ -23,4 +26,4 @@ Copy-Item (Join-Path $root "manifest.json") (Join-Path $lib "manifest.json") -Fo
 Compress-Archive -Path (Join-Path $lib "*") -DestinationPath (Join-Path $dist "asset-library.zip") -CompressionLevel Optimal
 Remove-Item (Join-Path $dist "stage"), $lib -Recurse -Force
 
-Get-ChildItem $dist | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }
+Get-ChildItem $dist -Filter *.zip | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }

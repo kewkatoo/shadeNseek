@@ -108,6 +108,24 @@ protected:
 	void RunCatGallery();
 	void RunCamShots();
 	void WriteSunMap(const TCHAR* Suffix);
+	void TickMotionCap(float Dt);
+
+	/**
+	 * QA motion capture (-motioncap=title|follow|side, run with -benchmark -fps=30 for a fixed time step): drives a
+	 * scripted walk / turn / stop / about-turn / trot / jump, screenshots every frame to Saved/MotionCap/<mode>/ and
+	 * writes bone + camera tracks to a CSV, so motion problems (jitter, tail spin, gait) can be measured, not guessed.
+	 */
+	FString MotionCap;
+	float CapTime = 0.f;
+	int32 CapFrame = 0;
+	FString CapCsv;
+	FVector CapStart = FVector::ZeroVector;
+	FVector CapFwd = FVector::ForwardVector;
+	FVector CapCamFocus = FVector::ZeroVector;
+	bool bCapInit = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ACameraActor> CapCam;
 
 	EShadePhase Phase = EShadePhase::Title;
 	double PhaseStartRealTime = 0.0;
