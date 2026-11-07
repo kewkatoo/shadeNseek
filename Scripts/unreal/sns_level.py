@@ -455,7 +455,7 @@ house("Caffe", 1700, 2500, -900, -160, 0, 820, wall="MI_Wall_Ochre", faces=("+y"
 place(mesh("SM_Card"), (1950, -158, 330), (0, -90, 0), (1, 2.6, 0.65), "Piazza", mats=[mat("MI_Sign_Caffe")], collision=False)
 chalk = prop("standing_chalkboard_01")
 if chalk:
-    place(chalk, (2215, -128, 0), (0, 12, 0), 1.0, "Piazza", sun=False)
+    place(chalk, (1990, 150, 0), (0, 160, 0), 1.0, "Piazza", sun=False)  # among the café tables, off the route along y -110
 else:
     place(mesh("SM_Card"), (2210, -150, 150), (0, -90, 0), (1, 0.55, 0.7), "Piazza", mats=[mat("MI_Sign_Menu")], collision=False)
 # lane 2 + stairs
@@ -778,7 +778,7 @@ for (kind, (x, y, z), yaw, extra) in DECOR:
         place(prop("painted_wooden_chair_02"), (x - math.cos(side) * (extra * 0.5 + 70), y - math.sin(side) * (extra * 0.5 + 70), z),
               (0, yaw + R.uniform(150, 210), 0), 0.95, F, sun=False)
 place(prop("planter_box_01"), (300, -125, 0), (0, 4, 0), 1.0, F, sun=False)
-for (x, y, z) in ((1450, -125, 0), (2480, -130, 0), (3600, -520, 300)):
+for (x, y, z) in ((1450, -125, 0), (2330, 470, 0), (3600, -520, 300)):
     place(prop("ceramic_pot"), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.9, 1.2), F, sun=False)
 for (x, y, z, kind) in ((-140, -150, 0, "crystalline_iceplant"), (470, -152, 0, "fern_02"), (1310, -150, 0, "weed_plant_02"),
                         (1690, -150, 0, "crystalline_iceplant"), (2520, -150, 0, "fern_02"), (2700, -150, 35, "weed_plant_02"),
