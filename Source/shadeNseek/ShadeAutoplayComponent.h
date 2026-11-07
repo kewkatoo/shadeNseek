@@ -73,5 +73,7 @@ private:
 	int32 StuckJumps = 0;
 	int32 StepEvaporations = 0;
 	bool bSeenLit = false;
+	/** -apfrom=<AP tag>: QA shortcut, Shade starts at that waypoint and the route continues from there. */
+	FString ApFrom;
 	float ShadedTime = 0.f;
 };

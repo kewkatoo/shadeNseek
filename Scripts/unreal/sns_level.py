@@ -7,9 +7,12 @@ every patch of shade on the route is cast by something *seaward* of it. Gameplay
   x -150..1700   Via del Gatto: lane between house rows                   (shaded by the sea-side row)
      x 900..1080   alley gap down to the harbour -> sunbeam  -> P1: push the lemon cart into it
   x 1700..2500   Piazzetta: open to the sea, Caffe Rosa                   -> P2: tug the awning cord
-  x 2500..3330   stairs up (z 0 -> 300) between tall houses               (shaded)
-  x 3330..       church terrace (z 300)
-     x 3500..3650  gap between Casa Azzurra and the bell tower  -> P3: knock the potted lemon tree off the wall
+  x 2500..3330   stairs up (z 0 -> 300) between tall houses
+     x 2660..2860  sunlit gap over the lower stairs  -> P3: run the washing out, cross between the sea gusts
+     x 3000..3150  sunlit gap over the upper stairs  -> P4: tug the shutter open, trot through before it shuts
+  x 3330..       church terrace (z 300), in full sun up to the bell tower
+     x 3330..3650  -> P5: Casa Azzurra's awning shades the garden wall, then the potted lemon tree knocked off the
+                   wall bridges the last gap (x 3525..3650) to the tower's shade
      tower x 3650..3800, y 100..250; Biscotto asleep on a bench at (3894,-470) in the sun, *shadowless*
   Finale: the sun swings 15 deg west and sinks to 24 deg; the bell tower's shadow sweeps over Biscotto.
 """
@@ -452,9 +455,20 @@ house("Caffe", 1700, 2500, -900, -160, 0, 820, wall="MI_Wall_Ochre", faces=("+y"
 place(mesh("SM_Card"), (1950, -158, 330), (0, -90, 0), (1, 2.6, 0.65), "Piazza", mats=[mat("MI_Sign_Caffe")], collision=False)
 place(mesh("SM_Card"), (2210, -150, 150), (0, -90, 0), (1, 0.55, 0.7), "Piazza", mats=[mat("MI_Sign_Menu")], collision=False)
 # lane 2 + stairs
-house("S4", 2500, 3000, 160, 760, 0, 650, wall="MI_Wall_Salmon", faces=("-y", "+y", "-x"), roof="vault")
+# Sea-side stair houses with two sunlit gaps between them (P3 x 2660..2860, P4 x 3000..3150). Their gap-facing walls are
+# blank party walls: window details there would drop stray patches of shade into the gaps.
+house("S4a", 2500, 2660, 160, 760, 0, 650, wall="MI_Wall_Salmon", faces=("-y", "+y"), roof="vault")
+house("S4b", 2860, 3000, 160, 760, 0, 800, wall="MI_Wall_Lemon", faces=("-y", "+y"), roof="flat")
 house("N5", 2500, 3330, -900, -160, 0, 1000, wall="MI_Wall_White", faces=("+y",), door=("+y", -250), roof="pergola")
-house("Azzurra", 3000, 3500, 160, 760, 0, 750, wall="MI_Wall_Sky", faces=("-y", "+y", "+x"), roof="flat", door=("-y", -150))
+house("Azzurra", 3150, 3330, 160, 760, 0, 750, wall="MI_Wall_Sky", faces=("-y", "+y", "+x"), roof="flat")
+# Iron railings + invisible walls along the open gaps and the terrace's seaward edge (railings never block the sun).
+for (x0, z0, x1, z1) in ((2660, 17.65, 2860, 105.9), (3000, 158.8, 3150, 229.4)):
+    run, rise = x1 - x0, z1 - z0
+    place(mesh("SM_Railing_200"), (x0, 166, z0), (math.degrees(math.atan2(rise, run)), 0, 0), (math.hypot(run, rise) / 200, 1, 1), "Stairs", collision=False)
+    blocker((x0 + x1) / 2, 176, (z0 + z1) / 2 + 120, run, 20, 360)
+for x in (3330, 3450):
+    place(mesh("SM_Railing_200"), (x, 250, 300), (0, 0, 0), 1.0, "Church", collision=False)
+blocker(3490, 262, 380, 320, 20, 200)
 
 # =====================================================================================================================
 # 3. Church terrace: church, dome, bell tower, railing, bench
@@ -504,7 +518,7 @@ place(mesh("SM_Bench_Stone"), (4250, -470, 300), (0, 0, 0), 1.0, F)
 wall = box(115, 60, 80, 0, (0, 0, 40), bev=3.0)
 append(wall, box(119, 64, 6, 1, (0, 0, 81)))
 wsm = save(wall, "SM_PotWall", [mat("MI_Wall_Stacked"), mat("MI_StepStone")], folder=HOUSES)
-place(wsm, (3435, 130, 300), folder=F)
+place(wsm, (3410, 130, 300), folder=F)
 
 # =====================================================================================================================
 # 4. Gameplay
@@ -521,7 +535,37 @@ for (px, py) in ((2492, 100), (2492, 400), (1714, 400)):
     place(mesh("SM_Post_100"), (px, py, 0), (0, 0, 0), (1, 1, 2.78), "Piazza", sun=False)
 for py in (100, 400):
     place(mesh("SM_Beam_100"), (1706, py, 286), (0, 0, 0), (7.9, 1, 1), "Piazza", sun=False)
-pot = spawn(gclass("ShadeFlowerPot"), (3468, 130, 386), (0, 0, 0), F, tags=("Dev_Pot",), land_offset=V(107, -15, -86), land_yaw=20.0,
+# P3 "Washing day": a line from a pulley on S4a's corner climbs with the stairs to S4b, 200 cm above the steps, 40 cm
+# seaward of the stairs; its sheets (140 cm drop) shade y -146..96 while they hang, nothing on the steps while a gust
+# lifts them.
+spawn(gclass("ShadeWashingLine"), (2660, 200, 218), (0, 0, 0), F, tags=("Dev_Wash",), span=200.0, rise=88.0, sheet_width=74.0,
+      sheet_drop=140.0, open_speed=0.5, gust_period=4.3, gust_time=1.8, gust_lift=78.0, cord_local=V(-15, -42, -163),
+      interact_offset=V(0, -85, -35), solved_event=unreal.Name("LineOut"))
+# P4 "The shutter": a big louvred shutter hinged on S4b's east wall (y 330..490 shut). Open it reaches across the upper
+# gap at y ~330; at 205 cm tall it shades the whole stair width.
+sh = new()
+append(sh, box(2, 160, 205, 0, (1, 80, 102.5)))
+for (yy, ww) in ((5, 10), (155, 10)):
+    append(sh, box(6, ww, 205, 0, (3, yy, 102.5), bev=0.8))
+for zz in (6, 102, 199):
+    append(sh, box(6, 160, 12, 0, (3, 80, zz), bev=0.8))
+for k in range(18):
+    zz = 16 + k * 9.6 if k < 9 else 112 + (k - 9) * 9.6
+    if zz < 196 and abs(zz - 102) > 8:
+        append(sh, box(3, 140, 4, 0, (4.5, 80, zz)))
+append(sh, box(4, 6, 14, 1, (5, 152, 102)))
+save(sh, "SM_BigShutter", [mat("MI_Shutter_Green"), mat("MI_Iron_Black")], folder="/Game/Shade/Meshes", collision=None, uv_tile=120.0)
+place(mesh("SM_Card"), (3000.6, 410, 392), (0, 0, 0), (1, 1.45, 1.95), "Stairs", mats=[mat("MI_Glass")], collision=False)
+spawn(gclass("ShadeShutter"), (3001, 330, 290), (0, 0, 0), F, tags=("Dev_Shutter",), panel_width=160.0, panel_height=205.0, open_angle=100.0,
+      open_time=0.45, hold_open=0.8, close_time=1.0, done_event=unreal.Name("Zone_AfterShutter"), cord_local=V(-16, -172, -80),
+      interact_offset=V(0, -85, -40))
+# P5 "Two shadows": Casa Azzurra's blue awning on its east wall shades the garden wall (only then can Shade nudge the pot).
+aw2 = spawn(gclass("ShadeAwning"), (3330, 340, 530), (0, 0, 0), F, tags=("Dev_Azzurra",), depth=175.0, width=360.0, slope=10.0,
+            start_extension=0.05, open_speed=0.6, cord_local=V(-12, -182, -175), interact_offset=V(-10, -85, -35), show_arms=True,
+            solved_event=unreal.Name("AzzurraOut"))
+for cname in ("canvas", "valance"):
+    aw2.get_editor_property(cname).set_material(0, mat("MI_Awning_Sea"))
+pot = spawn(gclass("ShadeFlowerPot"), (3440, 130, 386), (0, 0, 0), F, tags=("Dev_Pot",), land_offset=V(135, -15, -86), land_yaw=20.0,
             solved_event=unreal.Name("PotSolved"))
 pot_mesh = prop("planter_pot_clay")
 pc = pot.get_editor_property("pot")
@@ -557,11 +601,13 @@ spawn(gclass("ShadeNapCat"), (180, -128, 0), (0, 40, 0), F, coat_tint=unreal.Lin
 spawn(gclass("ShadeNapCat"), (2080, 545, 96), (0, 160, 0), F, coat_tint=unreal.LinearColor(1, 1, 1, 1), coat_dark=0.85, cat_scale=1.0)
 
 for (ev, x, y, z, ex, ey, ez) in (("Zone_Lane", 120, 0, 150, 60, 170, 160), ("Zone_AfterAlley", 1260, 0, 150, 60, 170, 160),
-                                  ("Zone_AfterPiazza", 2600, 0, 150, 60, 170, 160), ("Zone_Terrace", 3720, -150, 420, 45, 320, 160)):
+                                  ("Zone_AfterPiazza", 2600, 0, 150, 60, 170, 160), ("Zone_AfterWash", 2930, 0, 200, 40, 170, 160),
+                                  ("Zone_AfterShutter", 3215, 0, 300, 40, 170, 160), ("Zone_Terrace", 3720, -150, 420, 45, 320, 160)):
     z_ = spawn(gclass("ShadeZone"), (x, y, z), (0, 0, 0), F, event_name=unreal.Name(ev))
     z_.get_editor_property("box").set_editor_property("box_extent", V(ex, ey, ez))
 
-for (tag, x, y, z) in (("OBJ_Lane", 300, -60, 40), ("OBJ_Cart", 420, 95, 110), ("OBJ_Awning", 1690, 100, 70), ("OBJ_Pot", 3468, 130, 470),
+for (tag, x, y, z) in (("OBJ_Lane", 300, -60, 40), ("OBJ_Cart", 420, 95, 110), ("OBJ_Awning", 1690, 100, 70), ("OBJ_Wash", 2645, 158, 100),
+                       ("OBJ_Shutter", 2985, 158, 250), ("OBJ_Azzurra", 3318, 158, 400), ("OBJ_Pot", 3440, 130, 470),
                        ("OBJ_Wait", 3760, -100, 360), ("OBJ_Biscotto", 3894, -430, 420)):
     target(tag, x, y, z)
 target("SunFinale", 0, 0, 3000, SUN_FINALE)
@@ -570,8 +616,10 @@ target("Gallery", 2100, 180, 0, (0, 0, 0))
 # Autoplay route (all points are in shade at the moment they're used)
 for (tag, x, y, z) in (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), ("AP_SunBack", 780, -60, 0), ("AP_CartGrab", 400, 95, 0),
                        ("AP_Alley1", 840, -15, 0), ("AP_Alley2", 1000, -12, 0), ("AP_Alley3", 1220, -30, 0), ("AP_Cord", 1672, 58, 0),
-                       ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0), ("AP_Steps2", 2900, -40, 110),
-                       ("AP_Steps3", 3250, -40, 270), ("AP_WallJump", 3420, 45, 300), ("AP_WallTop", 3420, 128, 380), ("AP_PotNudge", 3442, 130, 380),
+                       ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0),
+                       ("AP_Pulley", 2640, 65, 0), ("AP_WashStart", 2632, 20, 0), ("AP_WashMid", 2760, 20, 53), ("AP_WashEnd", 2885, 20, 106),
+                       ("AP_ShutterCord", 2980, 65, 159), ("AP_ShutterMid", 3075, 40, 194), ("AP_ShutterEnd", 3185, 40, 247),
+                       ("AP_AzzurraCord", 3305, 70, 300), ("AP_WallJump", 3395, 45, 300), ("AP_WallTop", 3395, 128, 380), ("AP_PotNudge", 3402, 130, 380),
                        ("AP_WallDown", 3400, 30, 300), ("AP_Terrace", 3480, -150, 300), ("AP_Porch", 3760, -100, 300), ("AP_Biscotto", 3880, -372, 300)):
     waypoint(tag, x, y, z)
 
@@ -616,7 +664,7 @@ def festoon(x0, y0, x1, y1, z, n=10, sag=45.0, light=True):
         warm_light((mid[0], mid[1], mid[2] - 25), 260, 520)
 
 
-for (x, z) in ((60, 430), (520, 470), (1180, 450), (1560, 440), (2560, 520), (3120, 640)):
+for (x, z) in ((60, 430), (520, 470), (1180, 450), (1560, 440), (2510, 520), (3170, 640)):
     festoon(x, -158, x + 140, 158, z)
 festoon(1720, -158, 2480, 90, 470, n=16, sag=60)
 festoon(1720, 90, 2480, -158, 520, n=16, sag=60)

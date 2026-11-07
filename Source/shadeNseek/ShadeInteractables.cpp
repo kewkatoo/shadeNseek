@@ -781,6 +781,7 @@ void AShadeShutter::Interact(AShadeCharacter* Shade)
 	}
 	State = 1;
 	StateTime = 0.f;
+	UE_LOG(LogShade, Log, TEXT("SHADE_SHUTTER tug: opening (panel shade box %s)"), *PanelShade->Bounds.GetBox().ToString());
 	ShadeAssets::PlayAt(this, TEXT("SFX_AwningClick"), GetActorTransform().TransformPosition(CordLocal), 0.6f, 0.9f);
 	ShadeAssets::PlayAt(this, TEXT("SFX_ShutterCreak"), Hinge->GetComponentLocation() + FVector(0, 0, PanelHeight * 0.5f), 0.8f, 1.15f);
 }
@@ -808,6 +809,7 @@ void AShadeShutter::Tick(float DeltaSeconds)
 			StateTime = 0.f;
 			Angle = OpenAngle;
 			Bang.Velocity = -40.f;
+			UE_LOG(LogShade, Log, TEXT("SHADE_SHUTTER open (panel shade box %s)"), *PanelShade->Bounds.GetBox().ToString());
 			ShadeAssets::PlayAt(this, TEXT("SFX_Release"), Mid, 0.6f, 0.85f);
 		}
 		break;

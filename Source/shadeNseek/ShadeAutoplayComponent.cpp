@@ -20,6 +20,7 @@ void UShadeAutoplayComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	BuildScript();
+	FParse::Value(FCommandLine::Get(), TEXT("apfrom="), ApFrom);
 	NextStep();
 }
 
@@ -244,6 +245,26 @@ void UShadeAutoplayComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		}
 		break;
 	case EShadeAutoStep::Wait:
+		if (!ApFrom.IsEmpty())
+		{
+			// QA shortcut: jump to the requested waypoint and carry on from there.
+			const FName From(*ApFrom);
+			ApFrom.Empty();
+			for (int32 i = StepIndex + 1; i < Script.Num(); ++i)
+			{
+				if (Script[i].Type == EShadeAutoStep::MoveTo && Script[i].Tag == From)
+				{
+					if (AActor* T = FindTagged(From))
+					{
+						S->SetActorLocation(T->GetActorLocation() + FVector(0.f, 0.f, 30.f), false, nullptr, ETeleportType::TeleportPhysics);
+					}
+					UE_LOG(LogShade, Log, TEXT("SHADE_AP jumping to step %d (%s)"), i, *From.ToString());
+					StepIndex = i - 1;
+					NextStep();
+					return;
+				}
+			}
+		}
 		if (StepTime > St.Time)
 		{
 			NextStep();
