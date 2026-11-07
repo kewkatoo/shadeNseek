@@ -254,6 +254,11 @@ def build_cameras():
         ((6200, 2600, 500), (3700, -350, 520), 46.0),
         ((-100, -50, 120), (800, -60, 40), 78.0),
         ((2650, -60, 60), (3200, -60, 330), 78.0),
+        # close-ups of the CC0 dressing: café chalkboard, Biscotto's settle, window boxes, the terrace gate
+        ((1950, 200, 120), (2215, -128, 70), 60.0),
+        ((3894, -150, 160), (3894, -440, 330), 55.0),
+        ((600, 60, 150), (900, -158, 230), 60.0),
+        ((4300, -150, 420), (4690, -150, 400), 60.0),
     ]
     for i, (loc, tgt, fov) in enumerate(cands):
         camera(f"CamCandidate_{i}", loc, tgt, fov, folder="Cinematic/Candidates")

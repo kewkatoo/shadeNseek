@@ -68,7 +68,7 @@ def attenuation(name, inner, falloff):
 def import_audio():
     near = attenuation("ATT_Near", 200, 2400)
     far = attenuation("ATT_Far", 1500, 9000)
-    for wav in sorted(glob.glob(os.path.join(LIB, "Audio", "generated", "*.wav"))):
+    for wav in sorted(glob.glob(os.path.join(LIB, "Audio", "game", "*.wav"))):  # built by Scripts/prep_audio.py
         name = os.path.splitext(os.path.basename(wav))[0]
         paths = import_file(wav, "/Game/Shade/Audio", name)
         sw = load(paths[0]) if paths else None
@@ -107,10 +107,15 @@ def kind_for(filename):
 
 
 def import_textures(polyhaven=True):
-    for set_dir in sorted(glob.glob(os.path.join(LIB, "Textures", "polyhaven", "*"))) if polyhaven else []:
+    # Poly Haven and ambientCG sets share one layout: <set>/<set>_<diff|nor_dx|arm|alpha>_<res>.jpg.
+    # Sets already in /Game are skipped unless SNS_REIMPORT=1.
+    sets = sorted(glob.glob(os.path.join(LIB, "Textures", "polyhaven", "*")) + glob.glob(os.path.join(LIB, "Textures", "ambientcg", "*")))
+    for set_dir in sets if polyhaven else []:
         sid = os.path.basename(set_dir)
         for f in sorted(glob.glob(os.path.join(set_dir, "*.jpg"))):
             mp = os.path.basename(f).replace(sid + "_", "").rsplit("_", 1)[0]  # diff / nor_dx / arm
+            if not os.environ.get("SNS_REIMPORT") and eal.does_asset_exist(f"/Game/Shade/Textures/{sid}/T_{sid}_{mp}"):
+                continue
             paths = import_file(f, f"/Game/Shade/Textures/{sid}", f"T_{sid}_{mp}")
             if paths:
                 configure_texture(load(paths[0]), kind_for(f))
@@ -125,8 +130,11 @@ def import_textures(polyhaven=True):
 
 # ---------------------------------------------------------------------------------------------------------------------
 def import_models():
+    only_models = set(filter(None, os.environ.get("SNS_MODELS", "").split(",")))
     for mdir in sorted(glob.glob(os.path.join(LIB, "Models", "polyhaven", "*"))):
         mid = os.path.basename(mdir)
+        if only_models and mid not in only_models:
+            continue
         dest = f"/Game/Shade/Props/{mid}"
         gltf = glob.glob(os.path.join(mdir, "*.gltf"))
         if not gltf:

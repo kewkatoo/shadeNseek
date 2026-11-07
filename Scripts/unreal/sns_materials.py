@@ -641,38 +641,38 @@ def build_instances(M):
     # Positano palette: whitewash, cream, peach, salmon, ochre, lemon; aged plaster; dry stone.
     mi("MI_Wall_White", S, wall, {"Tint": (1.0, 0.985, 0.95)}, surf("white_stucco"))
     mi("MI_Wall_Cream", S, wall, {"Tint": (1.0, 0.9, 0.72)}, surf("white_stucco"))
-    mi("MI_Wall_Peach", S, wall, {"Tint": (1.0, 0.76, 0.56)}, surf("white_stucco_02"))
+    mi("MI_Wall_Peach", S, dict(wall, RoughMul=1.5), {"Tint": (1.0, 0.76, 0.56)}, surf("PaintedPlaster017"))
     mi("MI_Wall_Salmon", S, wall, {"Tint": (1.0, 0.6, 0.47)}, surf("white_stucco"))
-    mi("MI_Wall_Lemon", S, wall, {"Tint": (1.0, 0.84, 0.36)}, surf("white_stucco_02"))
-    mi("MI_Wall_Ochre", S, wall, {"Tint": (1.0, 0.66, 0.3)}, surf("white_stucco_02"))
+    mi("MI_Wall_Lemon", S, dict(wall, RoughMul=2.2), {"Tint": (1.05, 1.0, 0.72)}, surf("PaintedPlaster018"))
+    mi("MI_Wall_Ochre", S, dict(wall, RoughMul=2.2), {"Tint": (1.05, 0.8, 0.5)}, surf("PaintedPlaster018"))
     mi("MI_Wall_Rose", S, wall, {"Tint": (1.0, 0.64, 0.66)}, surf("white_stucco"))
     mi("MI_Wall_Sky", S, dict(wall, Tiling=1.0, Brightness=1.1), {"Tint": (1.05, 1.12, 1.12)}, surf("blue_plaster_weathered"))
     mi("MI_Wall_Aged", S, dict(wall, Tiling=1.0), {"Tint": (1.0, 0.96, 0.9)}, surf("white_rough_plaster"))
     mi("MI_Wall_Beige", S, dict(wall, Tiling=1.0), {"Tint": (1.0, 0.95, 0.86)}, surf("painted_plaster_wall"))
-    mi("MI_Wall_Stone", S, {"Tiling": 0.9, "DirtAmount": 0.4, "MacroAmount": 0.15}, {"Tint": (1.0, 0.95, 0.88)}, surf("rustic_stone_wall"))
+    mi("MI_Wall_Stone", S, {"Tiling": 0.8, "DirtAmount": 0.4, "MacroAmount": 0.15}, {"Tint": (1.02, 0.97, 0.9)}, surf("coral_stone_wall"))
     mi("MI_Wall_Stacked", S, {"Tiling": 1.0, "DirtAmount": 0.3, "MacroAmount": 0.15}, None, surf("stacked_stone_wall"))
     mi("MI_Trim_White", S, {"Tiling": 2.5, "MacroAmount": 0.06, "NormalStrength": 0.5}, {"Tint": (1.05, 1.03, 1.0)}, surf("white_stucco"))
     ground = {"MacroAmount": 0.2, "DirtAmount": 0.0}
-    mi("MI_Cobble", S, dict(ground, Tiling=1.3), {"Tint": (1.07, 0.96, 0.82)}, surf("cobblestone_floor_08"))
-    mi("MI_Flag", S, dict(ground, Tiling=0.8), {"Tint": (1.06, 0.97, 0.86)}, surf("stone_pathway"))
-    mi("MI_StepStone", S, dict(ground, Tiling=1.2), {"Tint": (1.06, 0.96, 0.84)}, surf("grey_stone_path"))
-    mi("MI_Terracotta", S, dict(ground, Tiling=1.6), None, surf("terracotta_floor_tiles"))
+    mi("MI_Cobble", S, dict(ground, Tiling=1.0), {"Tint": (1.08, 1.0, 0.9)}, surf("PavingStones150"))
+    mi("MI_Flag", S, dict(ground, Tiling=0.8, RoughMul=1.9, Brightness=0.86), {"Tint": (1.02, 0.98, 0.94)}, surf("Tiles143"))
+    mi("MI_StepStone", S, dict(ground, Tiling=1.1, RoughMul=12.0, Brightness=0.8), {"Tint": (1.0, 0.97, 0.92)}, surf("Travertine009"))
+    mi("MI_Terracotta", S, dict(ground, Tiling=1.6, RoughMul=2.5), None, surf("GlazedTerracotta001"))
     mi("MI_Sand", S, dict(ground, Tiling=0.6), None, surf("coast_sand_01"))
     mi("MI_Cliff", S, {"Tiling": 0.35, "MacroAmount": 0.25}, {"Tint": (0.95, 0.9, 0.84)}, surf("marble_cliff_02"))
     mi("MI_Soil", S, {"Tiling": 3.0, "MacroAmount": 0.3, "DirtAmount": 0.0, "RoughMul": 1.1}, {"Tint": (0.36, 0.25, 0.17)}, surf("coast_sand_01"))
-    mi("MI_RoofTiles", S, {"Tiling": 1.4, "MacroAmount": 0.2, "DirtAmount": 0.0}, None, surf("clay_roof_tiles_02"))
+    mi("MI_RoofTiles", S, {"Tiling": 1.2, "MacroAmount": 0.2, "DirtAmount": 0.0}, None, surf("RoofingTiles014B"))
 
     P = M["M_Paint"]
-    planks = surf("blue_painted_planks")
+    planks = surf("PaintedWood009B")
     mi("MI_Shutter_Green", P, {"WearAmount": 0.25, "Tiling": 1.6}, {"Tint": (0.2, 0.42, 0.3)}, planks)
-    mi("MI_Shutter_Blue", P, {"WearAmount": 0.3, "Tiling": 1.6}, {"Tint": (0.12, 0.3, 0.55)}, planks)
+    mi("MI_Shutter_Blue", P, {"WearAmount": 0.3, "Tiling": 1.6}, {"Tint": (0.12, 0.3, 0.55)}, surf("PaintedWood007B"))
     mi("MI_Shutter_Teal", P, {"WearAmount": 0.28, "Tiling": 1.6}, {"Tint": (0.16, 0.45, 0.48)}, planks)
     mi("MI_Shutter_Olive", P, {"WearAmount": 0.35, "Tiling": 1.6}, {"Tint": (0.38, 0.42, 0.22)}, planks)
     mi("MI_Door_Blue", P, {"WearAmount": 0.35, "Tiling": 1.2}, {"Tint": (0.1, 0.22, 0.42)}, surf("distressed_painted_planks"))
     mi("MI_Door_Red", P, {"WearAmount": 0.35, "Tiling": 1.2}, {"Tint": (0.5, 0.12, 0.08)}, surf("distressed_painted_planks"))
     mi("MI_Door_Wood", P, {"WearAmount": 1.0, "Tiling": 1.2}, None, surf("weathered_planks"))
-    mi("MI_Wood_Crate", P, {"WearAmount": 1.0, "Tiling": 1.4}, None, surf("weathered_planks"))
-    mi("MI_Wood_Beam", P, {"WearAmount": 0.9, "Tiling": 0.8}, None, surf("weathered_planks"))
+    mi("MI_Wood_Crate", P, {"WearAmount": 1.0, "Tiling": 1.4}, None, surf("rough_wood"))
+    mi("MI_Wood_Beam", P, {"WearAmount": 1.0, "Tiling": 0.8}, None, surf("rough_wood"))
     mi("MI_Paint_Cream", P, {"WearAmount": 0.35, "Tiling": 1.4, "PaintRough": 0.5}, {"Tint": (0.85, 0.8, 0.68)}, planks)
 
     mi("MI_Iron_Black", M["M_Iron"], {"Rust": 0.35}, {"Tint": (0.02, 0.022, 0.022)})
@@ -684,16 +684,19 @@ def build_instances(M):
 
     C = M["M_Cloth"]
     for v in ("Terracotta", "Sea", "Lemon"):
-        mi(f"MI_Awning_{v}", C, {"Tiling": 1.0, "WeaveTiling": 6.0, "FlutterAmp": 0.0, "Roughness": 0.9}, None, {"BaseColorTex": tex(f"T_Awning_{v}_D")})
+        mi(f"MI_Awning_{v}", C, {"Tiling": 1.0, "WeaveTiling": 3.0, "FlutterAmp": 0.0, "Roughness": 0.9}, None,
+           {"BaseColorTex": tex(f"T_Awning_{v}_D"), "NormalTex": ph("Fabric061", "nor_dx")})
     for v in ("White", "BlueStripe", "Coral", "Lemon", "Sea"):
-        mi(f"MI_Linen_{v}", C, {"Tiling": 1.0, "WeaveTiling": 8.0, "FlutterAmp": 7.0, "HangLength": 90.0}, None, {"BaseColorTex": tex(f"T_Linen_{v}_D")})
+        mi(f"MI_Linen_{v}", C, {"Tiling": 1.0, "WeaveTiling": 4.0, "FlutterAmp": 7.0, "HangLength": 90.0}, None,
+           {"BaseColorTex": tex(f"T_Linen_{v}_D"), "NormalTex": ph("Fabric071", "nor_dx")})
     mi("MI_Towel_Terry", C, {"Tiling": 1.0, "WeaveTiling": 3.0, "FlutterAmp": 5.0, "HangLength": 70.0}, None, {"BaseColorTex": ph("terry_cloth", "diff")})
     mi("MI_Tablecloth", C, {"Tiling": 1.5, "WeaveTiling": 6.0, "FlutterAmp": 0.6, "HangLength": 25.0}, None, {"BaseColorTex": ph("fabric_pattern_07", "diff")})
 
     K = M["M_Card"]
     mi("MI_Bougain", K, {"WindAmp": 2.0}, {"Tint": (1.0, 1.0, 1.0)}, {"BaseColorTex": tex("T_Bougain_D")})
     mi("MI_Bougain_Deep", K, {"WindAmp": 2.0}, {"Tint": (0.85, 0.7, 0.95)}, {"BaseColorTex": tex("T_Bougain_D")})
-    mi("MI_Leafy", K, {"WindAmp": 1.5}, {"Tint": (1.0, 1.0, 1.0)}, {"BaseColorTex": tex("T_Leafy_D")})
+    mi("MI_Leafy", M["M_Foliage"], {"WindAmp": 1.2}, None, {"BaseColorTex": ph("LeafSet017", "diff"), "NormalTex": ph("LeafSet017", "nor_dx"),
+                                                         "ARMTex": ph("LeafSet017", "arm"), "AlphaTex": ph("LeafSet017", "alpha")})
 
     mi("MI_Majolica", M["M_Majolica"], {"Tiling": 2.0})
     Pp = M["M_Prop"]

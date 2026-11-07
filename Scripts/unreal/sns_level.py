@@ -453,7 +453,11 @@ for (n, x0, x1, h, w, door) in south:
 # Caffe Rosa: north side of the piazza, a shopfront and the sign
 house("Caffe", 1700, 2500, -900, -160, 0, 820, wall="MI_Wall_Ochre", faces=("+y",), door=("+y", -150), shop=True)
 place(mesh("SM_Card"), (1950, -158, 330), (0, -90, 0), (1, 2.6, 0.65), "Piazza", mats=[mat("MI_Sign_Caffe")], collision=False)
-place(mesh("SM_Card"), (2210, -150, 150), (0, -90, 0), (1, 0.55, 0.7), "Piazza", mats=[mat("MI_Sign_Menu")], collision=False)
+chalk = prop("standing_chalkboard_01")
+if chalk:
+    place(chalk, (2215, -128, 0), (0, 12, 0), 1.0, "Piazza", sun=False)
+else:
+    place(mesh("SM_Card"), (2210, -150, 150), (0, -90, 0), (1, 0.55, 0.7), "Piazza", mats=[mat("MI_Sign_Menu")], collision=False)
 # lane 2 + stairs
 # Sea-side stair houses with two sunlit gaps between them (P3 x 2660..2860, P4 x 3000..3150). Their gap-facing walls are
 # blank party walls: window details there would drop stray patches of shade into the gaps.
@@ -512,7 +516,32 @@ blocker(4260, 262, 380, 900, 20, 200)
 blocker(2100, 572, 100, 820, 20, 200)
 blocker(4700, -150, 400, 20, 900, 300)
 house("E1", 4350, 4800, -1400, -560, 300, 800, faces=("+y", "-x"), roof="tiles")
-place(mesh("SM_Bench_Stone"), (3894, -430, 300), (0, 0, 0), 1.0, F)
+def high_side_y(sm, above):
+    """Which local Y side the part of a mesh above `above` cm sits on (-1 / +1): e.g. a settle's back."""
+    c = unreal.DynamicMesh()
+    unreal.GeometryScript_AssetUtils.copy_mesh_from_static_mesh(sm, c, unreal.GeometryScriptCopyMeshFromAssetOptions(), unreal.GeometryScriptMeshReadLOD())
+    bb = unreal.GeometryScript_MeshQueries.get_mesh_bounding_box(c)
+    for flip in (False, True):
+        k = unreal.DynamicMesh()
+        unreal.GeometryScript_AssetUtils.copy_mesh_from_static_mesh(sm, k, unreal.GeometryScriptCopyMeshFromAssetOptions(), unreal.GeometryScriptMeshReadLOD())
+        o = unreal.GeometryScriptMeshPlaneCutOptions()
+        o.set_editor_property("flip_cut_side", flip)
+        o.set_editor_property("fill_holes", False)
+        unreal.GeometryScript_MeshBooleans.apply_mesh_plane_cut(k, unreal.Transform(unreal.Vector(0, 0, above)), o)
+        kb = unreal.GeometryScript_MeshQueries.get_mesh_bounding_box(k)
+        if kb.min.z >= above - 1.0:
+            return -1 if (kb.min.y + kb.max.y) / 2 < (bb.min.y + bb.max.y) / 2 else 1
+    return 1
+
+
+settle = prop("painted_wooden_sofa")
+if settle:
+    s_ = 46.0 / 56.0  # its seat is 56 cm high; Biscotto naps at the stone slab's 46 cm
+    back = high_side_y(settle, 85.0)
+    place(settle, (3894, -440, 300), (0, 0 if back < 0 else 180, 0), s_, F, sun=False)
+    log("settle back side", back)
+else:
+    place(mesh("SM_Bench_Stone"), (3894, -430, 300), (0, 0, 0), 1.0, F)
 place(mesh("SM_Bench_Stone"), (4250, -470, 300), (0, 0, 0), 1.0, F)
 # low stone wall + planter in front of Casa Azzurra (the pot sits on its east end)
 wall = box(115, 60, 80, 0, (0, 0, 40), bev=3.0)
@@ -741,6 +770,27 @@ place(prop("garden_hose_wall_mounted_01"), (380, -156, 70), (0, 90, 0), 1.0, F, 
 place(prop("lion_head"), (2380, -158, 120), (0, 90, 0), 0.6, "Piazza", collision=False)
 place(prop("lifebuoy"), (2470, 548, 120), (0, 0, 0), 1.0, "Piazza", collision=False)
 place(prop("marble_bust_01"), (4060, -540, 300), (0, 90, 0), 1.0, F, sun=False)
+# CC0 dressing (asset-library/manifest_assets_new.json): chairs and pots at doorsteps, lemons in a planter by the cart,
+# succulents / ferns / weeds in the wall seams, a wrought-iron gate closing the terrace. sun=False: small props never
+# make gameplay shade.
+for (kind, (x, y, z), yaw, extra) in DECOR:
+    if kind == "door" and abs(y) < 200 and -1000 < x < 3400 and R.random() < 0.55:
+        side = math.radians(yaw - 90)
+        place(prop("painted_wooden_chair_02"), (x - math.cos(side) * (extra * 0.5 + 70), y - math.sin(side) * (extra * 0.5 + 70), z),
+              (0, yaw + R.uniform(150, 210), 0), 0.95, F, sun=False)
+place(prop("planter_box_01"), (300, -125, 0), (0, 4, 0), 1.0, F, sun=False)
+for (x, y, z) in ((1450, -125, 0), (2480, -130, 0), (3600, -520, 300)):
+    place(prop("ceramic_pot"), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.9, 1.2), F, sun=False)
+for (x, y, z, kind) in ((-140, -150, 0, "crystalline_iceplant"), (470, -152, 0, "fern_02"), (1310, -150, 0, "weed_plant_02"),
+                        (1690, -150, 0, "crystalline_iceplant"), (2520, -150, 0, "fern_02"), (2700, -150, 35, "weed_plant_02"),
+                        (2990, -150, 176, "crystalline_iceplant"), (3240, -150, 265, "weed_plant_02"), (3560, -545, 300, "fern_02"),
+                        (4120, -545, 300, "crystalline_iceplant")):
+    p_ = prop(kind)
+    if p_:
+        place(p_, (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.9, 1.4), F, sun=False, collision=False)
+gate = prop("large_iron_gate")
+if gate:
+    place(gate, (4690, -150, 300), (0, 90, 0), 1.0, "Church", sun=False)
 # café terrace by the railing, under the canvas
 for (x, y, r) in ((1860, 300, 10), (2100, 250, -20), (2330, 320, 35)):
     place(prop("outdoor_table_chair_set_01"), (x, y, 0), (0, r, 0), 1.0, "Piazza", sun=False)

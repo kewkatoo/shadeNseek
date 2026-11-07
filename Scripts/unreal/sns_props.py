@@ -23,13 +23,15 @@ COLLISION_BOX = {"wine_barrel_01", "planter_pot_clay", "potted_plant_01", "potte
                  "wicker_basket_02", "wooden_bucket_01", "painted_wooden_bench", "painted_wooden_table", "wooden_stool_01",
                  "folding_wooden_stool", "outdoor_table_chair_set_01", "painted_wooden_chair_01", "antique_ceramic_vase_01",
                  "ceramic_vase_01", "ceramic_vase_02", "exterior_aircon_unit", "lifebuoy", "ship_pinnace", "marble_bust_01",
-                 "concrete_cat_statue"}
+                 "concrete_cat_statue", "painted_wooden_sofa", "painted_wooden_chair_02", "standing_chalkboard_01", "planter_box_01",
+                 "ceramic_pot", "large_iron_gate"}
 COLLISION_COMPLEX = {"coastal_cliff_01", "coastal_cliff_02", "coastal_cliff_04", "coast_rocks_01", "mountainside", "modular_wooden_pier"}
 NO_SPLIT = {"ship_pinnace", "dutch_ship_medium", "outdoor_table_chair_set_01", "modular_wooden_pier", "tea_set_01", "wine_bottles_01",
             "island_tree_01", "island_tree_02", "mountainside", "coastal_cliff_01", "coastal_cliff_02", "coastal_cliff_04", "coast_rocks_01",
             "street_lamp_01", "street_lamp_02", "wooden_lantern_01", "exterior_aircon_unit", "modular_electric_cables",
             "garden_hose_wall_mounted_01", "lion_head", "marble_bust_01", "concrete_cat_statue", "potted_plant_01", "potted_plant_02",
-            "potted_plant_04", "planter_pot_clay", "lemon"}
+            "potted_plant_04", "planter_pot_clay", "lemon", "painted_wooden_sofa", "painted_wooden_chair_02", "standing_chalkboard_01",
+            "planter_box_01", "ceramic_pot", "large_iron_gate", "crystalline_iceplant", "fern_02", "weed_plant_02"}
 TRUNK_HINTS = ("trunk", "branch", "bark")
 
 
