@@ -154,3 +154,16 @@ Not yet listened to: a listening pass on `asset-library/Audio/game` before impor
 4. Assets: import textures/models, flower alpha fix, material swaps, new dressing. Test: camshots + perf_run.
 5. UI: fonts, tokens, cards, keycaps, every paint function. Test: title/HUD/pause/end screenshots at 1080p.
 6. Repackage Shipping, update README / BOUNDARIES / CREDITS, rebuild the zips.
+
+## Part B outcome (2026-11-07)
+- All three new puzzles kept: the autoplay route reaches the last puzzle at ~69 s and the end card at ~94-98 s of run
+  time (title to end card ~1:45-1:50, under 2:00). The video fits because the old detour back down the stairs after the
+  pot is gone and the finale (10.5 -> 7.7 s) and reunion (10.5 -> 9.4 s) are tighter. Existing timing tightened: burn-up
+  0.42 -> 0.36 s, slower cool-down, more sun drain.
+- Changes from the plan: P4's shutter holds 0.8 s and closes in 1.0 s (window ~1.5 s: trot yes, walk no); P5's pot wall
+  moved 25 cm west so the pot's own shade stops 1.25 m short of the tower (no dash past the puzzle), and the pot only
+  reacts from up on the wall; Biscotto keeps his stone slab (the settle's backrest filled the reunion close-up) and the
+  settle stands by the church wall; no rock_face scans and no lemons on the potted tree (not needed, risky).
+- Audio: the three risky picks were replaced (buckboard wagon, potatoes + apples, glockenspiel open/close pair); every
+  file passes Scripts/qa_audio.py; the in-game master mix of a full run peaks at -4.3 dBFS, ~-24 LUFS integrated.
+- Tests: one full autoplay run per step (0 evaporations), -sunmap, -camshots, 1080p UI shots with -pauseshot, -audiocap.
