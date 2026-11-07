@@ -534,15 +534,14 @@ def high_side_y(sm, above):
     return 1
 
 
+# Biscotto keeps the low stone slab: the reunion close-up is shot from the sun side at cat height, and a settle's
+# backrest filled that frame. The blue settle stands further along the church wall instead, back to the wall.
+place(mesh("SM_Bench_Stone"), (3894, -430, 300), (0, 0, 0), 1.0, F)
 settle = prop("painted_wooden_sofa")
 if settle:
-    s_ = 46.0 / 56.0  # its seat is 56 cm high; Biscotto naps at the stone slab's 46 cm
-    back = high_side_y(settle, 85.0)
-    place(settle, (3894, -440, 300), (0, 0 if back < 0 else 180, 0), s_, F, sun=False)
+    back = high_side_y(settle, 85.0)  # side of the backrest in the mesh's own Y (+1 placed it seaward at yaw 180)
+    place(settle, (4250, -480, 300), (0, 180 if back < 0 else 0, 0), 46.0 / 56.0, F, sun=False)
     log("settle back side", back)
-else:
-    place(mesh("SM_Bench_Stone"), (3894, -430, 300), (0, 0, 0), 1.0, F)
-place(mesh("SM_Bench_Stone"), (4250, -470, 300), (0, 0, 0), 1.0, F)
 # low stone wall + planter in front of Casa Azzurra (the pot sits on its east end)
 wall = box(115, 60, 80, 0, (0, 0, 40), bev=3.0)
 append(wall, box(119, 64, 6, 1, (0, 0, 81)))
