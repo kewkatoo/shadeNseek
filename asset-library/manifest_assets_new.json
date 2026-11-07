@@ -1,0 +1,184 @@
+[
+  {
+    "path": "asset-library/Textures/polyhaven/rough_wood",
+    "source_name": "Poly Haven - Rough Wood",
+    "source_url": "https://polyhaven.com/a/rough_wood",
+    "license": "CC0-1.0",
+    "author": "Rob Tuytel"
+  },
+  {
+    "path": "asset-library/Textures/polyhaven/coral_stone_wall",
+    "source_name": "Poly Haven - Coral Stone Wall",
+    "source_url": "https://polyhaven.com/a/coral_stone_wall",
+    "license": "CC0-1.0",
+    "author": "Dimitrios Savva"
+  },
+  {
+    "path": "asset-library/Textures/polyhaven/green_metal_rust",
+    "source_name": "Poly Haven - Green Metal Rust",
+    "source_url": "https://polyhaven.com/a/green_metal_rust",
+    "license": "CC0-1.0",
+    "author": "Rob Tuytel"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/standing_chalkboard_01",
+    "source_name": "Poly Haven - Standing Chalkboard 01",
+    "source_url": "https://polyhaven.com/a/standing_chalkboard_01",
+    "license": "CC0-1.0",
+    "author": "ParzivalCG"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/painted_wooden_sofa",
+    "source_name": "Poly Haven - Painted Wooden Sofa",
+    "source_url": "https://polyhaven.com/a/painted_wooden_sofa",
+    "license": "CC0-1.0",
+    "author": "Kirill Sannikov"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/painted_wooden_chair_02",
+    "source_name": "Poly Haven - Painted Wooden Chair 02",
+    "source_url": "https://polyhaven.com/a/painted_wooden_chair_02",
+    "license": "CC0-1.0",
+    "author": "Kirill Sannikov"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/ceramic_pot",
+    "source_name": "Poly Haven - Ceramic Pot",
+    "source_url": "https://polyhaven.com/a/ceramic_pot",
+    "license": "CC0-1.0",
+    "author": "Aron Łyczek"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/planter_box_01",
+    "source_name": "Poly Haven - Planter Box 01",
+    "source_url": "https://polyhaven.com/a/planter_box_01",
+    "license": "CC0-1.0",
+    "author": "James Ray Cock"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/crystalline_iceplant",
+    "source_name": "Poly Haven - Crystalline Iceplant",
+    "source_url": "https://polyhaven.com/a/crystalline_iceplant",
+    "license": "CC0-1.0",
+    "author": "James Ray Cock, Jenelle van Heerden"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/fern_02",
+    "source_name": "Poly Haven - Fern 02",
+    "source_url": "https://polyhaven.com/a/fern_02",
+    "license": "CC0-1.0",
+    "author": "Rob Tuytel, Rico Cilliers"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/weed_plant_02",
+    "source_name": "Poly Haven - Weed Plant 02",
+    "source_url": "https://polyhaven.com/a/weed_plant_02",
+    "license": "CC0-1.0",
+    "author": "Rob Tuytel, Rico Cilliers"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/rock_face_01",
+    "source_name": "Poly Haven - Rock Face 01",
+    "source_url": "https://polyhaven.com/a/rock_face_01",
+    "license": "CC0-1.0",
+    "author": "Dario Barresi"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/rock_face_02",
+    "source_name": "Poly Haven - Rock Face 02",
+    "source_url": "https://polyhaven.com/a/rock_face_02",
+    "license": "CC0-1.0",
+    "author": "Dario Barresi, Rico Cilliers"
+  },
+  {
+    "path": "asset-library/Models/polyhaven/large_iron_gate",
+    "source_name": "Poly Haven - Large Iron Gate",
+    "source_url": "https://polyhaven.com/a/large_iron_gate",
+    "license": "CC0-1.0",
+    "author": "Josh Dean"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/PavingStones150",
+    "source_name": "ambientCG - Paving Stones 150",
+    "source_url": "https://ambientcg.com/a/PavingStones150",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/Tiles143",
+    "source_name": "ambientCG - Tiles 143",
+    "source_url": "https://ambientcg.com/a/Tiles143",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/Travertine009",
+    "source_name": "ambientCG - Travertine 009",
+    "source_url": "https://ambientcg.com/a/Travertine009",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/RoofingTiles014B",
+    "source_name": "ambientCG - Roofing Tiles 014 B",
+    "source_url": "https://ambientcg.com/a/RoofingTiles014B",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/PaintedWood009B",
+    "source_name": "ambientCG - Painted Wood 009 B",
+    "source_url": "https://ambientcg.com/a/PaintedWood009B",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/PaintedWood007B",
+    "source_name": "ambientCG - Painted Wood 007 B",
+    "source_url": "https://ambientcg.com/a/PaintedWood007B",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/PaintedPlaster017",
+    "source_name": "ambientCG - Painted Plaster 017",
+    "source_url": "https://ambientcg.com/a/PaintedPlaster017",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/PaintedPlaster018",
+    "source_name": "ambientCG - Painted Plaster 018",
+    "source_url": "https://ambientcg.com/a/PaintedPlaster018",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/GlazedTerracotta001",
+    "source_name": "ambientCG - Glazed Terracotta 001",
+    "source_url": "https://ambientcg.com/a/GlazedTerracotta001",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/Fabric061",
+    "source_name": "ambientCG - Fabric 061",
+    "source_url": "https://ambientcg.com/a/Fabric061",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/Fabric071",
+    "source_name": "ambientCG - Fabric 071",
+    "source_url": "https://ambientcg.com/a/Fabric071",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  },
+  {
+    "path": "asset-library/Textures/ambientcg/LeafSet017",
+    "source_name": "ambientCG - Leaf Set 017",
+    "source_url": "https://ambientcg.com/a/LeafSet017",
+    "license": "CC0-1.0",
+    "author": "ambientCG / Lennart Demes"
+  }
+]

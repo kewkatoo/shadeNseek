@@ -1,0 +1,254 @@
+[
+  {
+    "path": "asset-library/Audio/kenney/interface-sounds",
+    "source_name": "Kenney - Interface Sounds (pluck_002; licence file included)",
+    "source_url": "https://kenney.nl/assets/interface-sounds",
+    "license": "CC0-1.0",
+    "author": "Kenney (kenney.nl)"
+  },
+  {
+    "path": "asset-library/Audio/kenney/impact-sounds",
+    "source_name": "Kenney - Impact Sounds (impactWood_light_000/002, impactWood_heavy_001, impactPlank_medium_002, impactSoft_medium_001, impactSoft_heavy_002; licence file included)",
+    "source_url": "https://kenney.nl/assets/impact-sounds",
+    "license": "CC0-1.0",
+    "author": "Kenney (kenney.nl)"
+  },
+  {
+    "path": "asset-library/Audio/kenney/rpg-audio",
+    "source_name": "Kenney - RPG Audio (bookOpen, bookClose; licence file included)",
+    "source_url": "https://kenney.nl/assets/rpg-audio",
+    "license": "CC0-1.0",
+    "author": "Kenney (kenney.nl)"
+  },
+  {
+    "path": "asset-library/Audio/freepd/wisdom_in_the_sun_kevin_macleod.mp3",
+    "source_name": "FreePD - Wisdom in the Sun (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture)",
+    "source_url": "https://web.archive.org/web/20241216000928/https://freepd.com/misc.php",
+    "license": "CC0-1.0",
+    "author": "Kevin MacLeod"
+  },
+  {
+    "path": "asset-library/Audio/freepd/champ_de_tournesol_komiku.mp3",
+    "source_name": "FreePD - Champ de tournesol (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture)",
+    "source_url": "https://web.archive.org/web/20241128211244/https://freepd.com/romantic.php",
+    "license": "CC0-1.0",
+    "author": "Komiku"
+  },
+  {
+    "path": "asset-library/Audio/freesound/155660_cig_extinguish.ogg",
+    "source_name": "Freesound - cig_extinguish.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/the_semen_incident/sounds/155660/",
+    "license": "CC0-1.0",
+    "author": "the_semen_incident"
+  },
+  {
+    "path": "asset-library/Audio/freesound/156996_Freewheel_clicks.ogg",
+    "source_name": "Freesound - Freewheel clicks.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/donkpow/sounds/156996/",
+    "license": "CC0-1.0",
+    "author": "donkpow"
+  },
+  {
+    "path": "asset-library/Audio/freesound/200336_Cat_trilling.ogg",
+    "source_name": "Freesound - Cat trilling (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/jsbarrett/sounds/200336/",
+    "license": "CC0-1.0",
+    "author": "jsbarrett"
+  },
+  {
+    "path": "asset-library/Audio/freesound/208111_Poof_of_Smoke.ogg",
+    "source_name": "Freesound - Poof of Smoke (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/Planman/sounds/208111/",
+    "license": "CC0-1.0",
+    "author": "Planman"
+  },
+  {
+    "path": "asset-library/Audio/freesound/244982_Wing_Flap_Flag_Flapping_5a.ogg",
+    "source_name": "Freesound - Wing Flap (Flag Flapping) 5a (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/ani_music/sounds/244982/",
+    "license": "CC0-1.0",
+    "author": "ani_music"
+  },
+  {
+    "path": "asset-library/Audio/freesound/265583_Wooden_Door_01.ogg",
+    "source_name": "Freesound - Wooden Door 01 (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/aglinder/sounds/265583/",
+    "license": "CC0-1.0",
+    "author": "aglinder"
+  },
+  {
+    "path": "asset-library/Audio/freesound/320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg",
+    "source_name": "Freesound - Bukarest 2015 Restaurant Terasse mittags MS.WAV (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/tribord/sounds/320026/",
+    "license": "CC0-1.0",
+    "author": "tribord"
+  },
+  {
+    "path": "asset-library/Audio/freesound/330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg",
+    "source_name": "Freesound - Cloth Flapping On A Clothesline Thickly (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/leonelmail/sounds/330638/",
+    "license": "CC0-1.0",
+    "author": "leonelmail"
+  },
+  {
+    "path": "asset-library/Audio/freesound/330639_Cloth_Flapping_On_A_Clothesline_Gently.ogg",
+    "source_name": "Freesound - Cloth Flapping On A Clothesline Gently (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/leonelmail/sounds/330639/",
+    "license": "CC0-1.0",
+    "author": "leonelmail"
+  },
+  {
+    "path": "asset-library/Audio/freesound/348924_Glockenspiel_46_f4_04.ogg",
+    "source_name": "Freesound - Glockenspiel_46_f4_04 (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/cabled_mess/sounds/348924/",
+    "license": "CC0-1.0",
+    "author": "cabled_mess"
+  },
+  {
+    "path": "asset-library/Audio/freesound/391448_Shirt_Whoosh_1.ogg",
+    "source_name": "Freesound - Shirt Whoosh 1.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/saturdaysoundguy/sounds/391448/",
+    "license": "CC0-1.0",
+    "author": "saturdaysoundguy"
+  },
+  {
+    "path": "asset-library/Audio/freesound/394222_Large_rope_pulley_operated.ogg",
+    "source_name": "Freesound - Large rope pulley operated.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/mikewest/sounds/394222/",
+    "license": "CC0-1.0",
+    "author": "mikewest"
+  },
+  {
+    "path": "asset-library/Audio/freesound/444799_Pivoting_Shutters_Opening_and_Closing.ogg",
+    "source_name": "Freesound - Pivoting Shutters Opening and Closing .wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/ross_sinc/sounds/444799/",
+    "license": "CC0-1.0",
+    "author": "ross_sinc"
+  },
+  {
+    "path": "asset-library/Audio/freesound/462462_Seagulls_gaviotas_clean_wildtrack.ogg",
+    "source_name": "Freesound - Seagulls / gaviotas clean wildtrack.WAV (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/Soojay/sounds/462462/",
+    "license": "CC0-1.0",
+    "author": "Soojay"
+  },
+  {
+    "path": "asset-library/Audio/freesound/468911_Bacon_Sizzling.ogg",
+    "source_name": "Freesound - Bacon Sizzling (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/timothyd4y/sounds/468911/",
+    "license": "CC0-1.0",
+    "author": "timothyd4y"
+  },
+  {
+    "path": "asset-library/Audio/freesound/472587_Reversed_Discovery_Sound.ogg",
+    "source_name": "Freesound - Reversed Discovery Sound.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/DeVern/sounds/472587/",
+    "license": "CC0-1.0",
+    "author": "DeVern"
+  },
+  {
+    "path": "asset-library/Audio/freesound/496727_04_1_Garden_wheelbarrow.ogg",
+    "source_name": "Freesound - 04-1 Garden wheelbarrow (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/16GPanskaKomarkova_Marina/sounds/496727/",
+    "license": "CC0-1.0",
+    "author": "16GPanskaKomarkova_Marina"
+  },
+  {
+    "path": "asset-library/Audio/freesound/553962_Cat_purr.ogg",
+    "source_name": "Freesound - Cat-purr.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/clareboots/sounds/553962/",
+    "license": "CC0-1.0",
+    "author": "clareboots"
+  },
+  {
+    "path": "asset-library/Audio/freesound/556975_Falling_fruit_Drumming_on_cookie_box.ogg",
+    "source_name": "Freesound - Falling fruit / Drumming on cookie box (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/lucasfuchs/sounds/556975/",
+    "license": "CC0-1.0",
+    "author": "lucasfuchs"
+  },
+  {
+    "path": "asset-library/Audio/freesound/563355_Celesta_Chime.ogg",
+    "source_name": "Freesound - Celesta Chime.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/nicholasdaryl/sounds/563355/",
+    "license": "CC0-1.0",
+    "author": "nicholasdaryl"
+  },
+  {
+    "path": "asset-library/Audio/freesound/584218_Cicale_Bolano_08_08_21.ogg",
+    "source_name": "Freesound - Cicale Bolano 08-08-21.WAV (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/nicolo.ciuffi/sounds/584218/",
+    "license": "CC0-1.0",
+    "author": "nicolo.ciuffi"
+  },
+  {
+    "path": "asset-library/Audio/freesound/610703_Good_answer_harp_glissando.ogg",
+    "source_name": "Freesound - Good answer harp glissando.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/oggraphics/sounds/610703/",
+    "license": "CC0-1.0",
+    "author": "oggraphics"
+  },
+  {
+    "path": "asset-library/Audio/freesound/611469_Church_Bell.ogg",
+    "source_name": "Freesound - Church Bell.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/Kalomina/sounds/611469/",
+    "license": "CC0-1.0",
+    "author": "Kalomina"
+  },
+  {
+    "path": "asset-library/Audio/freesound/637945_water_lake_waves_light_gentle_lap_at_boa.ogg",
+    "source_name": "Freesound - water lake waves light gentle lap at boats on beach.flac (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/kyles/sounds/637945/",
+    "license": "CC0-1.0",
+    "author": "kyles"
+  },
+  {
+    "path": "asset-library/Audio/freesound/648860_Sea_Waves_Against_Rocks.ogg",
+    "source_name": "Freesound - Sea Waves Against Rocks (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/emainta/sounds/648860/",
+    "license": "CC0-1.0",
+    "author": "emainta"
+  },
+  {
+    "path": "asset-library/Audio/freesound/690331_swifts_birds.ogg",
+    "source_name": "Freesound - swifts birds.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/bruno.auzet/sounds/690331/",
+    "license": "CC0-1.0",
+    "author": "bruno.auzet"
+  },
+  {
+    "path": "asset-library/Audio/freesound/776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg",
+    "source_name": "Freesound - SFX-TeaPot,Ceramic,Wobble,Stop2 (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/soundandmelodies/sounds/776201/",
+    "license": "CC0-1.0",
+    "author": "soundandmelodies"
+  },
+  {
+    "path": "asset-library/Audio/freesound/810043_Breaking_pot_short.ogg",
+    "source_name": "Freesound - Breaking pot short (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/anna_bliss/sounds/810043/",
+    "license": "CC0-1.0",
+    "author": "anna_bliss"
+  },
+  {
+    "path": "asset-library/Audio/freesound/816261_Broomstick_whoosh_2_Soft_low_OKM1.ogg",
+    "source_name": "Freesound - Broomstick whoosh 2 - Soft low OKM1 (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/Sadiquecat/sounds/816261/",
+    "license": "CC0-1.0",
+    "author": "Sadiquecat"
+  },
+  {
+    "path": "asset-library/Audio/freesound/832691_Italian_Square_at_Sunday_Lunch_Time_Piaz.ogg",
+    "source_name": "Freesound - Italian Square at Sunday Lunch Time, Piazza del Duomo, Padua, Sunday (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/bassimat/sounds/832691/",
+    "license": "CC0-1.0",
+    "author": "bassimat"
+  },
+  {
+    "path": "asset-library/Audio/freesound/864782_Walking_In_Socks.ogg",
+    "source_name": "Freesound - Walking In Socks (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/IENBA/sounds/864782/",
+    "license": "CC0-1.0",
+    "author": "IENBA"
+  }
+]

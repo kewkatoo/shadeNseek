@@ -3,7 +3,9 @@
 Every Poly Haven asset is CC0 1.0 (public domain, no attribution needed, no AI/redistribution restriction).
 We still record source URL + author per asset in asset-library/CREDITS.md and manifest.json.
 
-Run:  python -I Scripts/fetch_polyhaven.py <project_root>
+Run:  python -I Scripts/fetch_polyhaven.py <project_root> [--only id1,id2,...] [--records <file.json>]
+      --only     fetch just these ids (from the lists below); their records then go to --records instead of
+                 overwriting asset-library/polyhaven_records.json (which a full run rewrites).
 """
 import hashlib
 import json
@@ -12,8 +14,16 @@ import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-ROOT = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else ".")
+_args = sys.argv[1:]
+_flags = {}
+while "--only" in _args or "--records" in _args:
+    i = next(k for k, a in enumerate(_args) if a in ("--only", "--records"))
+    _flags[_args[i]] = _args[i + 1]
+    del _args[i:i + 2]
+ROOT = os.path.abspath(_args[0] if _args else ".")
+ONLY = set(filter(None, _flags.get("--only", "").split(",")))
 LIB = os.path.join(ROOT, "asset-library")
+RECORDS = _flags.get("--records") or (None if ONLY else os.path.join(LIB, "polyhaven_records.json"))
 API = "https://api.polyhaven.com"
 UA = {"User-Agent": "ShadeAndSeek-asset-fetch/1.0"}
 
@@ -26,6 +36,9 @@ TEXTURES = {
     "blue_painted_planks": "2k", "distressed_painted_planks": "2k", "weathered_planks": "2k",
     "fabric_pattern_07": "1k", "terry_cloth": "1k", "coast_sand_01": "2k",
     "marble_cliff_02": "2k",
+    # asset-quality pass (2026-11): beams/posts/cart wood without plank seams, limestone rubble for the retaining
+    # masses, painted+rusted iron detail for railings
+    "rough_wood": "2k", "coral_stone_wall": "2k", "green_metal_rust": "1k",
 }
 TEX_MAPS = ["Diffuse", "nor_dx", "arm"]
 
@@ -50,6 +63,11 @@ MODELS = {
     "wooden_bucket_01": "1k", "watering_can_metal_01": "1k", "lion_head": "1k", "marble_bust_01": "1k",
     "concrete_cat_statue": "1k", "exterior_aircon_unit": "1k", "modular_electric_cables": "1k",
     "garden_hose_wall_mounted_01": "1k",
+    # asset-quality pass (2026-11): cafe/terrace furniture, Mediterranean pots and crates, cheap greenery for walls
+    # and cracks (small masked plants only), natural rock for the seaward faces of the terrace masses
+    "standing_chalkboard_01": "1k", "painted_wooden_sofa": "1k", "painted_wooden_chair_02": "1k", "ceramic_pot": "1k",
+    "planter_box_01": "1k", "crystalline_iceplant": "1k", "fern_02": "1k", "weed_plant_02": "1k",
+    "rock_face_01": "2k", "rock_face_02": "2k", "large_iron_gate": "1k",
 }
 EXTRA_MODEL_MAPS = ("nor_dx", "alpha")
 # Sky dome: warm late-afternoon cirrus over a pale sky (the dome is rotated so its glow sits behind our sun).
@@ -101,7 +119,9 @@ def jobs_for_model(mid, res):
         out.append((e["url"], os.path.join(base, rel.replace("/", os.sep)), e.get("md5")))
     # DirectX normals + alpha masks are not referenced by the glTF but our UE materials want them.
     for key, val in files.items():
-        if key.endswith(EXTRA_MODEL_MAPS) and isinstance(val, dict) and res in val and "jpg" in val[res]:
+        # Single-material plants name their mask "Alpha" (capital A), multi-material ones "leaves_alpha": match both,
+        # or shrubs/flowers come without their mask and render as opaque cards.
+        if key.lower().endswith(EXTRA_MODEL_MAPS) and isinstance(val, dict) and res in val and "jpg" in val[res]:
             e = val[res]["jpg"]
             out.append((e["url"], os.path.join(base, "textures", os.path.basename(e["url"])), e.get("md5")))
     return out
@@ -115,15 +135,15 @@ def jobs_for_hdri(hid, res):
 def main():
     jobs = []
     meta = []
-    for hid, res in HDRIS.items():
-        jobs += jobs_for_hdri(hid, res)
-        meta.append(("hdri", hid, res))
-    for tid, res in TEXTURES.items():
-        jobs += jobs_for_texture(tid, res)
-        meta.append(("texture", tid, res))
-    for mid, res in MODELS.items():
-        jobs += jobs_for_model(mid, res)
-        meta.append(("model", mid, res))
+    unknown = ONLY - set(HDRIS) - set(TEXTURES) - set(MODELS)
+    if unknown:
+        raise SystemExit(f"--only ids not in the lists: {sorted(unknown)}")
+    for kind, table, make in (("hdri", HDRIS, jobs_for_hdri), ("texture", TEXTURES, jobs_for_texture), ("model", MODELS, jobs_for_model)):
+        for aid, res in table.items():
+            if ONLY and aid not in ONLY:
+                continue
+            jobs += make(aid, res)
+            meta.append((kind, aid, res))
     print(f"{len(jobs)} files")
     with ThreadPoolExecutor(8) as ex:
         for (url, dest, md5), st in zip(jobs, ex.map(lambda j: download(*j), jobs)):
@@ -142,9 +162,10 @@ def main():
             "author": ", ".join(info.get("authors", {}).keys()),
             "resolution": res,
         })
-    with open(os.path.join(LIB, "polyhaven_records.json"), "w", encoding="utf-8") as f:
-        json.dump(records, f, indent=2)
-    print("done", len(records), "assets")
+    if RECORDS:
+        with open(RECORDS, "w", encoding="utf-8") as f:
+            json.dump(records, f, indent=2)
+    print("done", len(records), "assets", "->", RECORDS or "(records not written: pass --records)")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,9 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 - `asset-library/Fonts/kalam` - Kalam by Indian Type Foundry (Google Fonts) - https://github.com/google/fonts/tree/main/ofl/kalam
 - `asset-library/Fonts/lato` - Lato by Łukasz Dziedzic (Google Fonts) - https://github.com/google/fonts/tree/main/ofl/lato
 - `asset-library/Fonts/cormorantgaramond` - Cormorant Garamond by Christian Thalmann (Google Fonts) - https://github.com/google/fonts/tree/main/ofl/cormorantgaramond
-- Cormorant Garamond ships as a variable font; `Scripts/fetch_fonts.py` bakes the static weights in its `static/` folder (fontTools instancer).
+- `asset-library/Fonts/fraunces` - Fraunces by Undercase Type, Phaedra Charles, Flavia Zimbardi (Google Fonts) - https://github.com/google/fonts/tree/main/ofl/fraunces
+- `asset-library/Fonts/nunito` - Nunito by Vernon Adams, Cyreal, Jacques Le Bailly (Google Fonts) - https://github.com/google/fonts/tree/main/ofl/nunito
+- Cormorant Garamond, Fraunces and Nunito ship as variable fonts; `Scripts/fetch_fonts.py` bakes the static weights in their `static/` folders (fontTools instancer).
 
 ## Poly Haven (CC0 1.0 - public domain, https://polyhaven.com/license)
 
@@ -23,6 +25,7 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 |---|---|---|
 | `HDRIs/polyhaven/evening_road_01_puresky` | Jarod Guest, Sergej Majboroda | https://polyhaven.com/a/evening_road_01_puresky |
 | `Models/polyhaven/antique_ceramic_vase_01` | James Ray Cock | https://polyhaven.com/a/antique_ceramic_vase_01 |
+| `Models/polyhaven/ceramic_pot` | Aron Łyczek | https://polyhaven.com/a/ceramic_pot |
 | `Models/polyhaven/ceramic_vase_01` | James Ray Cock | https://polyhaven.com/a/ceramic_vase_01 |
 | `Models/polyhaven/ceramic_vase_02` | James Ray Cock | https://polyhaven.com/a/ceramic_vase_02 |
 | `Models/polyhaven/coast_rocks_01` | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/coast_rocks_01 |
@@ -30,8 +33,10 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Models/polyhaven/coastal_cliff_02` | Rob Tuytel | https://polyhaven.com/a/coastal_cliff_02 |
 | `Models/polyhaven/coastal_cliff_04` | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/coastal_cliff_04 |
 | `Models/polyhaven/concrete_cat_statue` | Rico Cilliers, Riley Queen | https://polyhaven.com/a/concrete_cat_statue |
+| `Models/polyhaven/crystalline_iceplant` | James Ray Cock, Jenelle van Heerden | https://polyhaven.com/a/crystalline_iceplant |
 | `Models/polyhaven/dutch_ship_medium` | James Ray Cock, Rico Cilliers, Nicolò Zubbini | https://polyhaven.com/a/dutch_ship_medium |
 | `Models/polyhaven/exterior_aircon_unit` | Monsta3D | https://polyhaven.com/a/exterior_aircon_unit |
+| `Models/polyhaven/fern_02` | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/fern_02 |
 | `Models/polyhaven/flower_empodium` | Jenelle van Heerden, Rico Cilliers | https://polyhaven.com/a/flower_empodium |
 | `Models/polyhaven/flower_gazania` | James Ray Cock, Jenelle van Heerden | https://polyhaven.com/a/flower_gazania |
 | `Models/polyhaven/flower_heliophila` | Jenelle van Heerden | https://polyhaven.com/a/flower_heliophila |
@@ -42,6 +47,7 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Models/polyhaven/island_tree_01` | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/island_tree_01 |
 | `Models/polyhaven/island_tree_02` | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/island_tree_02 |
 | `Models/polyhaven/jug_01` | Kuutti Siitonen | https://polyhaven.com/a/jug_01 |
+| `Models/polyhaven/large_iron_gate` | Josh Dean | https://polyhaven.com/a/large_iron_gate |
 | `Models/polyhaven/lemon` | Kuutti Siitonen | https://polyhaven.com/a/lemon |
 | `Models/polyhaven/lifebuoy` | Hank Kaamura | https://polyhaven.com/a/lifebuoy |
 | `Models/polyhaven/lion_head` | Tina | https://polyhaven.com/a/lion_head |
@@ -52,21 +58,28 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Models/polyhaven/outdoor_table_chair_set_01` | James Ray Cock | https://polyhaven.com/a/outdoor_table_chair_set_01 |
 | `Models/polyhaven/painted_wooden_bench` | Kirill Sannikov | https://polyhaven.com/a/painted_wooden_bench |
 | `Models/polyhaven/painted_wooden_chair_01` | Kuutti Siitonen | https://polyhaven.com/a/painted_wooden_chair_01 |
+| `Models/polyhaven/painted_wooden_chair_02` | Kirill Sannikov | https://polyhaven.com/a/painted_wooden_chair_02 |
+| `Models/polyhaven/painted_wooden_sofa` | Kirill Sannikov | https://polyhaven.com/a/painted_wooden_sofa |
 | `Models/polyhaven/painted_wooden_table` | Kirill Sannikov | https://polyhaven.com/a/painted_wooden_table |
 | `Models/polyhaven/periwinkle_plant` | Amal Kumar | https://polyhaven.com/a/periwinkle_plant |
+| `Models/polyhaven/planter_box_01` | James Ray Cock | https://polyhaven.com/a/planter_box_01 |
 | `Models/polyhaven/planter_pot_clay` | Amal Kumar | https://polyhaven.com/a/planter_pot_clay |
 | `Models/polyhaven/potted_plant_01` | Rico Cilliers | https://polyhaven.com/a/potted_plant_01 |
 | `Models/polyhaven/potted_plant_02` | Rico Cilliers | https://polyhaven.com/a/potted_plant_02 |
 | `Models/polyhaven/potted_plant_04` | James Ray Cock | https://polyhaven.com/a/potted_plant_04 |
+| `Models/polyhaven/rock_face_01` | Dario Barresi | https://polyhaven.com/a/rock_face_01 |
+| `Models/polyhaven/rock_face_02` | Dario Barresi, Rico Cilliers | https://polyhaven.com/a/rock_face_02 |
 | `Models/polyhaven/ship_pinnace` | James Ray Cock, Rico Cilliers, Nicolò Zubbini, Yann Kervran | https://polyhaven.com/a/ship_pinnace |
 | `Models/polyhaven/shrub_01` | Rico Cilliers | https://polyhaven.com/a/shrub_01 |
 | `Models/polyhaven/shrub_02` | Rico Cilliers | https://polyhaven.com/a/shrub_02 |
 | `Models/polyhaven/shrub_03` | Rico Cilliers | https://polyhaven.com/a/shrub_03 |
 | `Models/polyhaven/shrub_sorrel_01` | Rico Cilliers | https://polyhaven.com/a/shrub_sorrel_01 |
+| `Models/polyhaven/standing_chalkboard_01` | ParzivalCG | https://polyhaven.com/a/standing_chalkboard_01 |
 | `Models/polyhaven/street_lamp_01` | Josh Dean | https://polyhaven.com/a/street_lamp_01 |
 | `Models/polyhaven/street_lamp_02` | Josh Dean | https://polyhaven.com/a/street_lamp_02 |
 | `Models/polyhaven/tea_set_01` | James Ray Cock, Rico Cilliers, Jurita Burger | https://polyhaven.com/a/tea_set_01 |
 | `Models/polyhaven/watering_can_metal_01` | Charles Nderitu | https://polyhaven.com/a/watering_can_metal_01 |
+| `Models/polyhaven/weed_plant_02` | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/weed_plant_02 |
 | `Models/polyhaven/wicker_basket_01` | Kuutti Siitonen | https://polyhaven.com/a/wicker_basket_01 |
 | `Models/polyhaven/wicker_basket_02` | Kuutti Siitonen | https://polyhaven.com/a/wicker_basket_02 |
 | `Models/polyhaven/wine_barrel_01` | James Ray Cock | https://polyhaven.com/a/wine_barrel_01 |
@@ -79,12 +92,15 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Textures/polyhaven/clay_roof_tiles_02` | Amal Kumar | https://polyhaven.com/a/clay_roof_tiles_02 |
 | `Textures/polyhaven/coast_sand_01` | Rob Tuytel | https://polyhaven.com/a/coast_sand_01 |
 | `Textures/polyhaven/cobblestone_floor_08` | Rob Tuytel | https://polyhaven.com/a/cobblestone_floor_08 |
+| `Textures/polyhaven/coral_stone_wall` | Dimitrios Savva | https://polyhaven.com/a/coral_stone_wall |
 | `Textures/polyhaven/distressed_painted_planks` | Rob Tuytel | https://polyhaven.com/a/distressed_painted_planks |
 | `Textures/polyhaven/fabric_pattern_07` | Rob Tuytel | https://polyhaven.com/a/fabric_pattern_07 |
+| `Textures/polyhaven/green_metal_rust` | Rob Tuytel | https://polyhaven.com/a/green_metal_rust |
 | `Textures/polyhaven/grey_stone_path` | Amal Kumar | https://polyhaven.com/a/grey_stone_path |
 | `Textures/polyhaven/marble_cliff_02` | Amal Kumar | https://polyhaven.com/a/marble_cliff_02 |
 | `Textures/polyhaven/painted_plaster_wall` | Amal Kumar | https://polyhaven.com/a/painted_plaster_wall |
 | `Textures/polyhaven/red_plaster_weathered` | Amal Kumar | https://polyhaven.com/a/red_plaster_weathered |
+| `Textures/polyhaven/rough_wood` | Rob Tuytel | https://polyhaven.com/a/rough_wood |
 | `Textures/polyhaven/rustic_stone_wall` | Dimitrios Savva | https://polyhaven.com/a/rustic_stone_wall |
 | `Textures/polyhaven/stacked_stone_wall` | Dimitrios Savva | https://polyhaven.com/a/stacked_stone_wall |
 | `Textures/polyhaven/stone_pathway` | Amal Kumar | https://polyhaven.com/a/stone_pathway |
@@ -95,5 +111,66 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Textures/polyhaven/white_stucco` | Amal Kumar | https://polyhaven.com/a/white_stucco |
 | `Textures/polyhaven/white_stucco_02` | Dimitrios Savva | https://polyhaven.com/a/white_stucco_02 |
 | `Textures/polyhaven/yellow_plaster` | Rob Tuytel | https://polyhaven.com/a/yellow_plaster |
+
+## ambientCG (CC0 1.0 - public domain, https://docs.ambientcg.com/license/)
+
+| Asset | Author(s) | Source |
+|---|---|---|
+| `Textures/ambientcg/Fabric061` | ambientCG / Lennart Demes | https://ambientcg.com/a/Fabric061 |
+| `Textures/ambientcg/Fabric071` | ambientCG / Lennart Demes | https://ambientcg.com/a/Fabric071 |
+| `Textures/ambientcg/GlazedTerracotta001` | ambientCG / Lennart Demes | https://ambientcg.com/a/GlazedTerracotta001 |
+| `Textures/ambientcg/LeafSet017` | ambientCG / Lennart Demes | https://ambientcg.com/a/LeafSet017 |
+| `Textures/ambientcg/PaintedPlaster017` | ambientCG / Lennart Demes | https://ambientcg.com/a/PaintedPlaster017 |
+| `Textures/ambientcg/PaintedPlaster018` | ambientCG / Lennart Demes | https://ambientcg.com/a/PaintedPlaster018 |
+| `Textures/ambientcg/PaintedWood007B` | ambientCG / Lennart Demes | https://ambientcg.com/a/PaintedWood007B |
+| `Textures/ambientcg/PaintedWood009B` | ambientCG / Lennart Demes | https://ambientcg.com/a/PaintedWood009B |
+| `Textures/ambientcg/PavingStones150` | ambientCG / Lennart Demes | https://ambientcg.com/a/PavingStones150 |
+| `Textures/ambientcg/RoofingTiles014B` | ambientCG / Lennart Demes | https://ambientcg.com/a/RoofingTiles014B |
+| `Textures/ambientcg/Tiles143` | ambientCG / Lennart Demes | https://ambientcg.com/a/Tiles143 |
+| `Textures/ambientcg/Travertine009` | ambientCG / Lennart Demes | https://ambientcg.com/a/Travertine009 |
+
+## Audio (CC0 1.0 - public domain; Freesound, FreePD, Kenney)
+
+Game-ready files are built from these by `Scripts/prep_audio.py` into `asset-library/Audio/game`. Freesound files are the
+public HQ previews of CC0 originals. FreePD (closed in 2025) is cited through Internet Archive copies of its pages.
+
+| File | Title | Author | Source |
+|---|---|---|---|
+| `Audio/freepd/champ_de_tournesol_komiku.mp3` | FreePD - Champ de tournesol (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture) | Komiku | https://web.archive.org/web/20241128211244/https://freepd.com/romantic.php |
+| `Audio/freepd/wisdom_in_the_sun_kevin_macleod.mp3` | FreePD - Wisdom in the Sun (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture) | Kevin MacLeod | https://web.archive.org/web/20241216000928/https://freepd.com/misc.php |
+| `Audio/freesound/155660_cig_extinguish.ogg` | Freesound - cig_extinguish.wav (HQ preview of the CC0 original) | the_semen_incident | https://freesound.org/people/the_semen_incident/sounds/155660/ |
+| `Audio/freesound/156996_Freewheel_clicks.ogg` | Freesound - Freewheel clicks.wav (HQ preview of the CC0 original) | donkpow | https://freesound.org/people/donkpow/sounds/156996/ |
+| `Audio/freesound/200336_Cat_trilling.ogg` | Freesound - Cat trilling (HQ preview of the CC0 original) | jsbarrett | https://freesound.org/people/jsbarrett/sounds/200336/ |
+| `Audio/freesound/208111_Poof_of_Smoke.ogg` | Freesound - Poof of Smoke (HQ preview of the CC0 original) | Planman | https://freesound.org/people/Planman/sounds/208111/ |
+| `Audio/freesound/244982_Wing_Flap_Flag_Flapping_5a.ogg` | Freesound - Wing Flap (Flag Flapping) 5a (HQ preview of the CC0 original) | ani_music | https://freesound.org/people/ani_music/sounds/244982/ |
+| `Audio/freesound/265583_Wooden_Door_01.ogg` | Freesound - Wooden Door 01 (HQ preview of the CC0 original) | aglinder | https://freesound.org/people/aglinder/sounds/265583/ |
+| `Audio/freesound/320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg` | Freesound - Bukarest 2015 Restaurant Terasse mittags MS.WAV (HQ preview of the CC0 original) | tribord | https://freesound.org/people/tribord/sounds/320026/ |
+| `Audio/freesound/330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg` | Freesound - Cloth Flapping On A Clothesline Thickly (HQ preview of the CC0 original) | leonelmail | https://freesound.org/people/leonelmail/sounds/330638/ |
+| `Audio/freesound/330639_Cloth_Flapping_On_A_Clothesline_Gently.ogg` | Freesound - Cloth Flapping On A Clothesline Gently (HQ preview of the CC0 original) | leonelmail | https://freesound.org/people/leonelmail/sounds/330639/ |
+| `Audio/freesound/348924_Glockenspiel_46_f4_04.ogg` | Freesound - Glockenspiel_46_f4_04 (HQ preview of the CC0 original) | cabled_mess | https://freesound.org/people/cabled_mess/sounds/348924/ |
+| `Audio/freesound/391448_Shirt_Whoosh_1.ogg` | Freesound - Shirt Whoosh 1.wav (HQ preview of the CC0 original) | saturdaysoundguy | https://freesound.org/people/saturdaysoundguy/sounds/391448/ |
+| `Audio/freesound/394222_Large_rope_pulley_operated.ogg` | Freesound - Large rope pulley operated.wav (HQ preview of the CC0 original) | mikewest | https://freesound.org/people/mikewest/sounds/394222/ |
+| `Audio/freesound/444799_Pivoting_Shutters_Opening_and_Closing.ogg` | Freesound - Pivoting Shutters Opening and Closing .wav (HQ preview of the CC0 original) | ross_sinc | https://freesound.org/people/ross_sinc/sounds/444799/ |
+| `Audio/freesound/462462_Seagulls_gaviotas_clean_wildtrack.ogg` | Freesound - Seagulls / gaviotas clean wildtrack.WAV (HQ preview of the CC0 original) | Soojay | https://freesound.org/people/Soojay/sounds/462462/ |
+| `Audio/freesound/468911_Bacon_Sizzling.ogg` | Freesound - Bacon Sizzling (HQ preview of the CC0 original) | timothyd4y | https://freesound.org/people/timothyd4y/sounds/468911/ |
+| `Audio/freesound/472587_Reversed_Discovery_Sound.ogg` | Freesound - Reversed Discovery Sound.wav (HQ preview of the CC0 original) | DeVern | https://freesound.org/people/DeVern/sounds/472587/ |
+| `Audio/freesound/496727_04_1_Garden_wheelbarrow.ogg` | Freesound - 04-1 Garden wheelbarrow (HQ preview of the CC0 original) | 16GPanskaKomarkova_Marina | https://freesound.org/people/16GPanskaKomarkova_Marina/sounds/496727/ |
+| `Audio/freesound/553962_Cat_purr.ogg` | Freesound - Cat-purr.wav (HQ preview of the CC0 original) | clareboots | https://freesound.org/people/clareboots/sounds/553962/ |
+| `Audio/freesound/556975_Falling_fruit_Drumming_on_cookie_box.ogg` | Freesound - Falling fruit / Drumming on cookie box (HQ preview of the CC0 original) | lucasfuchs | https://freesound.org/people/lucasfuchs/sounds/556975/ |
+| `Audio/freesound/563355_Celesta_Chime.ogg` | Freesound - Celesta Chime.wav (HQ preview of the CC0 original) | nicholasdaryl | https://freesound.org/people/nicholasdaryl/sounds/563355/ |
+| `Audio/freesound/584218_Cicale_Bolano_08_08_21.ogg` | Freesound - Cicale Bolano 08-08-21.WAV (HQ preview of the CC0 original) | nicolo.ciuffi | https://freesound.org/people/nicolo.ciuffi/sounds/584218/ |
+| `Audio/freesound/610703_Good_answer_harp_glissando.ogg` | Freesound - Good answer harp glissando.wav (HQ preview of the CC0 original) | oggraphics | https://freesound.org/people/oggraphics/sounds/610703/ |
+| `Audio/freesound/611469_Church_Bell.ogg` | Freesound - Church Bell.wav (HQ preview of the CC0 original) | Kalomina | https://freesound.org/people/Kalomina/sounds/611469/ |
+| `Audio/freesound/637945_water_lake_waves_light_gentle_lap_at_boa.ogg` | Freesound - water lake waves light gentle lap at boats on beach.flac (HQ preview of the CC0 original) | kyles | https://freesound.org/people/kyles/sounds/637945/ |
+| `Audio/freesound/648860_Sea_Waves_Against_Rocks.ogg` | Freesound - Sea Waves Against Rocks (HQ preview of the CC0 original) | emainta | https://freesound.org/people/emainta/sounds/648860/ |
+| `Audio/freesound/690331_swifts_birds.ogg` | Freesound - swifts birds.wav (HQ preview of the CC0 original) | bruno.auzet | https://freesound.org/people/bruno.auzet/sounds/690331/ |
+| `Audio/freesound/776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg` | Freesound - SFX-TeaPot,Ceramic,Wobble,Stop2 (HQ preview of the CC0 original) | soundandmelodies | https://freesound.org/people/soundandmelodies/sounds/776201/ |
+| `Audio/freesound/810043_Breaking_pot_short.ogg` | Freesound - Breaking pot short (HQ preview of the CC0 original) | anna_bliss | https://freesound.org/people/anna_bliss/sounds/810043/ |
+| `Audio/freesound/816261_Broomstick_whoosh_2_Soft_low_OKM1.ogg` | Freesound - Broomstick whoosh 2 - Soft low OKM1 (HQ preview of the CC0 original) | Sadiquecat | https://freesound.org/people/Sadiquecat/sounds/816261/ |
+| `Audio/freesound/832691_Italian_Square_at_Sunday_Lunch_Time_Piaz.ogg` | Freesound - Italian Square at Sunday Lunch Time, Piazza del Duomo, Padua, Sunday (HQ preview of the CC0 original) | bassimat | https://freesound.org/people/bassimat/sounds/832691/ |
+| `Audio/freesound/864782_Walking_In_Socks.ogg` | Freesound - Walking In Socks (HQ preview of the CC0 original) | IENBA | https://freesound.org/people/IENBA/sounds/864782/ |
+| `Audio/kenney/impact-sounds` | Kenney - Impact Sounds (impactWood_light_000/002, impactWood_heavy_001, impactPlank_medium_002, impactSoft_medium_001, impactSoft_heavy_002; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds |
+| `Audio/kenney/interface-sounds` | Kenney - Interface Sounds (pluck_002; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/interface-sounds |
+| `Audio/kenney/rpg-audio` | Kenney - RPG Audio (bookOpen, bookClose; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/rpg-audio |
 
 Note: `Textures/polyhaven/fabric_pattern_07/fabric_pattern_07_diff_1k.jpg` is Poly Haven's `col_1` colourway, renamed.

@@ -1,0 +1,16 @@
+[
+  {
+    "path": "asset-library/Fonts/fraunces",
+    "source_name": "Google Fonts - Fraunces",
+    "source_url": "https://github.com/google/fonts/tree/main/ofl/fraunces",
+    "license": "OFL-1.1",
+    "author": "Undercase Type, Phaedra Charles, Flavia Zimbardi"
+  },
+  {
+    "path": "asset-library/Fonts/nunito",
+    "source_name": "Google Fonts - Nunito",
+    "source_url": "https://github.com/google/fonts/tree/main/ofl/nunito",
+    "license": "OFL-1.1",
+    "author": "Vernon Adams, Cyreal, Jacques Le Bailly"
+  }
+]

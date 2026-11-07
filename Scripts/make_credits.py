@@ -34,6 +34,24 @@ generated = [
 for path, name in generated:
     manifest.append({"path": path, "source_name": name, "source_url": "this project", "license": "Original work (CC0-1.0 dedication)", "author": "Shade and Seek team"})
 
+# Later additions are logged as fragments next to what they describe (fetch/sourcing scripts write them).
+FRAGMENTS = ["asset-library/manifest_assets_new.json", "asset-library/Audio/manifest_audio.json", "asset-library/Fonts/manifest_fonts_new.json"]
+known = {e["path"] for e in manifest}
+extra = []
+for frag in FRAGMENTS:
+    fp = os.path.join(ROOT, frag)
+    if os.path.exists(fp):
+        with open(fp, encoding="utf-8-sig") as f:
+            for e in json.load(f):
+                if e["path"] not in known and os.path.exists(os.path.join(ROOT, e["path"])):
+                    known.add(e["path"])
+                    extra.append(e)
+manifest += extra
+ph += [{"path": e["path"], "author": e["author"], "source_url": e["source_url"]} for e in extra if "polyhaven.com" in e["source_url"]]
+acg = [e for e in extra if "ambientcg.com" in e["source_url"]]
+audio = [e for e in extra if e["path"].startswith("asset-library/Audio/")]
+new_fonts = [e for e in extra if e["path"].startswith("asset-library/Fonts/")]
+
 with open(os.path.join(ROOT, "manifest.json"), "w", encoding="utf-8") as f:
     json.dump(manifest, f, indent=2, ensure_ascii=False)
 
@@ -46,10 +64,23 @@ for path, name in generated:
 lines += ["", "## Fonts (SIL Open Font License 1.1, licence text included next to each font)", ""]
 for path, name, url in fonts:
     lines.append(f"- `{path}` - {name} - {url}")
-lines.append("- Cormorant Garamond ships as a variable font; `Scripts/fetch_fonts.py` bakes the static weights in its `static/` folder (fontTools instancer).")
+for e in new_fonts:
+    lines.append(f"- `{e['path']}` - {e['source_name'].replace('Google Fonts - ', '')} by {e['author']} (Google Fonts) - {e['source_url']}")
+lines.append("- Cormorant Garamond, Fraunces and Nunito ship as variable fonts; `Scripts/fetch_fonts.py` bakes the static weights in their `static/` folders (fontTools instancer).")
 lines += ["", "## Poly Haven (CC0 1.0 - public domain, https://polyhaven.com/license)", "", "| Asset | Author(s) | Source |", "|---|---|---|"]
 for r in sorted(ph, key=lambda r: r["path"]):
     lines.append(f"| `{r['path'].replace('asset-library/', '')}` | {r['author']} | {r['source_url']} |")
+if acg:
+    lines += ["", "## ambientCG (CC0 1.0 - public domain, https://docs.ambientcg.com/license/)", "", "| Asset | Author(s) | Source |", "|---|---|---|"]
+    for e in sorted(acg, key=lambda e: e["path"]):
+        lines.append(f"| `{e['path'].replace('asset-library/', '')}` | {e['author']} | {e['source_url']} |")
+if audio:
+    lines += ["", "## Audio (CC0 1.0 - public domain; Freesound, FreePD, Kenney)", "",
+              "Game-ready files are built from these by `Scripts/prep_audio.py` into `asset-library/Audio/game`. Freesound files are the",
+              "public HQ previews of CC0 originals. FreePD (closed in 2025) is cited through Internet Archive copies of its pages.", "",
+              "| File | Title | Author | Source |", "|---|---|---|---|"]
+    for e in sorted(audio, key=lambda e: e["path"]):
+        lines.append(f"| `{e['path'].replace('asset-library/', '')}` | {e['source_name']} | {e['author']} | {e['source_url']} |")
 lines.append("")
 lines.append("Note: `Textures/polyhaven/fabric_pattern_07/fabric_pattern_07_diff_1k.jpg` is Poly Haven's `col_1` colourway, renamed.")
 with open(os.path.join(LIB, "CREDITS.md"), "w", encoding="utf-8") as f:
