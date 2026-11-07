@@ -2,9 +2,10 @@
 
 Output: asset-library/Audio/game/<UE_NAME>.wav - 48 kHz, 16-bit PCM (TPDF dither), mono for point-source SFX and
 footsteps, stereo for music / ambience / 2D stingers. Every output is cut from the source(s) listed in TABLE below,
-high-passed below ~40 Hz, silence-trimmed with short fades (one-shots) or made seamless by crossfading the tail into
-the head (*_Loop), loudness-normalised to a per-category target (ITU-R BS.1770 K-weighted, gated integrated LUFS) and
-run through a 4x-oversampled look-ahead limiter with a -1 dBTP ceiling.
+optionally de-noised (gentle spectral gating with a noise profile from the source's own quiet frames), high-passed below
+~40 Hz, silence-trimmed with short fades (one-shots) or made seamless by crossfading the tail into the head (*_Loop),
+loudness-normalised to a per-category target (ITU-R BS.1770 K-weighted, gated integrated LUFS) and run through a
+4x-oversampled look-ahead limiter with a -1 dBTP ceiling. Scripts/qa_audio.py checks the result.
 
 Sources and licences: asset-library/Audio/manifest_audio.json (all CC0 1.0).
 Needs: Python 3.11, numpy, scipy, soundfile (libsndfile >= 1.1 for mp3). No ffmpeg.
@@ -18,7 +19,7 @@ from fractions import Fraction
 import numpy as np
 import soundfile as sf
 from scipy import signal
-from scipy.ndimage import minimum_filter1d, uniform_filter1d
+from scipy.ndimage import maximum_filter, minimum_filter1d, uniform_filter, uniform_filter1d
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(ROOT, "asset-library", "Audio")
@@ -41,20 +42,26 @@ TARGET = {
 FS = "freesound/"
 KI = "kenney/interface-sounds/"
 KM = "kenney/impact-sounds/"
-KR = "kenney/rpg-audio/"
 PD = "freepd/"
+# The glockenspiel sample sounds at ~2801 Hz (F7): playback rates that put it on F6 / C6 for the menu open / close pair.
+GLOCK_F6 = 0.5
+GLOCK_C6 = 1046.5 / 2801.0
 
 
-def L(src, start=0.0, end=None, gain=0.0, at=0.0, rate=1.0, chan=None):
+def L(src, start=0.0, end=None, gain=0.0, at=0.0, rate=1.0, chan=None, fade=None):
     """One source layer: file (relative to asset-library/Audio), cut [start, end) seconds, gain in dB relative to the
     other layers (each layer is first matched to the same loudness), placed `at` seconds into the output, played back at
-    `rate` (>1 = faster/higher), `chan` = 0/1 to take one channel of a stereo file instead of the mid."""
-    return dict(src=src, start=start, end=end, gain=gain, at=at, rate=rate, chan=chan)
+    `rate` (>1 = faster/higher), `chan` = 0/1 to take one channel of a stereo file instead of the mid, `fade` =
+    (in, out) seconds of fade on this layer alone (e.g. to damp a ringing note under the next one)."""
+    return dict(src=src, start=start, end=end, gain=gain, at=at, rate=rate, chan=chan, fade=fade)
 
 
 # =====================================================================================================================
 # UE name -> sources, channels (1 = mono, 2 = stereo), loudness category, loop crossfade seconds (0 = one-shot).
-# Optional: hp (Hz, default 40), lp (Hz), fin / fout (fade seconds for one-shots), trim (default True for one-shots).
+# Optional: hp (Hz, default 40), lp (Hz), fin / fout (fade seconds for one-shots), trim (default True for one-shots),
+#           dn (dB of gentle spectral-gating noise reduction, profile from each source's own quiet frames, ~10-12),
+#           notch (list of Hz: narrow notches for steady electronic lines), even (seconds: slow level-evening window for
+#           loops that should roll steadily; removes 60 % of the level drift slower than the window).
 # =====================================================================================================================
 TABLE = [
     # ---- Music ------------------------------------------------------------------------------------------------------
@@ -81,10 +88,12 @@ TABLE = [
         L(FS + "690331_swifts_birds.ogg", 60.0, 154.0, gain=-5.0)]),
 
     # ---- World one-shots --------------------------------------------------------------------------------------------
-    dict(name="SFX_Gull_01", ch=1, cat="env", hp=250, layers=[L(FS + "462462_Seagulls_gaviotas_clean_wildtrack.ogg", 7.75, 10.30)]),
-    dict(name="SFX_Gull_02", ch=1, cat="env", hp=250, layers=[L(FS + "462462_Seagulls_gaviotas_clean_wildtrack.ogg", 11.00, 13.60)]),
-    dict(name="SFX_Gull_03", ch=1, cat="env", hp=250, layers=[L(FS + "462462_Seagulls_gaviotas_clean_wildtrack.ogg", 25.10, 28.60)]),
-    dict(name="SFX_Gull_04", ch=1, cat="env", hp=250, layers=[L(FS + "462462_Seagulls_gaviotas_clean_wildtrack.ogg", 39.50, 43.60)]),
+    # Gull calls from a busy wildtrack (surf + distant gulls only ~22-30 dB under the calls, a steady white-ish hiss in
+    # the gaps): gently de-noised (12 dB) and low-passed at 9 kHz (distant calls lose their top anyway), cut at the
+    # quietest points between calls, with soft edges.
+    *[dict(name=f"SFX_Gull_{k + 1:02d}", ch=1, cat="env", hp=250, lp=9000, dn=12, fin=0.03, fout=0.2,
+           layers=[L(FS + "462462_Seagulls_gaviotas_clean_wildtrack.ogg", a, b)])
+      for k, (a, b) in enumerate([(7.75, 10.30), (11.00, 13.50), (25.10, 28.55), (39.40, 43.45)])],
     # The 12th (last) toll of a church bell with its full natural decay.
     dict(name="SFX_BellToll", ch=1, cat="sfx", hp=60, fout=2.5, layers=[L(FS + "611469_Church_Bell.ogg", 50.05, 62.0)]),
 
@@ -99,7 +108,8 @@ TABLE = [
         L(FS + "864782_Walking_In_Socks.ogg", 3.64, 3.86),
         L(FS + "864782_Walking_In_Socks.ogg", 4.76, 4.98, gain=-2.0, at=0.065),
         L(KM + "impactSoft_medium_001.ogg", gain=-6.0, at=0.01)]),
-    dict(name="SFX_Mrrp", ch=1, cat="sfx", hp=80, layers=[L(FS + "200336_Cat_trilling.ogg", 7.66, 8.45)]),
+    # Room noise ~40 dB under the trill: 10 dB of gentle de-noising.
+    dict(name="SFX_Mrrp", ch=1, cat="sfx", hp=80, dn=10, layers=[L(FS + "200336_Cat_trilling.ogg", 7.66, 8.45)]),
     dict(name="SFX_Purr_Loop", ch=1, cat="sfx", loop=1.5, hp=35, layers=[L(FS + "553962_Cat_purr.ogg", 4.0, 16.0)]),
 
     # ---- Shade (sun damage) -----------------------------------------------------------------------------------------
@@ -115,17 +125,30 @@ TABLE = [
     dict(name="SFX_CartBump", ch=1, cat="sfx", layers=[
         L(KM + "impactWood_heavy_001.ogg"),
         L(KM + "impactPlank_medium_002.ogg", gain=-8.0, at=0.005)]),
-    dict(name="SFX_CartRoll_Loop", ch=1, cat="sfx", loop=0.4, hp=50, layers=[L(FS + "496727_04_1_Garden_wheelbarrow.ogg", 2.75, 6.55)]),
-    *[dict(name=f"SFX_LemonRattle_{k + 1:02d}", ch=1, cat="sfx", hp=80, layers=[L(FS + "556975_Falling_fruit_Drumming_on_cookie_box.ogg", a, b)])
-      for k, (a, b) in enumerate([(1.04, 1.64), (1.82, 2.36), (5.08, 5.74)])],
+    # Rolling: the constant rattle of a light wagon's wooden spoked, iron-tyred wheels on hard ground (no horse audible,
+    # no squeak or hum), the steadiest stretch, evened out and nudged up in pitch for a smaller cart. Code varies
+    # volume with speed and pitch 0.85-1.15 around this.
+    dict(name="SFX_CartRoll_Loop", ch=1, cat="sfx", loop=1.0, hp=60, even=0.5,
+         layers=[L(FS + "437077_G52-06-Buckboard_Wagon.ogg", 23.0, 28.4, rate=1.08)]),
+    # Lemons shifting in the crate as the cart jolts: potatoes settling on a wooden table after a pour (soft, woody
+    # knocks, pitched up for smaller fruit) with one apple-on-apple knock on top.
+    *[dict(name=f"SFX_LemonRattle_{k + 1:02d}", ch=1, cat="sfx", hp=110, fin=0.005, fout=0.06, layers=[
+        L(FS + "656727_Pouring_Potatoes_Onto_a_Table.ogg", a, b, rate=1.2),
+        L(FS + "276882_Bumping_apples_Pouring_Apples.ogg", c, c + 0.11, gain=-3.0, at=at)])
+      for k, (a, b, c, at) in enumerate([(6.95, 7.48, 9.296, 0.10), (26.50, 26.98, 10.264, 0.05),
+                                         (16.62, 17.10, 4.790, 0.13)])],
 
     # ---- Awning -----------------------------------------------------------------------------------------------------
     dict(name="SFX_AwningClick", ch=1, cat="sfx", hp=200, fout=0.01, layers=[L(FS + "156996_Freewheel_clicks.ogg", 1.49, 1.60)]),
     dict(name="SFX_AwningFlap", ch=1, cat="sfx", hp=60, layers=[L(FS + "244982_Wing_Flap_Flag_Flapping_5a.ogg", 0.0, 0.88)]),
-    dict(name="SFX_AwningOpen", ch=1, cat="sfx", hp=50, fout=0.2, layers=[L(FS + "330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg", 4.85, 6.05)]),
+    # Outdoor background ~36 dB under the flap: 10 dB of gentle de-noising.
+    dict(name="SFX_AwningOpen", ch=1, cat="sfx", hp=50, fout=0.2, dn=10,
+         layers=[L(FS + "330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg", 4.85, 6.05)]),
 
     # ---- Terracotta pot ---------------------------------------------------------------------------------------------
-    dict(name="SFX_PotWobble", ch=1, cat="sfx", hp=60, fout=0.1, layers=[L(FS + "776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg", 10.40, 12.50)]),
+    # The recording carries a steady 18 kHz electronic whine (-62 dB): narrow notch.
+    dict(name="SFX_PotWobble", ch=1, cat="sfx", hp=60, fout=0.1, notch=[18047.0],
+         layers=[L(FS + "776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg", 10.40, 12.50)]),
     dict(name="SFX_PotFall", ch=1, cat="sfx", hp=50, layers=[L(FS + "816261_Broomstick_whoosh_2_Soft_low_OKM1.ogg", 0.0, 0.47)]),
     dict(name="SFX_PotLand", ch=1, cat="sfx", hp=45, fout=0.15, layers=[
         L(FS + "810043_Breaking_pot_short.ogg", 0.70, 2.30),
@@ -134,8 +157,15 @@ TABLE = [
     # ---- UI + stingers ----------------------------------------------------------------------------------------------
     dict(name="SFX_UI_Move", ch=1, cat="ui", layers=[L(KI + "pluck_002.ogg")]),
     dict(name="SFX_UI_Select", ch=1, cat="ui", hp=80, fout=0.6, layers=[L(FS + "348924_Glockenspiel_46_f4_04.ogg", 0.0, 1.6)]),
-    dict(name="SFX_UI_Open", ch=1, cat="ui", layers=[L(KR + "bookOpen.ogg")]),     # pause menu opens like a journal
-    dict(name="SFX_UI_Close", ch=1, cat="ui", layers=[L(KR + "bookClose.ogg")]),
+    # Pause menu open / close: the same glockenspiel as Select / TimerTick, an octave lower (softer, warmer). Open = a
+    # damped C6 grace note rising to a ringing F6 (brighter, on top); Close = the mirror, a damped F6 falling to a
+    # darker, shorter C6. Cut lengths are output seconds x rate, so the ringing note ends with the long fade-out.
+    dict(name="SFX_UI_Open", ch=1, cat="ui", hp=200, lp=6000, fin=0.004, fout=0.3, layers=[
+        L(FS + "348924_Glockenspiel_46_f4_04.ogg", 0.0, 0.15 * GLOCK_C6, rate=GLOCK_C6, gain=-2.0, fade=(0, 0.06)),
+        L(FS + "348924_Glockenspiel_46_f4_04.ogg", 0.0, 0.435 * GLOCK_F6, rate=GLOCK_F6, at=0.065)]),
+    dict(name="SFX_UI_Close", ch=1, cat="ui", hp=200, lp=3500, fin=0.004, fout=0.25, layers=[
+        L(FS + "348924_Glockenspiel_46_f4_04.ogg", 0.0, 0.15 * GLOCK_F6, rate=GLOCK_F6, fade=(0, 0.06)),
+        L(FS + "348924_Glockenspiel_46_f4_04.ogg", 0.0, 0.335 * GLOCK_C6, rate=GLOCK_C6, gain=-1.0, at=0.065)]),
     dict(name="SFX_Objective", ch=2, cat="sting", hp=60, fout=1.0, layers=[L(FS + "563355_Celesta_Chime.ogg", 0.0, 3.6)]),
     dict(name="SFX_Solve", ch=2, cat="sting", hp=60, fout=1.2, layers=[L(FS + "610703_Good_answer_harp_glissando.ogg", 0.0, 3.2)]),
 
@@ -253,6 +283,47 @@ def fades(x, fin, fout):
     return x
 
 
+def noise_profile(x, sr, a, b, pad=10.0, nper=2048):
+    """Mean power spectrum (mono) of the quietest 10 % of STFT frames of x between a - pad and b + pad seconds: the
+    recording's own background, taken from the gaps between events."""
+    lo, hi = max(0, int((a - pad) * sr)), min(len(x), int((b + pad) * sr))
+    _, _, Z = signal.stft(x[lo:hi].mean(axis=1), sr, nperseg=nper, noverlap=nper * 3 // 4)
+    P = np.abs(Z) ** 2
+    e = P.sum(axis=0)
+    ok = e > 1e-12                                   # ignore digital silence
+    q = ok & (e <= np.percentile(e[ok], 10))
+    return P[:, q].mean(axis=1)
+
+
+def denoise(x, sr, noise, reduce_db, nper=2048):
+    """Gentle spectral gating. Per STFT bin (2048 / 75 % overlap), the mono SNR against the noise profile maps to a soft
+    mask (3 dB above the noise mean -> closed, 12 dB -> open), held over 3 frames so decays are not chopped and smoothed
+    over +-2 bins x +-2 frames so single noise bins never pop open (no 'musical noise'). Closed bins are turned down by
+    reduce_db only, never muted. Bins well above the noise pass untouched (the STFT round trip is exact there)."""
+    _, _, Z = signal.stft(x.T, sr, nperseg=nper, noverlap=nper * 3 // 4)       # (ch, F, T)
+    P = (np.abs(Z) ** 2).mean(axis=0)
+    snr = 10 * np.log10(P / (noise[:, None] + 1e-30) + 1e-30)
+    m = np.clip((snr - 3.0) / 9.0, 0.0, 1.0)
+    m = maximum_filter(m, size=(1, 3))
+    m = uniform_filter(m, size=(5, 5), mode="nearest")
+    floor = 10 ** (-reduce_db / 20)
+    _, y = signal.istft(Z * (floor + (1 - floor) * m)[None], sr, nperseg=nper, noverlap=nper * 3 // 4)
+    y = y.T[: len(x)]
+    return np.pad(y, ((0, len(x) - len(y)), (0, 0))) if len(y) < len(x) else y
+
+
+def notch(x, hz, zero_phase, q=30.0):
+    b, a = signal.iirnotch(hz, q, fs=SR)
+    return signal.filtfilt(b, a, x, axis=0) if zero_phase else signal.lfilter(b, a, x, axis=0)
+
+
+def even_out(x, win, amount=0.6):
+    """Slow level-evening for steady loops: removes `amount` of the loudness drift slower than `win` seconds."""
+    env = 10 * np.log10(uniform_filter1d(np.mean(x ** 2, axis=1), max(1, int(win * SR)), mode="nearest") + 1e-20)
+    g = -amount * (env - np.mean(env))
+    return x * (10 ** (g / 20))[:, None]
+
+
 def trim(x, start_db=-50.0, end_db=-60.0, pre=0.004, post=0.02):
     """Cut leading / trailing silence relative to the peak (5 ms envelope)."""
     env = uniform_filter1d(np.max(np.abs(x), axis=1), max(1, int(0.005 * SR)))
@@ -316,19 +387,24 @@ def to_channels(x, ch, chan=None):
     return x[:, :2]
 
 
-def render_layer(ly, ch):
+def render_layer(ly, ch, dn=0.0):
     x, sr = read(os.path.join(RAW, ly["src"]))
     a = int(round(ly["start"] * sr))
     b = len(x) if ly["end"] is None else min(len(x), int(round(ly["end"] * sr)))
-    seg = to_channels(x[a:b], ch, ly["chan"])
-    return resample(seg, sr, ly["rate"])
+    if dn:   # de-noise with 0.25 s of real context on both sides (STFT edges), then cut
+        lo, hi = max(0, a - sr // 4), min(len(x), b + sr // 4)
+        seg = denoise(x[lo:hi], sr, noise_profile(x, sr, a / sr, b / sr), dn)[a - lo: b - lo]
+    else:
+        seg = x[a:b]
+    seg = resample(to_channels(seg, ch, ly["chan"]), sr, ly["rate"])
+    return fades(seg, *ly["fade"]) if ly.get("fade") else seg
 
 
 def build(e):
     ch, loop = e["ch"], e.get("loop", 0)
     layers = []
     for ly in e["layers"]:
-        y = render_layer(ly, ch)
+        y = render_layer(ly, ch, e.get("dn", 0.0))
         if len(e["layers"]) > 1:   # match layers to a common loudness, then apply their relative gains
             y = y * 10 ** ((-24.0 - lufs(y)) / 20)
         y = y * 10 ** (ly["gain"] / 20)
@@ -341,6 +417,10 @@ def build(e):
     x = highpass(x, e.get("hp", 40.0), zero_phase=bool(loop))
     if e.get("lp"):
         x = lowpass(x, e["lp"], zero_phase=bool(loop))
+    for hz in e.get("notch", ()):
+        x = notch(x, hz, zero_phase=bool(loop))
+    if e.get("even"):
+        x = even_out(x, e["even"])
     if loop:
         x = seamless(x, loop)
     else:

@@ -144,25 +144,26 @@ public HQ previews of CC0 originals. FreePD (closed in 2025) is cited through In
 | `Audio/freesound/208111_Poof_of_Smoke.ogg` | Freesound - Poof of Smoke (HQ preview of the CC0 original) | Planman | https://freesound.org/people/Planman/sounds/208111/ |
 | `Audio/freesound/244982_Wing_Flap_Flag_Flapping_5a.ogg` | Freesound - Wing Flap (Flag Flapping) 5a (HQ preview of the CC0 original) | ani_music | https://freesound.org/people/ani_music/sounds/244982/ |
 | `Audio/freesound/265583_Wooden_Door_01.ogg` | Freesound - Wooden Door 01 (HQ preview of the CC0 original) | aglinder | https://freesound.org/people/aglinder/sounds/265583/ |
+| `Audio/freesound/276882_Bumping_apples_Pouring_Apples.ogg` | Freesound - Bumping apples Pouring Apples (HQ preview of the CC0 original) | ScratchnSniff | https://freesound.org/people/ScratchnSniff/sounds/276882/ |
 | `Audio/freesound/320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg` | Freesound - Bukarest 2015 Restaurant Terasse mittags MS.WAV (HQ preview of the CC0 original) | tribord | https://freesound.org/people/tribord/sounds/320026/ |
 | `Audio/freesound/330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg` | Freesound - Cloth Flapping On A Clothesline Thickly (HQ preview of the CC0 original) | leonelmail | https://freesound.org/people/leonelmail/sounds/330638/ |
 | `Audio/freesound/330639_Cloth_Flapping_On_A_Clothesline_Gently.ogg` | Freesound - Cloth Flapping On A Clothesline Gently (HQ preview of the CC0 original) | leonelmail | https://freesound.org/people/leonelmail/sounds/330639/ |
 | `Audio/freesound/348924_Glockenspiel_46_f4_04.ogg` | Freesound - Glockenspiel_46_f4_04 (HQ preview of the CC0 original) | cabled_mess | https://freesound.org/people/cabled_mess/sounds/348924/ |
 | `Audio/freesound/391448_Shirt_Whoosh_1.ogg` | Freesound - Shirt Whoosh 1.wav (HQ preview of the CC0 original) | saturdaysoundguy | https://freesound.org/people/saturdaysoundguy/sounds/391448/ |
 | `Audio/freesound/394222_Large_rope_pulley_operated.ogg` | Freesound - Large rope pulley operated.wav (HQ preview of the CC0 original) | mikewest | https://freesound.org/people/mikewest/sounds/394222/ |
+| `Audio/freesound/437077_G52-06-Buckboard_Wagon.ogg` | Freesound - G52-06-Buckboard Wagon.wav (HQ preview of the CC0 original) | craigsmith | https://freesound.org/people/craigsmith/sounds/437077/ |
 | `Audio/freesound/444799_Pivoting_Shutters_Opening_and_Closing.ogg` | Freesound - Pivoting Shutters Opening and Closing .wav (HQ preview of the CC0 original) | ross_sinc | https://freesound.org/people/ross_sinc/sounds/444799/ |
 | `Audio/freesound/462462_Seagulls_gaviotas_clean_wildtrack.ogg` | Freesound - Seagulls / gaviotas clean wildtrack.WAV (HQ preview of the CC0 original) | Soojay | https://freesound.org/people/Soojay/sounds/462462/ |
 | `Audio/freesound/468911_Bacon_Sizzling.ogg` | Freesound - Bacon Sizzling (HQ preview of the CC0 original) | timothyd4y | https://freesound.org/people/timothyd4y/sounds/468911/ |
 | `Audio/freesound/472587_Reversed_Discovery_Sound.ogg` | Freesound - Reversed Discovery Sound.wav (HQ preview of the CC0 original) | DeVern | https://freesound.org/people/DeVern/sounds/472587/ |
-| `Audio/freesound/496727_04_1_Garden_wheelbarrow.ogg` | Freesound - 04-1 Garden wheelbarrow (HQ preview of the CC0 original) | 16GPanskaKomarkova_Marina | https://freesound.org/people/16GPanskaKomarkova_Marina/sounds/496727/ |
 | `Audio/freesound/553962_Cat_purr.ogg` | Freesound - Cat-purr.wav (HQ preview of the CC0 original) | clareboots | https://freesound.org/people/clareboots/sounds/553962/ |
-| `Audio/freesound/556975_Falling_fruit_Drumming_on_cookie_box.ogg` | Freesound - Falling fruit / Drumming on cookie box (HQ preview of the CC0 original) | lucasfuchs | https://freesound.org/people/lucasfuchs/sounds/556975/ |
 | `Audio/freesound/563355_Celesta_Chime.ogg` | Freesound - Celesta Chime.wav (HQ preview of the CC0 original) | nicholasdaryl | https://freesound.org/people/nicholasdaryl/sounds/563355/ |
 | `Audio/freesound/584218_Cicale_Bolano_08_08_21.ogg` | Freesound - Cicale Bolano 08-08-21.WAV (HQ preview of the CC0 original) | nicolo.ciuffi | https://freesound.org/people/nicolo.ciuffi/sounds/584218/ |
 | `Audio/freesound/610703_Good_answer_harp_glissando.ogg` | Freesound - Good answer harp glissando.wav (HQ preview of the CC0 original) | oggraphics | https://freesound.org/people/oggraphics/sounds/610703/ |
 | `Audio/freesound/611469_Church_Bell.ogg` | Freesound - Church Bell.wav (HQ preview of the CC0 original) | Kalomina | https://freesound.org/people/Kalomina/sounds/611469/ |
 | `Audio/freesound/637945_water_lake_waves_light_gentle_lap_at_boa.ogg` | Freesound - water lake waves light gentle lap at boats on beach.flac (HQ preview of the CC0 original) | kyles | https://freesound.org/people/kyles/sounds/637945/ |
 | `Audio/freesound/648860_Sea_Waves_Against_Rocks.ogg` | Freesound - Sea Waves Against Rocks (HQ preview of the CC0 original) | emainta | https://freesound.org/people/emainta/sounds/648860/ |
+| `Audio/freesound/656727_Pouring_Potatoes_Onto_a_Table.ogg` | Freesound - Pouring Potatoes Onto a Table.wav (HQ preview of the CC0 original) | dhallcomposer | https://freesound.org/people/dhallcomposer/sounds/656727/ |
 | `Audio/freesound/690331_swifts_birds.ogg` | Freesound - swifts birds.wav (HQ preview of the CC0 original) | bruno.auzet | https://freesound.org/people/bruno.auzet/sounds/690331/ |
 | `Audio/freesound/776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg` | Freesound - SFX-TeaPot,Ceramic,Wobble,Stop2 (HQ preview of the CC0 original) | soundandmelodies | https://freesound.org/people/soundandmelodies/sounds/776201/ |
 | `Audio/freesound/810043_Breaking_pot_short.ogg` | Freesound - Breaking pot short (HQ preview of the CC0 original) | anna_bliss | https://freesound.org/people/anna_bliss/sounds/810043/ |
@@ -171,6 +172,5 @@ public HQ previews of CC0 originals. FreePD (closed in 2025) is cited through In
 | `Audio/freesound/864782_Walking_In_Socks.ogg` | Freesound - Walking In Socks (HQ preview of the CC0 original) | IENBA | https://freesound.org/people/IENBA/sounds/864782/ |
 | `Audio/kenney/impact-sounds` | Kenney - Impact Sounds (impactWood_light_000/002, impactWood_heavy_001, impactPlank_medium_002, impactSoft_medium_001, impactSoft_heavy_002; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds |
 | `Audio/kenney/interface-sounds` | Kenney - Interface Sounds (pluck_002; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/interface-sounds |
-| `Audio/kenney/rpg-audio` | Kenney - RPG Audio (bookOpen, bookClose; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/rpg-audio |
 
 Note: `Textures/polyhaven/fabric_pattern_07/fabric_pattern_07_diff_1k.jpg` is Poly Haven's `col_1` colourway, renamed.

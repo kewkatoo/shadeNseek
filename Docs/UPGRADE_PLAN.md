@@ -135,7 +135,9 @@ SFX -20, stingers -18, UI -22, paws -26).
 - Beds: Mediterranean waves on cliff rocks + harbour lapping; cicadas in a Ligurian town; NEW town bed (Padua piazza
   after lunch + café terrace cutlery + swifts) placed in the piazza and lane.
 - Every SFX recorded: cat trill, purr, soft paw foley, ceramic pot smash + thud, ratchet clicks, cloth flaps, real
-  bell toll, glockenspiel/celesta/harp stingers, Kenney UI plucks and journal open/close for the pause menu.
+  bell toll, glockenspiel/celesta/harp stingers, Kenney UI pluck, a glockenspiel open/close pair for the pause menu,
+  a wooden-wheeled wagon rolling for the cart and fruit knocks for its lemons. `Scripts/qa_audio.py` checks every
+  output (true peak, loudness, clipped sources, hiss / hum, loop seams, clicks).
 - New for the puzzles: shutter creak, laundry flap loop, rope pulley creak, gate creak, timer tick.
 
 In-game mix: import the WAVs over the same asset names (code keeps working), add the new ones, add a master submix with

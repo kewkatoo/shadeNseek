@@ -14,13 +14,6 @@
     "author": "Kenney (kenney.nl)"
   },
   {
-    "path": "asset-library/Audio/kenney/rpg-audio",
-    "source_name": "Kenney - RPG Audio (bookOpen, bookClose; licence file included)",
-    "source_url": "https://kenney.nl/assets/rpg-audio",
-    "license": "CC0-1.0",
-    "author": "Kenney (kenney.nl)"
-  },
-  {
     "path": "asset-library/Audio/freepd/wisdom_in_the_sun_kevin_macleod.mp3",
     "source_name": "FreePD - Wisdom in the Sun (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture)",
     "source_url": "https://web.archive.org/web/20241216000928/https://freepd.com/misc.php",
@@ -77,6 +70,13 @@
     "author": "aglinder"
   },
   {
+    "path": "asset-library/Audio/freesound/276882_Bumping_apples_Pouring_Apples.ogg",
+    "source_name": "Freesound - Bumping apples Pouring Apples (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/ScratchnSniff/sounds/276882/",
+    "license": "CC0-1.0",
+    "author": "ScratchnSniff"
+  },
+  {
     "path": "asset-library/Audio/freesound/320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg",
     "source_name": "Freesound - Bukarest 2015 Restaurant Terasse mittags MS.WAV (HQ preview of the CC0 original)",
     "source_url": "https://freesound.org/people/tribord/sounds/320026/",
@@ -119,6 +119,13 @@
     "author": "mikewest"
   },
   {
+    "path": "asset-library/Audio/freesound/437077_G52-06-Buckboard_Wagon.ogg",
+    "source_name": "Freesound - G52-06-Buckboard Wagon.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/craigsmith/sounds/437077/",
+    "license": "CC0-1.0",
+    "author": "craigsmith"
+  },
+  {
     "path": "asset-library/Audio/freesound/444799_Pivoting_Shutters_Opening_and_Closing.ogg",
     "source_name": "Freesound - Pivoting Shutters Opening and Closing .wav (HQ preview of the CC0 original)",
     "source_url": "https://freesound.org/people/ross_sinc/sounds/444799/",
@@ -147,25 +154,11 @@
     "author": "DeVern"
   },
   {
-    "path": "asset-library/Audio/freesound/496727_04_1_Garden_wheelbarrow.ogg",
-    "source_name": "Freesound - 04-1 Garden wheelbarrow (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/16GPanskaKomarkova_Marina/sounds/496727/",
-    "license": "CC0-1.0",
-    "author": "16GPanskaKomarkova_Marina"
-  },
-  {
     "path": "asset-library/Audio/freesound/553962_Cat_purr.ogg",
     "source_name": "Freesound - Cat-purr.wav (HQ preview of the CC0 original)",
     "source_url": "https://freesound.org/people/clareboots/sounds/553962/",
     "license": "CC0-1.0",
     "author": "clareboots"
-  },
-  {
-    "path": "asset-library/Audio/freesound/556975_Falling_fruit_Drumming_on_cookie_box.ogg",
-    "source_name": "Freesound - Falling fruit / Drumming on cookie box (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/lucasfuchs/sounds/556975/",
-    "license": "CC0-1.0",
-    "author": "lucasfuchs"
   },
   {
     "path": "asset-library/Audio/freesound/563355_Celesta_Chime.ogg",
@@ -208,6 +201,13 @@
     "source_url": "https://freesound.org/people/emainta/sounds/648860/",
     "license": "CC0-1.0",
     "author": "emainta"
+  },
+  {
+    "path": "asset-library/Audio/freesound/656727_Pouring_Potatoes_Onto_a_Table.ogg",
+    "source_name": "Freesound - Pouring Potatoes Onto a Table.wav (HQ preview of the CC0 original)",
+    "source_url": "https://freesound.org/people/dhallcomposer/sounds/656727/",
+    "license": "CC0-1.0",
+    "author": "dhallcomposer"
   },
   {
     "path": "asset-library/Audio/freesound/690331_swifts_birds.ogg",

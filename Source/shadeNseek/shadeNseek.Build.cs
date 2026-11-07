@@ -8,7 +8,7 @@ public class shadeNseek : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
-			"UMG", "Slate", "SlateCore", "ImageWrapper", "AssetRegistry"
+			"UMG", "Slate", "SlateCore", "ImageWrapper", "AssetRegistry", "AudioMixer"
 		});
 	}
 }

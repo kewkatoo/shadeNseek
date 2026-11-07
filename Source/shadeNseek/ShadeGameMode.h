@@ -210,6 +210,12 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UAudioComponent> AmbVillage;
 
+	/** Piazza murmur, café cutlery and swifts: loud in the lane and piazza, fading out up the stairs. */
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> AmbTown;
+	float TownLevel = 0.f;
+	bool bAudioCapDone = false;
+
 	float MusicTarget = 0.5f;
 	float MusicLevel = 0.f;
 };

@@ -31,6 +31,8 @@
 #include "UnrealClient.h"
 #include "Scalability.h"
 #include "HAL/IConsoleManager.h"
+#include "AudioMixerBlueprintLibrary.h"
+#include "SubmixEffects/AudioMixerSubmixEffectDynamicsProcessor.h"
 #include "Containers/Ticker.h"
 
 #define LOCTEXT_NAMESPACE "ShadeGame"
@@ -223,6 +225,26 @@ void AShadeGameMode::StartPlay()
 	}
 
 	ShadeAssets::PreloadAudio();
+	// Master bus limiter: the sounds are loudness-matched offline (prep_audio.py); this only catches stacked peaks
+	// (bell tolls over the music, a pot smash during the score) so the mix never clips.
+	if (USubmixEffectDynamicsProcessorPreset* Limiter = NewObject<USubmixEffectDynamicsProcessorPreset>(this))
+	{
+		FSubmixEffectDynamicsProcessorSettings L;
+		L.DynamicsProcessorType = ESubmixEffectDynamicsProcessorType::Limiter;
+		L.PeakMode = ESubmixEffectDynamicsPeakMode::Peak;
+		L.ThresholdDb = -1.5f;
+		L.KneeBandwidthDb = 0.f;
+		L.LookAheadMsec = 3.f;
+		L.AttackTimeMsec = 1.f;
+		L.ReleaseTimeMsec = 150.f;
+		Limiter->SetSettings(L);
+		UAudioMixerBlueprintLibrary::AddMasterSubmixEffect(this, Limiter);
+	}
+	if (HasParam(TEXT("audiocap")))
+	{
+		// QA: record the final master mix (after the limiter) to Saved/AudioCap/audiocap.wav until the game quits.
+		UAudioMixerBlueprintLibrary::StartRecordingOutput(this, 400.f);
+	}
 	if (USoundBase* S = ShadeAssets::Sound(TEXT("MUS_Theme")))
 	{
 		Music = UGameplayStatics::SpawnSound2D(this, S, 0.f, 1.f, 0.f, nullptr, true, false);
@@ -234,6 +256,10 @@ void AShadeGameMode::StartPlay()
 	if (USoundBase* S = ShadeAssets::Sound(TEXT("AMB_Village_Loop")))
 	{
 		AmbVillage = UGameplayStatics::SpawnSound2D(this, S, 0.42f, 1.f, 0.f, nullptr, true, false);
+	}
+	if (USoundBase* S = ShadeAssets::Sound(TEXT("AMB_Town_Loop")))
+	{
+		AmbTown = UGameplayStatics::SpawnSound2D(this, S, 0.f, 1.f, 0.f, nullptr, true, false);
 	}
 	MusicTarget = 0.5f;
 
@@ -608,6 +634,16 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 		Music->SetVolumeMultiplier(MusicLevel);
 	}
 
+	// Town bed follows Shade: lane and piazza (x < ~2450) full, gone by the top of the stairs.
+	if (AmbTown)
+	{
+		const AShadeCharacter* S = GetShade();
+		const float X = S ? S->GetActorLocation().X : 0.f;
+		const float Want = (Phase == EShadePhase::Title ? 0.25f : 0.38f) * (1.f - ShadeEase::Smooth((X - 2450.f) / 700.f));
+		TownLevel = ShadeEase::Approach(TownLevel, Want, 1.5f, Dt);
+		AmbTown->SetVolumeMultiplier(TownLevel);
+	}
+
 	// Toast expiry
 	const double Now = FPlatformTime::Seconds();
 	Toasts.RemoveAll([Now](const FShadeToast& T) { return Now - T.StartTime > 4.0; });
@@ -649,6 +685,14 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 		TickReunion(Dt);
 		break;
 	case EShadePhase::Ended:
+		if (PhaseTime > 2.f && !bAudioCapDone && HasParam(TEXT("audiocap")))
+		{
+			// The WAV is written asynchronously: stop well before the autoplay quits.
+			bAudioCapDone = true;
+			const FString CapDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("AudioCap"));
+			IFileManager::Get().MakeDirectory(*CapDir, true);
+			UAudioMixerBlueprintLibrary::StopRecordingOutput(this, EAudioRecordingExportType::WavFile, TEXT("audiocap"), CapDir);
+		}
 		if (IsAutoplayExit() && PhaseTime > 7.f)
 		{
 			QuitGame();

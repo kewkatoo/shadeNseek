@@ -644,7 +644,7 @@ target("Gallery", 2100, 180, 0, (0, 0, 0))
 # Autoplay route (all points are in shade at the moment they're used)
 for (tag, x, y, z) in (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), ("AP_SunBack", 780, -60, 0), ("AP_CartGrab", 400, 95, 0),
                        ("AP_Alley1", 840, -15, 0), ("AP_Alley2", 1000, -12, 0), ("AP_Alley3", 1220, -30, 0), ("AP_Cord", 1672, 58, 0),
-                       ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0),
+                       ("AP_Piazza0", 1690, -125, 0), ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0),
                        ("AP_Pulley", 2640, 65, 0), ("AP_WashStart", 2632, 20, 0), ("AP_WashMid", 2760, 20, 53), ("AP_WashEnd", 2885, 20, 106),
                        ("AP_ShutterCord", 2980, 65, 159), ("AP_ShutterMid", 3075, 40, 194), ("AP_ShutterEnd", 3185, 40, 247),
                        ("AP_AzzurraCord", 3305, 70, 300), ("AP_WallJump", 3395, 45, 300), ("AP_WallTop", 3395, 128, 380), ("AP_PotNudge", 3402, 130, 380),

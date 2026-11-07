@@ -66,6 +66,8 @@ void UShadeAutoplayComponent::BuildScript()
 	Step(E::Hold, TEXT("Dev_Awning"), 6.f);
 	// Let the canvas finish rolling out: crossing while its shadow is still sweeping in sometimes clipped the sun.
 	Step(E::Wait, nullptr, 1.5f);
+	// Keep to the house's shade before stepping under the canvas: the diagonal from the cord crossed ~1 m of sun.
+	Step(E::MoveTo, TEXT("AP_Piazza0"), 0.f, 30.f);
 	Step(E::MoveTo, TEXT("AP_Piazza1"), 0.f, 35.f);
 	Step(E::MoveTo, TEXT("AP_Piazza2"), 0.f, 35.f);
 	Step(E::MoveTo, TEXT("AP_Steps1"), 0.f, 35.f);
