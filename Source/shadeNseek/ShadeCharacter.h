@@ -102,22 +102,22 @@ public:
 
 	/** Seconds of full exposure until Shade evaporates. */
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float BurnTime = 0.42f;
+	float BurnTime = 0.36f;
 
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float CoolTime = 0.7f;
+	float CoolTime = 0.8f;
 
 	/** Shadow lost per second just by being out in the afternoon heat (the walk has a time limit). */
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float IdleDrain = 0.0038f;
+	float IdleDrain = 0.0040f;
 
 	/** Shadow lost per second in full sunlight (on top of the burn-up exposure). */
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float SunDrain = 0.17f;
+	float SunDrain = 0.2f;
 
 	/** Shadow lost each time Shade evaporates. */
 	UPROPERTY(EditAnywhere, Category = "Shade")
-	float EvaporateCost = 0.22f;
+	float EvaporateCost = 0.18f;
 
 protected:
 	void UpdateSun(float Dt);

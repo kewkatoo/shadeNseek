@@ -908,7 +908,7 @@ void SShadeOverlay::PaintEnd(const FPainter& P, double Now) const
 	const float SIn = Stage(1.8f, 2.6f);
 	const FString Stats[3][2] = {
 		{ G ? FormatTime(G->GetRunTime()) : TEXT("-"), TEXT("TIME") },
-		{ FString::FromInt(G ? G->GetPuzzlesSolved() : 0) + TEXT(" / 3"), TEXT("SHADE MADE") },
+		{ FString::Printf(TEXT("%d / %d"), G ? G->GetPuzzlesSolved() : 0, AShadeGameMode::PuzzleCount), TEXT("SHADE MADE") },
 		{ FString::FromInt(K ? K->GetEvaporations() : 0), TEXT("EVAPORATIONS") } };
 	const float SY = RuleY + 110.f;
 	for (int32 i = 0; i < 3; ++i)

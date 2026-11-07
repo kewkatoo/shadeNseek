@@ -4,6 +4,7 @@
 #include "ShadeGameMode.h"
 #include "ShadeInteractables.h"
 #include "ShadePlayerController.h"
+#include "ShadeSunSubsystem.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -66,8 +67,25 @@ void UShadeAutoplayComponent::BuildScript()
 	Step(E::Wait, nullptr, 1.5f);
 	Step(E::MoveTo, TEXT("AP_Piazza1"), 0.f, 35.f);
 	Step(E::MoveTo, TEXT("AP_Piazza2"), 0.f, 35.f);
-	Step(E::MoveTo, TEXT("AP_Steps1"));
-	// Puzzle 3: hop onto the wall, nudge the pot off.
+	Step(E::MoveTo, TEXT("AP_Steps1"), 0.f, 35.f);
+	// Puzzle 3: run the washing out, then cross the gap in a lull between the sea gusts.
+	Step(E::MoveTo, TEXT("AP_Pulley"), 0.f, 30.f);
+	Step(E::Face, TEXT("Dev_Wash"), 0.35f);
+	Step(E::Hold, TEXT("Dev_Wash"), 5.f);
+	Step(E::MoveTo, TEXT("AP_WashStart"), 0.f, 30.f);
+	Step(E::WaitShade, TEXT("AP_WashMid"), 9.f);
+	Step(E::MoveTo, TEXT("AP_WashEnd"), 0.f, 35.f, true);
+	// Puzzle 4: tug the shutter cord and trot through its shade before it swings shut.
+	Step(E::MoveTo, TEXT("AP_ShutterCord"), 0.f, 30.f);
+	Step(E::Face, TEXT("Dev_Shutter"), 0.35f);
+	Step(E::Interact, TEXT("Dev_Shutter"));
+	Step(E::WaitShade, TEXT("AP_ShutterMid"), 2.5f);
+	Step(E::MoveTo, TEXT("AP_ShutterEnd"), 0.f, 35.f, true);
+	// Puzzle 5: Casa Azzurra's awning shades the wall, then the pot bridges the last gap.
+	Step(E::MoveTo, TEXT("AP_AzzurraCord"), 0.f, 30.f);
+	Step(E::Face, TEXT("Dev_Azzurra"), 0.35f);
+	Step(E::Hold, TEXT("Dev_Azzurra"), 5.f);
+	Step(E::Wait, nullptr, 0.4f);
 	Step(E::MoveTo, TEXT("AP_WallJump"), 0.f, 30.f);
 	Step(E::Jump);
 	Step(E::MoveTo, TEXT("AP_WallTop"), 0.f, 30.f);
@@ -76,14 +94,12 @@ void UShadeAutoplayComponent::BuildScript()
 	Step(E::Interact, TEXT("Dev_Pot"));
 	Step(E::Wait, nullptr, 1.6f);
 	Step(E::MoveTo, TEXT("AP_WallDown"), 0.f, 35.f);
-	Step(E::MoveTo, TEXT("AP_Steps2"), 0.f, 35.f);
-	Step(E::MoveTo, TEXT("AP_Steps3"), 0.f, 35.f);
-	Step(E::MoveTo, TEXT("AP_Terrace"));
+	Step(E::MoveTo, TEXT("AP_Terrace"), 0.f, 35.f);
 	// Finale: wait in the porch while the bell-tower shadow sweeps over Biscotto.
 	Step(E::MoveTo, TEXT("AP_Porch"), 0.f, 30.f);
-	Step(E::Face, TEXT("Dev_Biscotto"), 1.0f);
+	Step(E::Face, TEXT("Dev_Biscotto"), 0.8f);
 	Step(E::WaitEvent, TEXT("TowerShadeArrived"), 22.f);
-	Step(E::Wait, nullptr, 0.6f);
+	Step(E::Wait, nullptr, 0.3f);
 	Step(E::MoveTo, TEXT("AP_Biscotto"), 0.f, 30.f);
 	Step(E::Face, TEXT("Dev_Biscotto"), 0.4f);
 	Step(E::Interact, TEXT("Dev_Biscotto"));
@@ -132,6 +148,8 @@ void UShadeAutoplayComponent::NextStep()
 	bStepStarted = false;
 	StuckTimer = 0.f;
 	StuckJumps = 0;
+	bSeenLit = false;
+	ShadedTime = 0.f;
 	if (AShadeCharacter* S = GetShade())
 	{
 		LastProgressPos = S->GetActorLocation();
@@ -366,6 +384,34 @@ void UShadeAutoplayComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		S->JumpInput();
 		NextStep();
 		break;
+	case EShadeAutoStep::WaitShade:
+	{
+		AActor* T = FindTagged(St.Tag);
+		const UShadeSunSubsystem* Sun = UShadeSunSubsystem::Get(this);
+		if (!T || !Sun)
+		{
+			UE_LOG(LogShade, Warning, TEXT("SHADE_AP missing shade point %s"), *St.Tag.ToString());
+			NextStep();
+			break;
+		}
+		// Watch the gap (waypoints sit 40 cm above the ground; test just above the ground like Shade's paws).
+		SteerCamera(T->GetActorLocation() + FVector(0.f, 0.f, 90.f), Dt, 2.f, -8.f);
+		if (Sun->IsSunlit(T->GetActorLocation() - FVector(0.f, 0.f, 30.f), S))
+		{
+			bSeenLit = true;
+			ShadedTime = 0.f;
+		}
+		else if (bSeenLit)
+		{
+			ShadedTime += Dt;
+		}
+		if ((bSeenLit && ShadedTime > 0.12f) || StepTime > St.Time)
+		{
+			UE_LOG(LogShade, Log, TEXT("SHADE_AP shade at %s after %.2fs (seen lit %d)"), *St.Tag.ToString(), StepTime, bSeenLit ? 1 : 0);
+			NextStep();
+		}
+		break;
+	}
 	case EShadeAutoStep::Finish:
 		UE_LOG(LogShade, Log, TEXT("SHADE_AP finished t=%.1f"), G->GetRunTime());
 		StepIndex = Script.Num();

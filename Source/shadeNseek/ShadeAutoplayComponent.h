@@ -22,6 +22,7 @@ enum class EShadeAutoStep : uint8
 	PushCart,     // push the grabbed cart forward until solved (or Time)
 	WaitEvent,    // until game-mode event Tag (or Time)
 	Jump,         // Space
+	WaitShade,    // until the TargetPoint tagged Tag has been lit and is then in shade again (or Time)
 	Finish
 };
 
@@ -71,4 +72,6 @@ private:
 	float StuckTimer = 0.f;
 	int32 StuckJumps = 0;
 	int32 StepEvaporations = 0;
+	bool bSeenLit = false;
+	float ShadedTime = 0.f;
 };

@@ -276,6 +276,173 @@ private:
 	FVector PlantRest = FVector::ZeroVector;
 };
 
+/**
+ * Washing day: hold E on the pulley cord to run sheets out on a line across a sunlit gap in the stairs. Sea gusts come
+ * on a steady rhythm and lift the sheets inland, so their shade slides off the steps: cross in the lulls.
+ * Local +X runs along the line (which may climb with the stairs), the sheets hang below it and gusts swing them to -Y.
+ */
+UCLASS()
+class SHADENSEEK_API AShadeWashingLine : public AShadeInteractable
+{
+	GENERATED_BODY()
+
+public:
+	AShadeWashingLine();
+
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual bool IsHoldInteraction() const override { return true; }
+	virtual void Interact(AShadeCharacter* Shade) override;
+	virtual void EndInteract(AShadeCharacter* Shade) override;
+	virtual FVector GetInteractLocation() const override;
+	virtual FVector GetFocusLocation() const override;
+	virtual float GetProgress() const override { return Extension; }
+
+	/** True while a gust holds the sheets up (their shade is off the steps). */
+	bool IsGusting() const;
+
+	/** Line length along local +X (cm). */
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float Span = 200.f;
+
+	/** Rise of the far end of the line above its start (cm): the line follows the stairs. */
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float Rise = 88.f;
+
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float SheetWidth = 74.f;
+
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float SheetDrop = 140.f;
+
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float OpenSpeed = 0.5f;
+
+	/** One full gust cycle (s): a gust of GustTime, then a lull. */
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float GustPeriod = 4.3f;
+
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float GustTime = 1.8f;
+
+	/** How far a gust lifts the sheets inland (deg from hanging). */
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	float GustLift = 78.f;
+
+	/** Cord handle on the wall (actor space), and where Shade stands relative to it. */
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	FVector CordLocal = FVector(-20.f, -40.f, -210.f);
+
+	UPROPERTY(EditAnywhere, Category = "Washing")
+	FVector InteractOffset = FVector(0.f, -45.f, 0.f);
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> Line;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> Cord;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> Handle;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TArray<TObjectPtr<USceneComponent>> SheetPivots;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TArray<TObjectPtr<UStaticMeshComponent>> Sheets;
+
+	/** Thin boxes that block only the Sunlight channel: the sheets' gameplay shade. */
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TArray<TObjectPtr<UBoxComponent>> SheetShade;
+
+private:
+	float GustEnvelope(float T) const;
+	void UpdateSheets(float Dt);
+
+	float Extension = 0.f;
+	float ClickAccum = 0.f;
+	float Time = 0.f;
+	float GustClock = 0.f;
+	bool bHolding = false;
+	bool bWasGusting = false;
+	TArray<FShadeSpring> Swing;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> FlapAudio;
+};
+
+/**
+ * The shutter: tug the cord and a big shutter swings open across a sunlit gap, holds a moment, then the breeze creaks it
+ * shut. Its shade lasts barely long enough to trot through. Re-usable. Local: hinge at the origin, the panel lies along
+ * +Y against the wall when closed and swings toward +X.
+ */
+UCLASS()
+class SHADENSEEK_API AShadeShutter : public AShadeInteractable
+{
+	GENERATED_BODY()
+
+public:
+	AShadeShutter();
+
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void Interact(AShadeCharacter* Shade) override;
+	virtual bool CanInteract(const AShadeCharacter* Shade) const override;
+	virtual FVector GetInteractLocation() const override;
+	virtual FVector GetFocusLocation() const override;
+	virtual float GetProgress() const override { return OpenAngle > 0.f ? Angle / OpenAngle : 0.f; }
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	float PanelWidth = 160.f;
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	float PanelHeight = 205.f;
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	float OpenAngle = 100.f;
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	float OpenTime = 0.45f;
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	float HoldOpen = 0.8f;
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	float CloseTime = 1.0f;
+
+	/** Once this game-mode event has fired (Shade got across), the cord is done. */
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	FName DoneEvent;
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	FVector CordLocal = FVector(-15.f, -160.f, -140.f);
+
+	UPROPERTY(EditAnywhere, Category = "Shutter")
+	FVector InteractOffset = FVector(0.f, -45.f, 0.f);
+
+	UPROPERTY(VisibleAnywhere, Category = "Shutter")
+	TObjectPtr<USceneComponent> Hinge;
+
+	UPROPERTY(VisibleAnywhere, Category = "Shutter")
+	TObjectPtr<UStaticMeshComponent> Panel;
+
+	/** Blocks only the Sunlight channel: the shutter's gameplay shade (the panel mesh may be louvred). */
+	UPROPERTY(VisibleAnywhere, Category = "Shutter")
+	TObjectPtr<UBoxComponent> PanelShade;
+
+	UPROPERTY(VisibleAnywhere, Category = "Shutter")
+	TObjectPtr<UStaticMeshComponent> Cord;
+
+	UPROPERTY(VisibleAnywhere, Category = "Shutter")
+	TObjectPtr<UStaticMeshComponent> Handle;
+
+private:
+	int32 State = 0; // 0 shut, 1 opening, 2 holding, 3 closing
+	float StateTime = 0.f;
+	float Angle = 0.f;
+	FShadeSpring Bang;
+};
+
 /** A sleeping cat. Biscotto (the goal) has lost his shadow; the village's other nappers have theirs. */
 UCLASS()
 class SHADENSEEK_API AShadeNapCat : public AShadeInteractable

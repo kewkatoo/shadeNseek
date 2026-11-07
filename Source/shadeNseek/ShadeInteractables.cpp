@@ -426,7 +426,8 @@ void AShadeFlowerPot::PosePot(const FVector& Base, float Angle, float YawDeg)
 
 bool AShadeFlowerPot::CanInteract(const AShadeCharacter* Shade) const
 {
-	return State == 0 && Shade != nullptr;
+	// Only from up on the wall (the wall's own shadow at its foot must not let Shade nudge it from the ground).
+	return State == 0 && Shade != nullptr && Shade->GetActorLocation().Z > GetActorLocation().Z - 25.f;
 }
 
 FVector AShadeFlowerPot::GetFocusLocation() const
@@ -525,6 +526,320 @@ void AShadeFlowerPot::Tick(float DeltaSeconds)
 		Plant->SetRelativeLocation(Foot + SwayQ.RotateVector(PlantRest - Foot));
 		Plant->SetRelativeRotation(SwayQ);
 	}
+}
+
+// =====================================================================================================================
+// Washing line (moving shade)
+// =====================================================================================================================
+
+namespace
+{
+	const TCHAR* const GSheetMeshes[3] = { TEXT("SM_Sheet_White"), TEXT("SM_Sheet_Blue"), TEXT("SM_Sheet_Lemon") };
+}
+
+AShadeWashingLine::AShadeWashingLine()
+{
+	Verb = LOCTEXT("WashVerb", "Pull");
+	Label = LOCTEXT("WashLabel", "Washing line");
+	InteractRange = 95.f;
+	Root->SetMobility(EComponentMobility::Movable);
+
+	Line = MakeMesh(this, TEXT("Line"), Root);
+	NoCollision(Line);
+	Cord = MakeMesh(this, TEXT("Cord"), Root);
+	Handle = MakeMesh(this, TEXT("Handle"), Root);
+	NoCollision(Cord);
+	NoCollision(Handle);
+	Cord->SetCastShadow(false);
+	for (int32 i = 0; i < 3; ++i)
+	{
+		USceneComponent* P = CreateDefaultSubobject<USceneComponent>(*FString::Printf(TEXT("SheetPivot%d"), i));
+		P->SetupAttachment(Root);
+		P->SetMobility(EComponentMobility::Movable);
+		UStaticMeshComponent* M = MakeMesh(this, *FString::Printf(TEXT("Sheet%d"), i), P);
+		NoCollision(M);
+		UBoxComponent* B = CreateDefaultSubobject<UBoxComponent>(*FString::Printf(TEXT("SheetShade%d"), i));
+		B->SetupAttachment(P);
+		B->SetMobility(EComponentMobility::Movable);
+		SunOnlyCollision(B);
+		SheetPivots.Add(P);
+		Sheets.Add(M);
+		SheetShade.Add(B);
+	}
+}
+
+void AShadeWashingLine::BeginPlay()
+{
+	Super::BeginPlay();
+	DefaultMesh(Line, TEXT("SM_Rope_100"));
+	DefaultMesh(Cord, TEXT("SM_Cord"));
+	DefaultMesh(Handle, TEXT("SM_CordHandle"));
+	Swing.SetNum(Sheets.Num());
+	for (int32 i = 0; i < Sheets.Num(); ++i)
+	{
+		DefaultMesh(Sheets[i], GSheetMeshes[i % 3]);
+		SheetShade[i]->SetBoxExtent(FVector(SheetWidth * 0.5f, 1.5f, SheetDrop * 0.5f));
+		SheetShade[i]->SetRelativeLocation(FVector(0.f, 0.f, -SheetDrop * 0.5f));
+	}
+	// The line climbs with the stairs from the pulley on the corner to a hook on the next house.
+	const FVector LineVec(Span, 0.f, Rise);
+	Line->SetRelativeLocation(FVector::ZeroVector);
+	Line->SetRelativeRotation(LineVec.Rotation());
+	Line->SetRelativeScale3D(FVector(LineVec.Size() / 100.f, 1.2f, 1.2f));
+	// The cord runs down the wall from the pulley to a handle at cat height.
+	const FVector Top(CordLocal.X, CordLocal.Y, -12.f);
+	Cord->SetRelativeLocation(CordLocal);
+	Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
+	Cord->SetRelativeScale3D(FVector(FMath::Max((Top - CordLocal).Size(), 1.f) / 100.f, 1.f, 1.f));
+	Handle->SetRelativeLocation(CordLocal);
+	FlapAudio = ShadeAssets::Loop(Root, TEXT("SFX_LaundryFlap_Loop"), 0.f, true);
+	if (FlapAudio)
+	{
+		FlapAudio->SetRelativeLocation(FVector(Span * 0.5f, 0.f, Rise * 0.5f - 60.f));
+	}
+	Extension = 0.f;
+	UpdateSheets(0.f);
+}
+
+FVector AShadeWashingLine::GetInteractLocation() const
+{
+	return GetActorTransform().TransformPosition(CordLocal + InteractOffset);
+}
+
+FVector AShadeWashingLine::GetFocusLocation() const
+{
+	return GetActorTransform().TransformPosition(CordLocal + FVector(0.f, 0.f, 55.f));
+}
+
+void AShadeWashingLine::Interact(AShadeCharacter* Shade)
+{
+	if (bSolved)
+	{
+		return;
+	}
+	bHolding = true;
+	ShadeAssets::PlayAt(this, TEXT("SFX_RopeCreak"), GetActorTransform().TransformPosition(CordLocal), 0.7f);
+}
+
+void AShadeWashingLine::EndInteract(AShadeCharacter* Shade)
+{
+	bHolding = false;
+}
+
+float AShadeWashingLine::GustEnvelope(float T) const
+{
+	// Deterministic sea breeze: a gust of GustTime (eased in and out), then a lull. The rhythm is the puzzle.
+	const float P = FMath::Max(GustPeriod, 1.f);
+	const float X = FMath::Fmod(FMath::Fmod(T, P) + P, P);
+	if (X > GustTime)
+	{
+		return 0.f;
+	}
+	return ShadeEase::Smooth(X / 0.3f) * (1.f - ShadeEase::Smooth((X - (GustTime - 0.45f)) / 0.45f));
+}
+
+bool AShadeWashingLine::IsGusting() const
+{
+	return GustEnvelope(GustClock) > 0.25f;
+}
+
+void AShadeWashingLine::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
+	Time += Dt;
+	GustClock += Dt;
+	if (bHolding && !bSolved)
+	{
+		const float Before = Extension;
+		Extension = FMath::Min(1.f, Extension + OpenSpeed * Dt);
+		ClickAccum += Extension - Before;
+		if (ClickAccum > 0.1f)
+		{
+			ClickAccum = 0.f;
+			ShadeAssets::PlayAt(this, TEXT("SFX_AwningClick"), GetActorTransform().TransformPosition(FVector(0.f, 0.f, -20.f)), 0.5f, FMath::FRandRange(0.9f, 1.05f));
+		}
+		if (Extension >= 1.f)
+		{
+			bHolding = false;
+			MarkSolved();
+		}
+	}
+	const bool bGust = IsGusting();
+	if (bGust && !bWasGusting && Extension > 0.3f)
+	{
+		ShadeAssets::PlayAt(this, TEXT("SFX_AwningFlap"), GetActorTransform().TransformPosition(FVector(Span * 0.5f, 0.f, 0.f)), 0.75f, FMath::FRandRange(0.95f, 1.1f));
+	}
+	bWasGusting = bGust;
+	if (FlapAudio)
+	{
+		FlapAudio->SetVolumeMultiplier(ShadeEase::Clamp01(Extension) * (0.25f + 0.75f * GustEnvelope(GustClock)));
+	}
+	UpdateSheets(Dt);
+}
+
+void AShadeWashingLine::UpdateSheets(float Dt)
+{
+	const int32 N = Sheets.Num();
+	for (int32 i = 0; i < N; ++i)
+	{
+		// Pegged on the running line: the lead sheet goes out first, the others follow; retracted they bunch up by the
+		// pulley, gathered narrow.
+		const float OpenX = (i + 0.5f) * Span / N;
+		const float BunchX = 10.f + i * 9.f;
+		const float X = FMath::Max(BunchX, OpenX - (1.f - ShadeEase::Clamp01(Extension)) * Span);
+		const float Out = ShadeEase::Clamp01((X - BunchX) / FMath::Max(OpenX - BunchX, 1.f));
+		SheetPivots[i]->SetRelativeLocation(FVector(X, 0.f, X * Rise / FMath::Max(Span, 1.f)));
+
+		// Lift inland (-Y): the gust (each sheet a beat behind the one nearer the sea gap's mouth), a pre-gust billow
+		// that tells the player a gust is coming, and a calm flutter.
+		const float Lag = 0.07f * i;
+		const float Gust = GustEnvelope(GustClock - Lag);
+		const float Ahead = GustEnvelope(GustClock - Lag + 0.5f);
+		const float Calm = 5.f * FMath::Sin(Time * 2.1f + i * 1.7f) + 2.f * FMath::Sin(Time * 5.3f + i);
+		const float Billow = 10.f * Ahead * (1.f - Gust) * (0.6f + 0.4f * FMath::Sin(Time * 9.f + i));
+		const float Target = (GustLift * Gust + Calm + Billow) * Out;
+		if (Dt > 0.f && Swing.IsValidIndex(i))
+		{
+			Swing[i].Update(Target, 70.f, 9.f, Dt);
+		}
+		const float Lift = Swing.IsValidIndex(i) ? Swing[i].Value : 0.f;
+		SheetPivots[i]->SetRelativeRotation(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(-Lift)));
+
+		if (const UStaticMesh* M = Sheets[i]->GetStaticMesh())
+		{
+			const FVector E = M->GetBounds().BoxExtent;
+			const float W = FMath::Max(E.X * 2.f, 1.f), H = FMath::Max(E.Z * 2.f, 1.f);
+			Sheets[i]->SetRelativeScale3D(FVector(SheetWidth / W * FMath::Lerp(0.3f, 1.f, Out), 1.f, SheetDrop / H));
+		}
+		SheetShade[i]->SetRelativeScale3D(FVector(FMath::Lerp(0.3f, 1.f, Out), 1.f, 1.f));
+	}
+}
+
+// =====================================================================================================================
+// Shutter (timed shade)
+// =====================================================================================================================
+
+AShadeShutter::AShadeShutter()
+{
+	Verb = LOCTEXT("ShutterVerb", "Tug");
+	Label = LOCTEXT("ShutterLabel", "Shutter cord");
+	InteractRange = 95.f;
+	Root->SetMobility(EComponentMobility::Movable);
+	Hinge = CreateDefaultSubobject<USceneComponent>(TEXT("Hinge"));
+	Hinge->SetupAttachment(Root);
+	Hinge->SetMobility(EComponentMobility::Movable);
+	Panel = MakeMesh(this, TEXT("Panel"), Hinge);
+	NoCollision(Panel);
+	PanelShade = CreateDefaultSubobject<UBoxComponent>(TEXT("PanelShade"));
+	PanelShade->SetupAttachment(Hinge);
+	PanelShade->SetMobility(EComponentMobility::Movable);
+	SunOnlyCollision(PanelShade);
+	Cord = MakeMesh(this, TEXT("Cord"), Root);
+	Handle = MakeMesh(this, TEXT("Handle"), Root);
+	NoCollision(Cord);
+	NoCollision(Handle);
+	Cord->SetCastShadow(false);
+}
+
+void AShadeShutter::BeginPlay()
+{
+	Super::BeginPlay();
+	DefaultMesh(Panel, TEXT("SM_BigShutter"));
+	DefaultMesh(Cord, TEXT("SM_Cord"));
+	DefaultMesh(Handle, TEXT("SM_CordHandle"));
+	PanelShade->SetBoxExtent(FVector(2.5f, PanelWidth * 0.5f, PanelHeight * 0.5f));
+	PanelShade->SetRelativeLocation(FVector(3.f, PanelWidth * 0.5f, PanelHeight * 0.5f));
+	const FVector Top(CordLocal.X, CordLocal.Y, PanelHeight * 0.5f);
+	Cord->SetRelativeLocation(CordLocal);
+	Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
+	Cord->SetRelativeScale3D(FVector(FMath::Max((Top - CordLocal).Size(), 1.f) / 100.f, 1.f, 1.f));
+	Handle->SetRelativeLocation(CordLocal);
+	Hinge->SetRelativeRotation(FRotator::ZeroRotator);
+}
+
+bool AShadeShutter::CanInteract(const AShadeCharacter* Shade) const
+{
+	return Shade != nullptr && !bSolved && State == 0;
+}
+
+FVector AShadeShutter::GetInteractLocation() const
+{
+	return GetActorTransform().TransformPosition(CordLocal + InteractOffset);
+}
+
+FVector AShadeShutter::GetFocusLocation() const
+{
+	return GetActorTransform().TransformPosition(CordLocal + FVector(0.f, 0.f, 55.f));
+}
+
+void AShadeShutter::Interact(AShadeCharacter* Shade)
+{
+	if (State != 0 || bSolved)
+	{
+		return;
+	}
+	State = 1;
+	StateTime = 0.f;
+	ShadeAssets::PlayAt(this, TEXT("SFX_AwningClick"), GetActorTransform().TransformPosition(CordLocal), 0.6f, 0.9f);
+	ShadeAssets::PlayAt(this, TEXT("SFX_ShutterCreak"), Hinge->GetComponentLocation() + FVector(0, 0, PanelHeight * 0.5f), 0.8f, 1.15f);
+}
+
+void AShadeShutter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
+	StateTime += Dt;
+	if (!bSolved && !DoneEvent.IsNone() && State == 0)
+	{
+		if (const AShadeGameMode* G = GM(this))
+		{
+			bSolved = G->HasEvent(DoneEvent);
+		}
+	}
+	const FVector Mid = Hinge->GetComponentLocation() + FVector(0, 0, PanelHeight * 0.5f);
+	switch (State)
+	{
+	case 1: // flung open by the tug, overshoots onto its stop
+		Angle = OpenAngle * ShadeEase::OutBack(StateTime / FMath::Max(OpenTime, 0.05f), 1.1f);
+		if (StateTime >= OpenTime)
+		{
+			State = 2;
+			StateTime = 0.f;
+			Angle = OpenAngle;
+			Bang.Velocity = -40.f;
+			ShadeAssets::PlayAt(this, TEXT("SFX_Release"), Mid, 0.6f, 0.85f);
+		}
+		break;
+	case 2: // the breeze holds it a moment
+		Angle = OpenAngle;
+		if (StateTime >= HoldOpen)
+		{
+			State = 3;
+			StateTime = 0.f;
+			ShadeAssets::PlayAt(this, TEXT("SFX_ShutterCreak"), Mid, 0.8f, 0.95f);
+		}
+		break;
+	case 3: // and creaks it shut, slowly at first
+	{
+		const float U = ShadeEase::Clamp01(StateTime / FMath::Max(CloseTime, 0.05f));
+		Angle = OpenAngle * (1.f - U * U);
+		if (U >= 1.f)
+		{
+			State = 0;
+			StateTime = 0.f;
+			Angle = 0.f;
+			Bang.Velocity = 60.f;
+			ShadeAssets::PlayAt(this, TEXT("SFX_CartBump"), Mid, 0.55f, 1.1f);
+		}
+		break;
+	}
+	default:
+		break;
+	}
+	Bang.Update(0.f, 260.f, 14.f, Dt);
+	const float A = FMath::Max(0.f, Angle + (State == 1 ? 0.f : Bang.Value));
+	Hinge->SetRelativeRotation(FRotator(0.f, -A, 0.f));
 }
 
 // =====================================================================================================================

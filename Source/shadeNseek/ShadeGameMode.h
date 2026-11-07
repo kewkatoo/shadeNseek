@@ -103,6 +103,8 @@ public:
 	void AddTrauma(float Amount);
 	void SpawnDust(const FVector& Location, float Strength);
 	int32 GetPuzzlesSolved() const { return PuzzlesSolved; }
+	/** Cart, cafe awning, washing line, shutter, two shadows (awning + pot). */
+	static constexpr int32 PuzzleCount = 5;
 
 protected:
 	void SetPhase(EShadePhase NewPhase);

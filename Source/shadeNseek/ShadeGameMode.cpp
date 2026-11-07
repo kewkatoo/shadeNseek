@@ -130,7 +130,10 @@ void AShadeGameMode::BuildObjectives()
 	Add(TEXT("Zone_Lane"), TEXT("OBJ_Lane"), LOCTEXT("O0", "Find Biscotto"), LOCTEXT("O0H", "He naps up by the bell tower. Stay in the shade - sunlight burns."));
 	Add(TEXT("Zone_AfterAlley"), TEXT("OBJ_Cart"), LOCTEXT("O1", "Cross the sunlit alley"), LOCTEXT("O1H", "Push the lemon cart into the sunbeam and walk in its shade."));
 	Add(TEXT("Zone_AfterPiazza"), TEXT("OBJ_Awning"), LOCTEXT("O2", "Shade the little piazza"), LOCTEXT("O2H", "Hold E on the awning cord to roll the canvas out."));
-	Add(TEXT("Zone_Terrace"), TEXT("OBJ_Pot"), LOCTEXT("O3", "Climb the old steps"), LOCTEXT("O3H", "Hop onto the wall and nudge the potted lemon tree off the edge."));
+	Add(TEXT("Zone_AfterWash"), TEXT("OBJ_Wash"), LOCTEXT("O3", "Wait out the sea breeze"), LOCTEXT("O3H", "Hold E on the pulley to run the washing out. Cross while the sheets hang still."));
+	Add(TEXT("Zone_AfterShutter"), TEXT("OBJ_Shutter"), LOCTEXT("O4s", "Beat the shutter"), LOCTEXT("O4sH", "Tug the cord, then trot (Shift) through its shade before the breeze swings it shut."));
+	Add(TEXT("AzzurraOut"), TEXT("OBJ_Azzurra"), LOCTEXT("O5a", "Shade the garden wall"), LOCTEXT("O5aH", "The terrace is in full sun. Casa Azzurra's awning cord hangs by its corner."));
+	Add(TEXT("Zone_Terrace"), TEXT("OBJ_Pot"), LOCTEXT("O5b", "One more shadow"), LOCTEXT("O5bH", "From the shaded wall, nudge the potted lemon tree into the last sunny gap."));
 	Add(TEXT("TowerShadeArrived"), TEXT("OBJ_Wait"), LOCTEXT("O4", "Wait for the bell tower's shadow"), LOCTEXT("O4H", "The sun is sinking. Stay in the tower's shade and let it carry you to him."));
 	Add(TEXT("Reunited"), TEXT("OBJ_Biscotto"), LOCTEXT("O5", "Reunite with Biscotto"), LOCTEXT("O5H", "Slip into his shadow - press E beside him."));
 
@@ -139,6 +142,10 @@ void AShadeGameMode::BuildObjectives()
 	EventLines.Add(TEXT("CartSolved"), LOCTEXT("L_Cart", "A cart full of lemons makes a fine patch of shade."));
 	EventLines.Add(TEXT("AwningSolved"), LOCTEXT("L_Awning", "Signora Rosa won't mind. Probably."));
 	EventLines.Add(TEXT("PotSolved"), LOCTEXT("L_Pot", "Cats do love knocking things off ledges."));
+	EventLines.Add(TEXT("LineOut"), LOCTEXT("L_Line", "Washing day. The sea breeze keeps lifting the sheets..."));
+	EventLines.Add(TEXT("Zone_AfterWash"), LOCTEXT("L_Wash", "Timed it like a cat on a windowsill."));
+	EventLines.Add(TEXT("Zone_AfterShutter"), LOCTEXT("L_Shutter", "Slam! Not today, breeze."));
+	EventLines.Add(TEXT("AzzurraOut"), LOCTEXT("L_Azzurra", "Blue shade for the wall. Now that lemon tree..."));
 	EventLines.Add(TEXT("Zone_Terrace"), LOCTEXT("L_Terrace", "Six o'clock... the bell tower's shadow is stretching across the terrace."));
 	EventLines.Add(TEXT("TowerShadeArrived"), LOCTEXT("L_Tower", "There he is - still snoring, still shadowless."));
 	EventLines.Add(TEXT("Zone_Lane"), LOCTEXT("L_Lane", "The cool side of the street. Keep to it."));
@@ -456,13 +463,14 @@ void AShadeGameMode::NotifyEvent(FName EventName, AActor* Source)
 			Say(*L, 4.2f);
 		}
 	}
-	if (EventName == TEXT("CartSolved") || EventName == TEXT("AwningSolved") || EventName == TEXT("PotSolved"))
+	if (EventName == TEXT("CartSolved") || EventName == TEXT("AwningSolved") || EventName == TEXT("Zone_AfterWash") || EventName == TEXT("Zone_AfterShutter")
+		|| EventName == TEXT("PotSolved"))
 	{
 		if (bNew)
 		{
 			++PuzzlesSolved;
 			ShadeAssets::Play2D(this, TEXT("SFX_Solve"), 0.6f);
-			PushToast(FText::Format(LOCTEXT("Solved", "{0} of 3"), FText::AsNumber(PuzzlesSolved)));
+			PushToast(FText::Format(LOCTEXT("Solved", "{0} of {1}"), FText::AsNumber(PuzzlesSolved), FText::AsNumber(PuzzleCount)));
 		}
 	}
 	if (EventName == TEXT("Zone_Terrace") && bNew && Phase == EShadePhase::Playing)
@@ -671,7 +679,7 @@ void AShadeGameMode::TickFinale(float Dt)
 {
 	FinaleTime += Dt;
 	// Bells: three tolls, the first right away.
-	const float BellAt[3] = { 0.3f, 2.6f, 4.9f };
+	const float BellAt[3] = { 0.3f, 2.1f, 3.9f };
 	while (BellsRung < 3 && FinaleTime >= BellAt[BellsRung])
 	{
 		ShadeAssets::Play2D(this, TEXT("SFX_BellToll"), 0.75f);
@@ -679,7 +687,7 @@ void AShadeGameMode::TickFinale(float Dt)
 		AddTrauma(0.08f);
 	}
 	// The sun sinks and swings west: every shadow in the village slides, the bell tower's sweeps over Biscotto.
-	const float SunDelay = 1.5f, SunDuration = 9.f;
+	const float SunDelay = 0.9f, SunDuration = 6.8f;
 	FinaleAlpha = ShadeEase::InOutCubic((FinaleTime - SunDelay) / SunDuration);
 	if (Sun.IsValid() && bHasSunEnd)
 	{
@@ -775,7 +783,7 @@ void AShadeGameMode::TickReunion(float Dt)
 		// Gentle push-in.
 		CineCamera->AddActorWorldOffset(CineCamera->GetActorForwardVector() * 6.f * Dt);
 	}
-	if (ReunionStep == 0 && ReunionTime > 2.25f)
+	if (ReunionStep == 0 && ReunionTime > 2.1f)
 	{
 		ReunionStep = 1;
 		if (Cat)
@@ -790,7 +798,7 @@ void AShadeGameMode::TickReunion(float Dt)
 		ShadeAssets::Play2D(this, TEXT("SFX_Solve"), 0.5f, 0.8f);
 		NotifyEvent(TEXT("Reunited"), this);
 	}
-	if (ReunionStep == 1 && ReunionTime > 3.0f)
+	if (ReunionStep == 1 && ReunionTime > 2.8f)
 	{
 		ReunionStep = 2;
 		if (Cat)
@@ -798,17 +806,17 @@ void AShadeGameMode::TickReunion(float Dt)
 			Cat->WakeUp();
 		}
 	}
-	if (ReunionStep == 2 && ReunionTime > 5.2f)
+	if (ReunionStep == 2 && ReunionTime > 4.6f)
 	{
 		ReunionStep = 3;
 		Say(LOCTEXT("Reunion", "There you are. Welcome home, little shadow."), 4.5f);
 	}
-	if (ReunionStep == 3 && ReunionTime > 7.0f)
+	if (ReunionStep == 3 && ReunionTime > 6.4f)
 	{
 		ReunionStep = 4;
 		FadeTo(1.f, 0.7f, FLinearColor(0.02f, 0.015f, 0.03f));
 	}
-	if (ReunionStep == 4 && ReunionTime > 7.8f)
+	if (ReunionStep == 4 && ReunionTime > 7.1f)
 	{
 		// Cut (a long blend would fly the camera through the houses) to the wide sunset shot, then fade up.
 		ReunionStep = 5;
@@ -825,7 +833,7 @@ void AShadeGameMode::TickReunion(float Dt)
 		}
 		FadeTo(0.f, 1.4f, FLinearColor(0.02f, 0.015f, 0.03f));
 	}
-	if (ReunionStep == 5 && ReunionTime > 10.5f)
+	if (ReunionStep == 5 && ReunionTime > 9.4f)
 	{
 		ReunionStep = 6;
 		MusicTarget = 0.4f;
