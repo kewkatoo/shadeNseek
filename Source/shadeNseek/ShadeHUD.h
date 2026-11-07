@@ -41,7 +41,7 @@ public:
 
 	int32 Selected = 0;
 
-	/** Faces: "Script" (Lobster), "Hand" (Kalam), "Body"/"Bold"/"Black"/"Italic" (Lato), "Serif"/"SerifBold"/"SerifItalic"/"SerifBoldItalic" (Cormorant Garamond). */
+	/** Faces: "Display"/"DisplayItalic" (Fraunces SemiBold / SemiBold Italic), "Body"/"BodyBold"/"BodyHeavy" (Nunito SemiBold / Bold / ExtraBold). Missing files fall back to Roboto. */
 	FSlateFontInfo Font(FName Face, float Size, int32 LetterSpacing = 0) const;
 
 private:

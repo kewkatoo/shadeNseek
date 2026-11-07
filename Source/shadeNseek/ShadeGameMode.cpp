@@ -31,6 +31,7 @@
 #include "UnrealClient.h"
 #include "Scalability.h"
 #include "HAL/IConsoleManager.h"
+#include "Containers/Ticker.h"
 
 #define LOCTEXT_NAMESPACE "ShadeGame"
 
@@ -253,6 +254,37 @@ void AShadeGameMode::StartPlay()
 	if (HasParam(TEXT("camshots")))
 	{
 		RunCamShots();
+	}
+	float PauseShotAt = 0.f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("pauseshot="), PauseShotAt) && PauseShotAt > 0.f)
+	{
+		// QA: open the pause menu at that run time, screenshot it, close it (real-time ticker: the world is paused).
+		TWeakObjectPtr<AShadeGameMode> Self(this);
+		TSharedRef<int32> Stage = MakeShared<int32>(0);
+		TSharedRef<double> T0 = MakeShared<double>(0.0);
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Self, Stage, T0, PauseShotAt](float)
+		{
+			if (!Self.IsValid()) { return false; }
+			AShadePlayerController* PC = Cast<AShadePlayerController>(UGameplayStatics::GetPlayerController(Self.Get(), 0));
+			const double Now = FPlatformTime::Seconds();
+			if (*Stage == 0 && Self->GetRunTime() > PauseShotAt && Self->GetPhase() == EShadePhase::Playing && PC)
+			{
+				PC->OpenPauseMenu();
+				*T0 = Now;
+				*Stage = 1;
+			}
+			else if (*Stage == 1 && Now - *T0 > 0.9)
+			{
+				FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots/ui_pause.png"), true, false);
+				*Stage = 2;
+			}
+			else if (*Stage == 2 && Now - *T0 > 1.8 && PC)
+			{
+				PC->ClosePauseMenu();
+				return false;
+			}
+			return true;
+		}));
 	}
 	if (HasParam(TEXT("sunmap")))
 	{
