@@ -52,7 +52,8 @@ AShadeCharacter::AShadeCharacter()
 	Move->MaxAcceleration = 720.f;
 	Move->BrakingDecelerationWalking = 950.f;
 	Move->GroundFriction = 7.f;
-	Move->JumpZVelocity = 560.f;
+	// ~1.1 m hop: clears the 87 cm planter wall with room to spare and reads as a cat's spring, not a launch.
+	Move->JumpZVelocity = 500.f;
 	Move->AirControl = 0.65f;
 	Move->MaxStepHeight = 26.f;
 	Move->SetWalkableFloorAngle(52.f);
@@ -62,8 +63,10 @@ AShadeCharacter::AShadeCharacter()
 	CameraBoom = CreateDefaultSubobject<UShadeSpringArm>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 300.f;
-	CameraBoom->SocketOffset = FVector(0.f, 0.f, 58.f);
-	CameraBoom->TargetOffset = FVector(0.f, 0.f, 22.f);
+	// The boom pivots on the capsule centre (never inside the world, unlike a point above it that a hop can push
+	// into the vault ceiling); the height lives in the socket offset instead.
+	CameraBoom->SocketOffset = FVector(0.f, 0.f, 80.f);
+	CameraBoom->TargetOffset = FVector::ZeroVector;
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 9.f;
@@ -82,6 +85,9 @@ AShadeCharacter::AShadeCharacter()
 	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Body->SetCastShadow(false);
 	Body->bRenderCustomDepth = true;
+	// The rig reaches and stretches well outside the reference pose (hops, sprawls); generous bounds keep the
+	// renderer from ever culling Shade while still on screen.
+	Body->SetBoundsScale(1.6f);
 
 	Rig = CreateDefaultSubobject<UShadeCatRig>(TEXT("Rig"));
 
@@ -673,10 +679,10 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 	}
 	if (EyeMID)
 	{
-		// The eyes flare white-hot as Shade burns, and blink.
+		// The eyes flare white-hot as Shade burns; they stay open (closed lids read as empty sockets).
 		EyeMID->SetScalarParameterValue(TEXT("Glow"), (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 1.5f * Exposure));
 		EyeMID->SetScalarParameterValue(TEXT("Burn"), Exposure);
-		EyeMID->SetScalarParameterValue(TEXT("Lid"), FMath::Max(Rig->GetEyeLid(), Exposure > 0.6f ? 0.45f : 0.f));
+		EyeMID->SetScalarParameterValue(TEXT("Lid"), 0.f);
 	}
 	EyeLight->SetIntensity(0.4f * (1.f - EvapAlpha) * (1.f - MergeAlpha) * (1.f + 3.f * Exposure));
 	EyeLight->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.62f, 0.2f), FLinearColor(1.f, 0.9f, 0.7f), Exposure));

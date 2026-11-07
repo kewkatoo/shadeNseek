@@ -26,8 +26,11 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
+#include "Scalability.h"
+#include "HAL/IConsoleManager.h"
 
 #define LOCTEXT_NAMESPACE "ShadeGame"
 
@@ -55,9 +58,54 @@ bool AShadeGameMode::IsAutoplayExit()
 	return HasParam(TEXT("autoplayexit"));
 }
 
+void AShadeGameMode::ApplyRenderBudget()
+{
+	if (HasParam(TEXT("epic")))
+	{
+		UE_LOG(LogShade, Log, TEXT("SHADE_RENDER epic (no budget preset)"));
+		return;
+	}
+	// Measured on the target laptop (Saved/Perf, Scripts/perf_run.ps1): Epic at native 1080p cost ~19 ms of GPU -
+	// shadow depths 5.3, Lumen + lighting 3.2, TSR with a 200% history 2.2, volumetric fog 0.9 - and ~20 M classic
+	// triangles a frame (props that were meant to be Nanite, see sns_nanite_props.py). Now ~8 ms GPU, ~92 fps median
+	// in Development with the CSV profiler running (render thread bound).
+	Scalability::FQualityLevels Q = Scalability::GetQualityLevels();
+	Q.SetFromSingleQualityLevel(2);
+	// Lumen's irradiance-volume final gather (Medium GI): keeps the warm bounce in the shaded lanes (turning Lumen
+	// off leaves them cold blue-grey) for ~1.5 ms less render thread and GPU than screen probes.
+	Q.GlobalIlluminationQuality = 1;
+	Q.ResolutionQuality = 100.f;
+	Q.ViewDistanceQuality = 3;
+	Q.TextureQuality = 3;
+	Q.FoliageQuality = 3;
+	Q.ShadingQuality = 3;
+	Scalability::SetQualityLevels(Q, true);
+	auto Set = [](const TCHAR* Name, const TCHAR* Value)
+	{
+		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(Name))
+		{
+			V->Set(Value, ECVF_SetByCode);
+		}
+	};
+	// Two cascades cover the lanes (shadow depths 2.5 -> 1.5 ms, ~70% resolution instead of the 58% floor);
+	// distance-field shadows take over beyond them.
+	Set(TEXT("r.Shadow.CSM.MaxCascades"), TEXT("2"));
+	// Nearly everything is Nanite (GPU-culled), so hardware occlusion queries only cost a render-thread sync.
+	Set(TEXT("r.AllowOcclusionQueries"), TEXT("0"));
+	// Plaster and cobbles are rough: screen-space reflections are enough.
+	Set(TEXT("r.Lumen.Reflections.Allow"), TEXT("0"));
+	// Dynamic resolution: TSR renders between 58% and 100% of 1080p to hold ~115 fps.
+	Set(TEXT("r.DynamicRes.OperationMode"), TEXT("2"));
+	Set(TEXT("r.DynamicRes.MinScreenPercentage"), TEXT("58"));
+	Set(TEXT("r.DynamicRes.MaxScreenPercentage"), TEXT("100"));
+	Set(TEXT("r.DynamicRes.FrameTimeBudget"), TEXT("8.7"));
+	UE_LOG(LogShade, Log, TEXT("SHADE_RENDER budget preset applied"));
+}
+
 void AShadeGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
+	ApplyRenderBudget();
 	// A retry after Shade faded comes straight back into the lane (no title).
 	bRetry = UGameplayStatics::HasOption(Options, TEXT("retry"));
 	bSkipTitle = HasParam(TEXT("skiptitle")) || bRetry;
@@ -108,6 +156,7 @@ void AShadeGameMode::StartPlay()
 	// lamps, chairs and the cart used to catch the boom in the narrow lanes and jerk the whole view back and forth.
 	{
 		int32 Freed = 0;
+		TMap<FString, int32> Kinds;
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (Cast<APawn>(*It))
@@ -121,10 +170,17 @@ void AShadeGameMode::StartPlay()
 				{
 					C->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 					++Freed;
+					const UStaticMeshComponent* SMC = Cast<UStaticMeshComponent>(C);
+					Kinds.FindOrAdd(SMC && SMC->GetStaticMesh() ? SMC->GetStaticMesh()->GetName() : C->GetClass()->GetName())++;
 				}
 			}
 		}
-		UE_LOG(LogShade, Log, TEXT("SHADE_CAMERA %d small props no longer block the camera"), Freed);
+		FString List;
+		for (const TPair<FString, int32>& K : Kinds)
+		{
+			List += FString::Printf(TEXT(" %s:%d"), *K.Key, K.Value);
+		}
+		UE_LOG(LogShade, Log, TEXT("SHADE_CAMERA %d small props no longer block the camera:%s"), Freed, *List);
 	}
 	for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
 	{
@@ -158,6 +214,7 @@ void AShadeGameMode::StartPlay()
 		}
 	}
 
+	ShadeAssets::PreloadAudio();
 	if (USoundBase* S = ShadeAssets::Sound(TEXT("MUS_Theme")))
 	{
 		Music = UGameplayStatics::SpawnSound2D(this, S, 0.f, 1.f, 0.f, nullptr, true, false);
@@ -302,7 +359,36 @@ void AShadeGameMode::RestartRun()
 
 void AShadeGameMode::QuitGame()
 {
+	WritePerfLog();
 	UKismetSystemLibrary::QuitGame(this, UGameplayStatics::GetPlayerController(this, 0), EQuitPreference::Quit, false);
+}
+
+void AShadeGameMode::EndPlay(const EEndPlayReason::Type Reason)
+{
+	WritePerfLog();
+	Super::EndPlay(Reason);
+}
+
+void AShadeGameMode::WritePerfLog()
+{
+	if (PerfFrames.Num() < 60)
+	{
+		return;
+	}
+	TArray<float> S = PerfFrames;
+	S.Sort();
+	double Sum = 0.0;
+	for (const float F : S)
+	{
+		Sum += F;
+	}
+	auto Pct = [&S](float P) { return S[FMath::Clamp(FMath::FloorToInt(P * S.Num()), 0, S.Num() - 1)] * 1000.f; };
+	const FString Summary = FString::Printf(TEXT("frames %d  mean fps %.1f  p50 %.2f ms (%.1f fps)  p95 %.2f ms (%.1f fps)  p99 %.2f ms  max %.1f ms\n"),
+		S.Num(), S.Num() / Sum, Pct(0.5f), 1000.f / Pct(0.5f), Pct(0.95f), 1000.f / Pct(0.95f), Pct(0.99f), S.Last() * 1000.f);
+	FFileHelper::SaveStringToFile(Summary, *(FPaths::ProjectSavedDir() / TEXT("Perf") / TEXT("perflog.txt")), FFileHelper::EEncodingOptions::AutoDetect,
+		&IFileManager::Get(), FILEWRITE_Append);
+	UE_LOG(LogShade, Log, TEXT("SHADE_PERF %s"), *Summary);
+	PerfFrames.Reset();
 }
 
 void AShadeGameMode::Say(const FText& InLine, float Hold)
@@ -447,6 +533,16 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.1f);
+	static const bool bPerfLog = HasParam(TEXT("perflog"));
+	if (bPerfLog)
+	{
+		const double Now = FPlatformTime::Seconds();
+		if (PerfLast > 0.0 && (Phase == EShadePhase::Playing || Phase == EShadePhase::Finale) && PhaseTime > 2.f)
+		{
+			PerfFrames.Add(static_cast<float>(Now - PerfLast));
+		}
+		PerfLast = Now;
+	}
 	PhaseTime += Dt;
 	if (Phase != EShadePhase::Title)
 	{
@@ -777,7 +873,7 @@ void AShadeGameMode::TickMotionCap(float Dt)
 		return;
 	}
 	const bool bTitle = MotionCap == TEXT("title");
-	if (!bTitle && Phase != EShadePhase::Playing)
+	if (!bTitle && Phase != EShadePhase::Playing && !(MotionCap == TEXT("tour") && Phase == EShadePhase::Finale))
 	{
 		return;
 	}
@@ -794,7 +890,8 @@ void AShadeGameMode::TickMotionCap(float Dt)
 		CapStart = S->GetActorLocation();
 		CapFwd = S->GetActorForwardVector().GetSafeNormal2D();
 		CapCamFocus = CapStart;
-		CapCsv = TEXT("frame,t,phase,x,y,z,yaw,speed,camx,camy,camz,campitch,camyaw,camroll,arm");
+		CapYaw = PC->GetControlRotation().Yaw;
+		CapCsv = TEXT("frame,t,phase,x,y,z,yaw,speed,camx,camy,camz,campitch,camyaw,camroll,arm,vis,nan,los,evap,exposure,falling");
 		for (const TCHAR* B : Bones)
 		{
 			CapCsv += FString::Printf(TEXT(",%s_px,%s_py,%s_pz,%s_qx,%s_qy,%s_qz,%s_qw"), B, B, B, B, B, B, B);
@@ -833,6 +930,98 @@ void AShadeGameMode::TickMotionCap(float Dt)
 			StartGame();
 		}
 	}
+	else if (MotionCap == TEXT("still"))
+	{
+		// No input at all: anything that changes between frames is the renderer (shimmer, noise, flicker).
+		// -capend=<s> sets the length, -capcmds="1.5=r.Foo 0;3=r.Bar 1" runs console commands at set times so one
+		// capture can A/B several render features.
+		EndAt = 3.f;
+		FString EndStr;
+		if (FParse::Value(FCommandLine::Get(), TEXT("capend="), EndStr))
+		{
+			EndAt = FCString::Atof(*EndStr);
+		}
+		// -capdrift=<deg>: a slow look-around pan, because temporal artefacts only show while the view moves.
+		float Drift = 0.f;
+		if (FParse::Value(FCommandLine::Get(), TEXT("capdrift="), Drift) && Drift > 0.f)
+		{
+			PC->SetControlRotation(FRotator(-12.f, CapYaw + Drift * FMath::Sin(2.f * PI * 0.3f * T), 0.f));
+		}
+		FString Cmds;
+		if (FParse::Value(FCommandLine::Get(), TEXT("capcmds="), Cmds, false))
+		{
+			TArray<FString> Items;
+			Cmds.TrimQuotes().ParseIntoArray(Items, TEXT(";"));
+			for (const FString& Item : Items)
+			{
+				FString At, Cmd;
+				if (Item.Split(TEXT("="), &At, &Cmd) && Crossed(FCString::Atof(*At)))
+				{
+					PC->ConsoleCommand(Cmd, true);
+					UE_LOG(LogShade, Log, TEXT("SHADE_CAPCMD frame %d: %s"), CapFrame, *Cmd);
+				}
+			}
+		}
+	}
+	else if (MotionCap == TEXT("tour"))
+	{
+		// Hold at the start and every autoplay waypoint for 2.2 s with a slow pan: finds z-fighting and shimmer
+		// anywhere on the route (both only show while the view moves).
+		static const TCHAR* Stops[] = { TEXT("AP_Lane1"), TEXT("AP_SunBack"), TEXT("AP_CartGrab"), TEXT("AP_Alley1"), TEXT("AP_Alley2"),
+			TEXT("AP_Alley3"), TEXT("AP_Cord"), TEXT("AP_Piazza1"), TEXT("AP_Piazza2"), TEXT("AP_Steps1"), TEXT("AP_WallJump"),
+			TEXT("AP_Steps2"), TEXT("AP_Steps3"), TEXT("AP_Terrace"), TEXT("AP_Porch"), TEXT("AP_Biscotto") };
+		const int32 N = UE_ARRAY_COUNT(Stops);
+		const float Hold = 2.2f;
+		EndAt = Hold * (N + 1);
+		auto FindPoint = [this](const TCHAR* Tag) -> AActor*
+		{
+			for (TActorIterator<ATargetPoint> It(GetWorld()); It; ++It)
+			{
+				if (It->ActorHasTag(Tag))
+				{
+					return *It;
+				}
+			}
+			return nullptr;
+		};
+		const int32 Idx = FMath::FloorToInt(T / Hold);
+		if (Idx != FMath::FloorToInt(T0 / Hold) && Idx >= 1 && Idx <= N)
+		{
+			if (const AActor* P = FindPoint(Stops[Idx - 1]))
+			{
+				const AActor* Next = Idx < N ? FindPoint(Stops[Idx]) : nullptr;
+				const FVector Loc = P->GetActorLocation();
+				const FVector Heading = Next ? (Next->GetActorLocation() - Loc).GetSafeNormal2D() : CapFwd;
+				S->TeleportTo(Loc + FVector(0.f, 0.f, 30.f), Heading.Rotation());
+				CapYaw = Heading.Rotation().Yaw;
+				UE_LOG(LogShade, Log, TEXT("SHADE_TOUR stop %d %s frame %d at %s"), Idx, Stops[Idx - 1], CapFrame, *Loc.ToCompactString());
+			}
+		}
+		S->GetBoom()->bEnableCameraLag = false;
+		S->GetBoom()->bEnableCameraRotationLag = false;
+		PC->SetControlRotation(FRotator(-12.f, CapYaw + 3.f * FMath::Sin(2.f * PI * 0.3f * T), 0.f));
+	}
+	else if (MotionCap == TEXT("jumps"))
+	{
+		// Hop in place under the vault, while walking, while trotting, then with the camera swung toward a wall.
+		EndAt = 13.f;
+		FVector Wish = FVector::ZeroVector;
+		bool bSprintNow = false;
+		if (T >= 2.4f && T < 4.8f) { Wish = CapFwd; }
+		else if (T >= 5.6f && T < 7.8f) { Wish = CapFwd; bSprintNow = true; }
+		else if (T >= 8.6f && T < 9.6f) { Wish = -CapFwd; }
+		if (Crossed(1.f) || Crossed(3.4f) || Crossed(6.6f) || Crossed(11.f))
+		{
+			S->JumpInput();
+		}
+		S->SetSprint(bSprintNow);
+		if (!Wish.IsNearlyZero())
+		{
+			S->AddMovementInput(Wish, 1.f);
+		}
+		const float Swing = FMath::SmoothStep(9.8f, 10.8f, T);
+		PC->SetControlRotation(FRotator(-12.f - 10.f * Swing, CapYaw + 75.f * Swing, 0.f));
+	}
 	else
 	{
 		// Idle, walk, veer, stop, about-turn, trot, stop, walking hop - the moves a player makes in the first minute.
@@ -869,9 +1058,28 @@ void AShadeGameMode::TickMotionCap(float Dt)
 	const FVector CL = PCM ? PCM->GetCameraLocation() : FVector::ZeroVector;
 	const FRotator CR = PCM ? PCM->GetCameraRotation() : FRotator::ZeroRotator;
 	const float Arm = S->GetBoom() ? FVector::Dist(S->GetBoom()->GetComponentLocation(), S->GetCamera()->GetComponentLocation()) : 0.f;
-	CapCsv += FString::Printf(TEXT("%d,%.4f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.4f,%.4f,%.3f"), CapFrame, T, static_cast<int32>(Phase),
-		L.X, L.Y, L.Z, S->GetActorRotation().Yaw, S->GetVelocity().Size2D(), CL.X, CL.Y, CL.Z, CR.Pitch, CR.Yaw, CR.Roll, Arm);
 	UPoseableMeshComponent* Body = S->GetBody();
+	// Is the cat actually on screen? Body visibility, any non-finite bone, and how much of the camera -> chest line is
+	// clear (1 = nothing in the way).
+	bool bNan = false;
+	for (int32 Bi = 0; Body && Bi < Body->GetNumBones(); ++Bi)
+	{
+		const FTransform X = Body->GetBoneTransform(Bi);
+		bNan |= X.ContainsNaN();
+	}
+	float Los = 1.f;
+	{
+		const FVector Chest = L + FVector(0.f, 0.f, 6.f);
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(ShadeCapLos), true, S);
+		if (GetWorld()->LineTraceSingleByChannel(Hit, CL, Chest, ECC_Visibility, Q))
+		{
+			Los = Hit.Time;
+		}
+	}
+	CapCsv += FString::Printf(TEXT("%d,%.4f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.4f,%.4f,%.3f,%d,%d,%.3f,%d,%.3f,%d"), CapFrame, T, static_cast<int32>(Phase),
+		L.X, L.Y, L.Z, S->GetActorRotation().Yaw, S->GetVelocity().Size2D(), CL.X, CL.Y, CL.Z, CR.Pitch, CR.Yaw, CR.Roll, Arm,
+		Body && Body->IsVisible() ? 1 : 0, bNan ? 1 : 0, Los, S->IsEvaporating() ? 1 : 0, S->GetExposure(), S->GetCharacterMovement()->IsFalling() ? 1 : 0);
 	for (const TCHAR* B : Bones)
 	{
 		const int32 Bi = Body ? Body->GetBoneIndex(FName(B)) : INDEX_NONE;

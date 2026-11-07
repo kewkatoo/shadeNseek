@@ -21,6 +21,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 import unreal  # noqa: E402
 from sngeo import (GT, T, V, append, box, cyl, extrude, arch_poly, subtract, save, mat, new, log, eal, opts)  # noqa: E402
+from sns_bridge import build_bridge_mesh  # noqa: E402
 
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 lvl = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -430,16 +431,7 @@ F = "Houses"
 # start passage: north + south houses joined by a bridge block over the lane (the vault)
 house("N0", -1000, -100, -900, -160, 0, 900, wall="MI_Wall_Cream", faces=("+y",), door=("+y", 250))
 house("S0", -1000, -250, 160, 760, 0, 820, wall="MI_Wall_Peach", faces=("-y", "+y"), door=("-y", 200))
-bridge = box(400, 340, 520, 0, (0, 0, 260), bev=3)
-vault_box = box(440, 320, 180, 0, (0, 0, 80))
-subtract(bridge, vault_box)
-vc = new()
-unreal.GeometryScript_Primitives.append_cylinder(vc, unreal.GeometryScriptPrimitiveOptions(), T(), 160.0, 440.0, 32, 0, True, unreal.GeometryScriptPrimitiveOriginMode.CENTER)
-GT.transform_mesh(vc, T(rot=(90, 0, 0)))
-GT.transform_mesh(vc, T((0, 0, 170)))
-subtract(bridge, vc)
-append(bridge, box(420, 360, 14, 1, (0, 0, 520)))
-bsm = save(bridge, "SM_BridgeHouse", [mat("MI_Wall_Aged"), mat("MI_Trim_White")], folder=HOUSES, nanite=True)
+bsm = build_bridge_mesh()  # sns_bridge.py: vault cut 2 cm inside the house fronts (no z-fighting)
 place(bsm, (-450, 0, 0), folder=F)
 place(prop("street_lamp_02"), (-450, -150, 280), (0, 90, 0), 1.0, F)
 blocker(-1010, 0, 200, 40, 340, 400)
@@ -540,7 +532,7 @@ plant = pot.get_editor_property("plant")
 plant.set_static_mesh(tree)
 ts = 190.0 / height_of(tree)
 plant.set_editor_property("relative_scale3d", V(ts, ts, ts))
-plant.set_editor_property("relative_location", V(0, 0, 50))
+plant.set_editor_property("relative_location", V(4.6, 49.0, 43.0))  # island_tree_02's trunk is off its pivot (sns_fix_pot.py)
 # The lemon tree stands in the terracotta pot: a disc of earth just under the rim hides the trunk's base.
 pot_h = 62.0
 pot_r = (width_of(pot_mesh) * (62.0 / height_of(pot_mesh))) / 2

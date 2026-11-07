@@ -18,7 +18,17 @@ shadowless, so you can slip back into place.
   - Motion QA: `-motioncap=follow|side|title -benchmark -fps=30` drives a scripted walk / veer / stop / about-turn / trot /
     hop (or the title-to-game transition), saves every frame to `Saved/MotionCap/<mode>/` with bone + camera tracks, and
     `python -I Scripts/qa_motion.py . <mode>` turns them into numbers (tail spin, joint snaps, paw slip, camera pops;
-    `--flicker a:b` maps shimmer, `--sheet a:b:step` makes a contact sheet)
+    `--flicker a:b` maps shimmer, `--sheet a:b:step` makes a contact sheet). More modes: `jumps` (hops in place, walking,
+    trotting, camera swung at a wall; the CSV logs body visibility, bad bones and camera line of sight), `tour` (a slow
+    pan at every route waypoint - z-fighting and camera pumping only show while the view moves) and `still`
+    (`-capend=<s> -capdrift=<deg> -capcmds="2=r.Foo 0;4=r.Foo 1"` A/B render features inside one capture)
+  - Performance: `Scripts/perf_run.ps1` plays the packaged build over the autoplay route at 1920x1080 with the CSV
+    profiler on and `Scripts/perf_report.py` prints fps, game / render / GPU thread times, slow stretches, hitches
+    and the GPU passes by cost (`-NoCsv` uses only the game's own `-perflog` frame timer, which also works in
+    Shipping). The render budget (`AShadeGameMode::ApplyRenderBudget`: High scalability, Lumen with the
+    irradiance-volume final gather, two shadow cascades, no hardware occlusion queries, dynamic resolution that TSR
+    upscales - tuned for 90-120 fps on a laptop RTX 4050) is applied by code at startup; `-epic` skips it.
+    `unreal/sns_tri_audit.py` lists placed meshes by classic (non-Nanite) triangles
 - `Scripts/run_game.ps1` launches a standalone game window with any of those flags. Recording guide: `Docs/PLAYTHROUGH.md`.
 - **Packaged build:** `Scripts/package_game.ps1` cooks a standalone Windows game into `Dist/Packaged/Windows/`
   (run `shadeNseek.exe`, same flags work). `Scripts/make_submission.ps1` builds the source + asset-library zips in `Dist/`.
@@ -48,7 +58,7 @@ walk restarts from the passage (`?retry`, no title). A clean run finishes with r
 |---|---|
 | `ShadeCharacter` | Shade: movement, camera, sun exposure / evaporation / respawn, interaction focus, cart pushing, ink-wisp particles |
 | `ShadeCatRig` | Procedural quadruped animation on a `UPoseableMeshComponent`: paws planted in the world and traced onto the ground (stairs too), digitigrade leg IK with shoulder blades, walk / trot gaits from ground speed, idle re-stepping, a lowered carriage and rolling shoulder blades on the move, spine bending into turns and slopes, jump crouch / air pose / landing squash, a tail of independent damped angular springs (lags and swings, never resonates), sprung ears, blinking, look-at; sit and sleep are blended in the same pose space |
-| `ShadeSpringArm` | Follow-camera boom that pulls in fast and eases out slowly on collisions (no popping); small props never block the camera |
+| `ShadeSpringArm` | Follow-camera boom pivoting on the capsule centre: pulls in fast and eases out slowly on collisions, holds a pull-in briefly (no pumping at edges), ignores start-penetrating hits and keeps a minimum distance (the camera never ends up inside Shade); small props never block the camera |
 | `ShadeSunSubsystem` | Sun queries + `-sunmap` QA image |
 | `ShadeInteractables` | Lemon cart (push), café awning (hold to tug), flower pot (nudge off a ledge), nap cats / Biscotto, zones, sound scatter |
 | `ShadeGameMode` | Run flow (title, intro, play, bell-tower finale with the moving sun, reunion cinematic, end), objectives, narration, music |
@@ -69,7 +79,9 @@ Everything in `Content/Shade` is rebuilt from `asset-library/` by scripts:
    heat-diffused weights, fur shells -> FBX). `Scripts/rebuild_cat.ps1 -Gallery` runs the whole cat chain incl. UE import.
 6. inside UE (`Scripts/run_ue_python.ps1 -Script <file>`): `unreal/sns_import.py` (runs `sns_cat_reimport.py` for the cat) →
    `sns_fix_masks.py` → `sns_materials.py` (add `-WithRHI` to see shader compile errors) → `sns_props.py` → `sns_fix_trees.py` →
-   `sns_meshes.py` → `sns_level.py` (houses are generated with GeometryScript, windows cut with booleans; it ends by running
+   `sns_nanite_props.py` (Nanite on every dense prop - the create option alone does not stick in 5.8) →
+   `sns_meshes.py` → `sns_level.py` (houses are generated with GeometryScript, windows cut with booleans; the start
+   passage's bridge house comes from `sns_bridge.py`, which can also regenerate just that mesh; it ends by running
    `sns_lighting.py`: HDRI sky dome, sun, bounce fill, sky light, fog, post, cinematic cameras - rerun it alone to iterate).
    After `sns_props.py` the raw Interchange imports in `Content/Shade/Props/*/Mesh` are unreferenced and can be deleted.
 7. `python -I Scripts/make_credits.py .` - `asset-library/CREDITS.md` + `manifest.json`

@@ -53,6 +53,12 @@ public:
 	static bool IsAutoplay();
 	static bool IsAutoplayExit();
 	static bool HasParam(const TCHAR* Param);
+	/**
+	 * Render budget for 1080p at 90-120 fps on a 6 GB laptop RTX 4050: High scalability with a few hand-picked
+	 * cvars and dynamic resolution (TSR upscales). Applied by code at startup so a saved Epic config cannot undo it;
+	 * -epic skips it (old look, for comparisons) and -ExecCmds still override it.
+	 */
+	static void ApplyRenderBudget();
 
 	// --- Flow -----------------------------------------------------------------------------------------------------
 	EShadePhase GetPhase() const { return Phase; }
@@ -111,11 +117,14 @@ protected:
 	void TickMotionCap(float Dt);
 
 	/**
-	 * QA motion capture (-motioncap=title|follow|side, run with -benchmark -fps=30 for a fixed time step): drives a
-	 * scripted walk / turn / stop / about-turn / trot / jump, screenshots every frame to Saved/MotionCap/<mode>/ and
-	 * writes bone + camera tracks to a CSV, so motion problems (jitter, tail spin, gait) can be measured, not guessed.
+	 * QA motion capture (-motioncap=title|follow|side|still|jumps, run with -benchmark -fps=30 for a fixed time step):
+	 * drives a scripted walk / turn / stop / about-turn / trot / jump (still: no input, for render flicker; jumps: hops
+	 * in place, walking, trotting and with the camera swung at a wall), screenshots every frame to
+	 * Saved/MotionCap/<mode>/ and writes bone + camera tracks (plus body visibility and camera line of sight) to a CSV,
+	 * so motion problems (jitter, tail spin, gait, a vanishing cat) can be measured, not guessed.
 	 */
 	FString MotionCap;
+	float CapYaw = 0.f;
 	float CapTime = 0.f;
 	int32 CapFrame = 0;
 	FString CapCsv;
@@ -126,6 +135,15 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ACameraActor> CapCam;
+
+	/**
+	 * -perflog: wall-clock frame times while Shade is in play (works in Shipping, where the CSV profiler does not);
+	 * the summary goes to Saved/Perf/perflog.txt when the game quits.
+	 */
+	TArray<float> PerfFrames;
+	double PerfLast = 0.0;
+	void WritePerfLog();
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	EShadePhase Phase = EShadePhase::Title;
 	double PhaseStartRealTime = 0.0;

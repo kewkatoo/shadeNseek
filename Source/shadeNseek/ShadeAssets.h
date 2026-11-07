@@ -21,7 +21,10 @@ namespace ShadeAssets
 	SHADENSEEK_API UStaticMesh* PropMesh(const TCHAR* Folder, const TCHAR* Name);
 	SHADENSEEK_API USkeletalMesh* Skeletal(const TCHAR* Name);
 	SHADENSEEK_API UMaterialInterface* Material(const TCHAR* Name);
+	/** Sounds are cached and rooted on first use, so a footstep never reloads one from disk mid-game. */
 	SHADENSEEK_API USoundBase* Sound(const TCHAR* Name);
+	/** Loads every sound under /Game/Shade/Audio up front (StartPlay), instead of hitching on first play. */
+	SHADENSEEK_API void PreloadAudio();
 
 	/** Creates a dynamic instance of the named material (or of the slot's current material) on the given slot. */
 	SHADENSEEK_API UMaterialInstanceDynamic* MakeMID(UPrimitiveComponent* Comp, int32 Slot = 0, const TCHAR* MaterialName = nullptr);

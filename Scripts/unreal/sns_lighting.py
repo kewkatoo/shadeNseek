@@ -395,11 +395,14 @@ def build_lighting(sky_mat, sky_tex):
     pp("depth_of_field_focal_distance", 330.0)
     pp("depth_of_field_fstop", 4.0)
     pp("depth_of_field_sensor_width", 24.576)
-    pp("motion_blur_amount", 0.18)
-    pp("motion_blur_max", 2.0)
-    pp("lumen_scene_lighting_quality", 1.25)
-    pp("lumen_scene_detail", 1.5)
-    pp("lumen_final_gather_quality", 2.0)
+    # Light blur only: at high frame rates it just softens, and it used to smear the small black cat mid-hop.
+    pp("motion_blur_amount", 0.1)
+    pp("motion_blur_max", 1.0)
+    # Lumen at its stock quality: the 1.25 / 1.5 / 2.0 boosts cost several ms on the 6 GB laptop GPU and the 90-120
+    # fps budget (ShadeGameMode::ApplyRenderBudget) cannot afford them; the look holds with indirect intensity below.
+    pp("lumen_scene_lighting_quality", 1.0)
+    pp("lumen_scene_detail", 1.0)
+    pp("lumen_final_gather_quality", 1.0)
     pp("lumen_reflection_quality", 1.0)
     pp("indirect_lighting_intensity", 1.85)
     ppv.set_editor_property("settings", s)

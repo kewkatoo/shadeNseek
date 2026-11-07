@@ -7,6 +7,7 @@
 #include "Components/AudioComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 
 namespace
 {
@@ -19,6 +20,14 @@ namespace
 	FString ObjectPath(const TCHAR* Folder, const TCHAR* Name)
 	{
 		return FString::Printf(TEXT("/Game/Shade/%s/%s.%s"), Folder, Name, Name);
+	}
+
+	/** Played sounds are otherwise unreferenced between plays, so GC dropped them and every paw step re-loaded its
+	 *  wave synchronously (FlushAsyncLoading hitches of 50-500 ms in play). Rooted once, kept for the session. */
+	TMap<FString, USoundBase*>& SoundCache()
+	{
+		static TMap<FString, USoundBase*> Cache;
+		return Cache;
 	}
 }
 
@@ -44,7 +53,30 @@ UMaterialInterface* ShadeAssets::Material(const TCHAR* Name)
 
 USoundBase* ShadeAssets::Sound(const TCHAR* Name)
 {
-	return LoadQuiet<USoundBase>(ObjectPath(TEXT("Audio"), Name));
+	if (USoundBase** Hit = SoundCache().Find(Name))
+	{
+		if (!*Hit || IsValid(*Hit))
+		{
+			return *Hit;
+		}
+	}
+	USoundBase* S = LoadQuiet<USoundBase>(ObjectPath(TEXT("Audio"), Name));
+	if (S)
+	{
+		S->AddToRoot();
+	}
+	SoundCache().Add(Name, S);
+	return S;
+}
+
+void ShadeAssets::PreloadAudio()
+{
+	TArray<FAssetData> Assets;
+	FAssetRegistryModule::GetRegistry().GetAssetsByPath(FName(TEXT("/Game/Shade/Audio")), Assets, true);
+	for (const FAssetData& A : Assets)
+	{
+		Sound(*A.AssetName.ToString());
+	}
 }
 
 UMaterialInstanceDynamic* ShadeAssets::MakeMID(UPrimitiveComponent* Comp, int32 Slot, const TCHAR* MaterialName)

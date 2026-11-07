@@ -62,7 +62,8 @@ void UShadeAutoplayComponent::BuildScript()
 	Step(E::MoveTo, TEXT("AP_Cord"), 0.f, 30.f);
 	Step(E::Face, TEXT("Dev_Awning"), 0.5f);
 	Step(E::Hold, TEXT("Dev_Awning"), 6.f);
-	Step(E::Wait, nullptr, 0.4f);
+	// Let the canvas finish rolling out: crossing while its shadow is still sweeping in sometimes clipped the sun.
+	Step(E::Wait, nullptr, 1.5f);
 	Step(E::MoveTo, TEXT("AP_Piazza1"), 0.f, 35.f);
 	Step(E::MoveTo, TEXT("AP_Piazza2"), 0.f, 35.f);
 	Step(E::MoveTo, TEXT("AP_Steps1"));

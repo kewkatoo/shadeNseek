@@ -10,7 +10,9 @@ Dist\Packaged\Windows\shadeNseek.exe -windowed -ResX=1920 -ResY=1080
 `"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "<path>\shadeNseek.uproject" -game -windowed -ResX=1920 -ResY=1080`)
 
 Run it once before recording so shaders/distance fields are cached (the first launch after a rebuild is slower).
-Close other GPU-heavy apps (another Unreal instance especially): the scene uses Lumen + Nanite on a 6 GB GPU.
+Close other GPU-heavy apps (another Unreal instance especially): the scene uses Lumen + Nanite on a 6 GB GPU. The game
+holds roughly 90-120 fps at 1080p on a laptop RTX 4050 by rendering at a dynamic resolution that TSR upscales; add
+`-epic` to the command line for the old all-Epic settings (much slower).
 To watch the intended route first, run the same command with `-autoplay` (it finishes the game in ~1:40).
 
 Shade walks at an unhurried cat pace; hold **Shift** to trot on the long straights if you want to tighten the take.

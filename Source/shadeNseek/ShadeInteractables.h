@@ -258,9 +258,22 @@ public:
 	bool IsFalling() const { return State == 1 || State == 2; }
 
 private:
-	int32 State = 0; // 0 idle, 1 wobble, 2 falling, 3 landed
+	/** Pose the pot tilted Angle degrees toward the throw, pivoting on its rim (front rim forward, back rim back). */
+	void PosePot(const FVector& Base, float Angle, float YawDeg);
+
+	int32 State = 0; // 0 idle, 1 teeter, 2 falling, 3 landed
 	float StateTime = 0.f;
 	FShadeSpring Bounce;
+	/** Rocking on the ground after the landing (degrees toward the throw). */
+	FShadeSpring Settle;
+	/** The tree lagging behind the pot's swings (degrees, about the trunk foot). */
+	FShadeSpring Sway;
+	FVector ThrowDir = FVector::ForwardVector;
+	float RimRadius = 26.f;
+	float Tilt = 0.f;
+	float PrevTilt = 0.f;
+	float PrevTiltRate = 0.f;
+	FVector PlantRest = FVector::ZeroVector;
 };
 
 /** A sleeping cat. Biscotto (the goal) has lost his shadow; the village's other nappers have theirs. */

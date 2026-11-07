@@ -333,7 +333,6 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	P.SpinePitch[2] += Breath * (0.5f + 1.1f * SleepW);
 	P.SpinePitch[3] -= Breath * 0.4f * (0.4f + SleepW);
 	YawnTime += Dt;
-	float Squint = 0.f;
 	if (YawnTime < 2.8f)
 	{
 		const float Y = ShadeEase::Bump(YawnTime, 0.f, 2.8f);
@@ -343,17 +342,9 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 		P.EarBack += 30.f * Y;
 		P.EarOut += 14.f * Y;
 		P.SpinePitch[1] -= 5.f * Y;
-		Squint = 0.85f * Y;
 	}
-	BlinkTimer -= Dt;
-	if (BlinkTimer <= 0.f)
-	{
-		BlinkTimer = FMath::FRandRange(2.2f, 6.f);
-		BlinkT = 0.f;
-	}
-	BlinkT += Dt;
-	const float Blink = BlinkT < 0.17f ? FMath::Sin(BlinkT / 0.17f * PI) : 0.f;
-	EyeLid = FMath::Clamp(FMath::Max3(P.Lid, Blink, Squint), 0.f, 1.f);
+	// No blinks, squints or closed lids: closed lids read as empty sockets on the eye material, so the eyes stay open.
+	EyeLid = 0.f;
 
 	// Ear twitches: a quick flick back and out, sprung.
 	EarTimer -= Dt;

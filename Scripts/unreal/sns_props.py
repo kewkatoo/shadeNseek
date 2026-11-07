@@ -167,13 +167,16 @@ def merge_model(mid, foliage, prop):
             log("FAILED", name, outcome)
             continue
         sm.set_editor_property("static_materials", [unreal.StaticMaterial(material_interface=m, material_slot_name=n) for m, n in zip(materials, global_slots)])
-        if heavy and any_alpha:
-            ns = sm.get_editor_property("nanite_settings")
+        # enable_nanite on the create options does not stick in UE 5.8: set the flag on the asset itself (dense
+        # foliage too - classic million-triangle trees cost every pass, see sns_nanite_props.py).
+        ns = sm.get_editor_property("nanite_settings")
+        ns.set_editor_property("enabled", bool(heavy or ntri >= 8000 or (not any_alpha and mid not in COLLISION_BOX)))
+        if any_alpha:
             try:
-                ns.set_editor_property("preserve_area", True)
-                sm.set_editor_property("nanite_settings", ns)
+                ns.set_editor_property("shape_preservation", unreal.NaniteShapePreservation.PRESERVE_AREA)
             except Exception:
                 pass
+        sm.set_editor_property("nanite_settings", ns)
         if mid in COLLISION_BOX:
             unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).add_simple_collisions(sm, unreal.ScriptCollisionShapeType.BOX)
         if mid in COLLISION_COMPLEX:

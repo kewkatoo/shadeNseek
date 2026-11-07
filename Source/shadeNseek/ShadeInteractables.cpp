@@ -358,15 +358,14 @@ void AShadeAwning::UpdateGeometry()
 		A->SetRelativeScale3D(FVector(FMath::Max(D.Size(), 1.f) / 100.f, 1.f, 1.f));
 	}
 
-	// Cord hangs from a cleat on the wall; while tugging, the handle bobs.
-	const float Tug = bHolding ? FMath::Max(0.f, FMath::Sin(TugPhase)) * 9.f : 0.f;
+	// Cord hangs still from a cleat on the wall (its sway and tug bob read as jitter).
 	const FVector Top(CordLocal.X, CordLocal.Y, -18.f);
-	const FVector Bottom = CordLocal + FVector(0.f, 0.f, -Tug);
+	const FVector Bottom = CordLocal;
 	Cord->SetRelativeLocation(Bottom);
 	Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
 	Cord->SetRelativeScale3D(FVector(FMath::Max((Top - Bottom).Size(), 1.f) / 100.f, 1.f, 1.f));
 	Handle->SetRelativeLocation(Bottom);
-	Handle->SetRelativeRotation(FRotator(0.f, 0.f, FMath::Sin(Time * 1.7f) * 4.f + Tug));
+	Handle->SetRelativeRotation(FRotator::ZeroRotator);
 }
 
 // =====================================================================================================================
@@ -405,6 +404,24 @@ void AShadeFlowerPot::BeginPlay()
 	{
 		Pot->SetStaticMesh(ShadeAssets::PropMesh(TEXT("planter_pot_clay"), TEXT("SM_planter_pot_clay")));
 	}
+	if (const UStaticMesh* M = Pot->GetStaticMesh())
+	{
+		// The foot of the pot is narrower than its widest extent.
+		RimRadius = M->GetBounds().BoxExtent.X * Pot->GetRelativeScale3D().X * 0.72f;
+	}
+	const FVector Flat(LandOffset.X, LandOffset.Y, 0.f);
+	ThrowDir = Flat.IsNearlyZero() ? FVector::ForwardVector : Flat.GetSafeNormal();
+	PlantRest = Plant->GetRelativeLocation();
+}
+
+void AShadeFlowerPot::PosePot(const FVector& Base, float Angle, float YawDeg)
+{
+	const FVector Axis = FVector::CrossProduct(FVector::UpVector, ThrowDir).GetSafeNormal();
+	const FQuat TiltQ(Axis, FMath::DegreesToRadians(Angle));
+	const FVector Rim = ThrowDir * (Angle >= 0.f ? RimRadius : -RimRadius);
+	Pivot->SetRelativeLocation(Base + Rim - TiltQ.RotateVector(Rim));
+	Pivot->SetRelativeRotation(TiltQ * FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDeg)));
+	Tilt = Angle;
 }
 
 bool AShadeFlowerPot::CanInteract(const AShadeCharacter* Shade) const
@@ -433,15 +450,18 @@ void AShadeFlowerPot::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
 	StateTime += Dt;
-	const FVector Dir2 = FVector(LandOffset.X, LandOffset.Y, 0.f).GetSafeNormal();
-	// Tumble axis: perpendicular to the throw, in actor space.
+	const FVector Dir2 = ThrowDir;
+	const float TeeterTime = 0.6f;
+	const float Slide = 10.f;
 	if (State == 1)
 	{
-		// Wobble: it rocks twice, each time a little further, then goes.
-		const float W = FMath::Sin(StateTime * 26.f) * 5.f * ShadeEase::Window(StateTime, 0.f, 0.35f);
-		Pivot->SetRelativeRotation(FRotator(W * Dir2.X, 0.f, -W * Dir2.Y));
-		Pivot->SetRelativeLocation(Dir2 * 8.f * ShadeEase::Smooth(StateTime / 0.45f));
-		if (StateTime > 0.45f)
+		// Teeter: it rocks on its rim, front and back, while it shuffles to the edge; then it leans past the
+		// balance point and goes (ending at 26 deg, turning at 130 deg/s).
+		const float T = StateTime;
+		const float Rock = 5.f * FMath::Sin(T * 2.f * PI / 0.2f) * ShadeEase::Smooth(T / 0.06f) * (1.f - ShadeEase::Smooth(T / 0.5f));
+		const float Tip = 26.f * ShadeEase::InCubic(T / TeeterTime);
+		PosePot(Dir2 * Slide * ShadeEase::Smooth(T / 0.45f), Rock + Tip, 0.f);
+		if (StateTime >= TeeterTime)
 		{
 			State = 2;
 			StateTime = 0.f;
@@ -452,18 +472,25 @@ void AShadeFlowerPot::Tick(float DeltaSeconds)
 	else if (State == 2)
 	{
 		const float T = ShadeEase::Clamp01(StateTime / FallTime);
-		const FVector Start = Dir2 * 8.f;
-		const FVector Lateral = FMath::Lerp(Start, FVector(LandOffset.X, LandOffset.Y, 0.f), T);
-		// Ballistic: small hop up off the ledge then gravity.
-		const float Z = 14.f * FMath::Sin(T * PI * 0.5f) * (1.f - T) + LandOffset.Z * T * T;
-		Pivot->SetRelativeLocation(FVector(Lateral.X, Lateral.Y, Z));
-		const float Tilt = FMath::Sin(T * PI) * 38.f;
-		Pivot->SetRelativeRotation(FRotator(Tilt * Dir2.X, LandYaw * T, -Tilt * Dir2.Y));
+		// Rolls off the edge: steady drift outward, gravity downward (no vertical speed at the start).
+		FVector Base = FMath::Lerp(Dir2 * Slide, FVector(LandOffset.X, LandOffset.Y, 0.f), T);
+		Base.Z = LandOffset.Z * T * T;
+		// Tumble: carries on tipping (to ~38 deg), then the heavy foot swings back under so it lands on its front
+		// rim at 14 deg. Cubic Hermite from (26 deg, 130 deg/s) to (14 deg, -65 deg/s).
+		const float T2 = T * T;
+		const float T3 = T2 * T;
+		const float Angle = (2.f * T3 - 3.f * T2 + 1.f) * 26.f + (T3 - 2.f * T2 + T) * 130.f * FallTime
+			+ (-2.f * T3 + 3.f * T2) * 14.f + (T3 - T2) * -40.f;
+		PosePot(Base, Angle, LandYaw * ShadeEase::Smooth(T));
 		if (T >= 1.f)
 		{
 			State = 3;
 			StateTime = 0.f;
 			Bounce.Velocity = -3.2f;
+			// Slaps down onto its foot, rocks back past upright and settles; the tree whips forward.
+			Settle.Value = Tilt;
+			Settle.Velocity = -90.f;
+			Sway.Velocity += 70.f;
 			Pot->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 			ShadeAssets::PlayAt(this, TEXT("SFX_PotLand"), Pivot->GetComponentLocation(), 1.f);
 			if (AShadeGameMode* G = GM(this))
@@ -477,8 +504,26 @@ void AShadeFlowerPot::Tick(float DeltaSeconds)
 	else if (State == 3)
 	{
 		const float B = Bounce.Update(0.f, 220.f, 14.f, Dt);
+		const float A = Settle.Update(3.f, 170.f, 7.f, Dt);
+		PosePot(FVector(LandOffset.X, LandOffset.Y, LandOffset.Z), A, LandYaw);
 		Pivot->SetRelativeScale3D(FVector(1.f - B * 0.04f, 1.f - B * 0.04f, 1.f + B * 0.08f));
-		Pivot->SetRelativeRotation(FRotator(4.f * Dir2.X * (1.f + B), LandYaw, -4.f * Dir2.Y * (1.f + B)));
+	}
+
+	// The tree has inertia: it lags the pot's swings and springs back, bending at the trunk foot (on the pot's axis).
+	if (State != 0 && Dt > 1e-4f)
+	{
+		const float Rate = (Tilt - PrevTilt) / Dt;
+		Sway.Velocity -= (Rate - PrevTiltRate) * 0.7f;
+		PrevTilt = Tilt;
+		PrevTiltRate = Rate;
+		const float S = FMath::Clamp(Sway.Update(0.f, 110.f, 5.5f, Dt), -16.f, 16.f);
+		// Plant is a child of the pivot: express the tilt axis in the pivot's (yawed) frame.
+		const FVector Axis = FVector::CrossProduct(FVector::UpVector, Dir2).GetSafeNormal();
+		const FVector LocalAxis = Pivot->GetRelativeRotation().Quaternion().Inverse().RotateVector(Axis);
+		const FQuat SwayQ(LocalAxis.GetSafeNormal(), FMath::DegreesToRadians(S));
+		const FVector Foot(0.f, 0.f, PlantRest.Z);
+		Plant->SetRelativeLocation(Foot + SwayQ.RotateVector(PlantRest - Foot));
+		Plant->SetRelativeRotation(SwayQ);
 	}
 }
 

@@ -990,7 +990,7 @@ FReply SShadeOverlay::OnMouseButtonDown(const FGeometry& Geo, const FPointerEven
 {
 	AShadeHUD* H = Owner.Get();
 	AShadeGameMode* G = GM();
-	if (!H || !G)
+	if (!H || !G || (PC() && PC()->IsAutoplaying()))
 	{
 		return FReply::Unhandled();
 	}
