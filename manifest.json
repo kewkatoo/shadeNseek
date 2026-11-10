@@ -14,32 +14,11 @@
     "author": "Amal Kumar"
   },
   {
-    "path": "asset-library/Textures/polyhaven/white_stucco_02",
-    "source_name": "Poly Haven - White Stucco 02",
-    "source_url": "https://polyhaven.com/a/white_stucco_02",
-    "license": "CC0-1.0",
-    "author": "Dimitrios Savva"
-  },
-  {
     "path": "asset-library/Textures/polyhaven/white_rough_plaster",
     "source_name": "Poly Haven - White Rough Plaster",
     "source_url": "https://polyhaven.com/a/white_rough_plaster",
     "license": "CC0-1.0",
     "author": "Rob Tuytel"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/yellow_plaster",
-    "source_name": "Poly Haven - Yellow Plaster",
-    "source_url": "https://polyhaven.com/a/yellow_plaster",
-    "license": "CC0-1.0",
-    "author": "Rob Tuytel"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/red_plaster_weathered",
-    "source_name": "Poly Haven - Red Plaster Weathered",
-    "source_url": "https://polyhaven.com/a/red_plaster_weathered",
-    "license": "CC0-1.0",
-    "author": "Amal Kumar"
   },
   {
     "path": "asset-library/Textures/polyhaven/blue_plaster_weathered",
@@ -56,60 +35,11 @@
     "author": "Amal Kumar"
   },
   {
-    "path": "asset-library/Textures/polyhaven/clay_roof_tiles_02",
-    "source_name": "Poly Haven - Clay Roof Tiles 02",
-    "source_url": "https://polyhaven.com/a/clay_roof_tiles_02",
-    "license": "CC0-1.0",
-    "author": "Amal Kumar"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/cobblestone_floor_08",
-    "source_name": "Poly Haven - Cobblestone Floor 08",
-    "source_url": "https://polyhaven.com/a/cobblestone_floor_08",
-    "license": "CC0-1.0",
-    "author": "Rob Tuytel"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/grey_stone_path",
-    "source_name": "Poly Haven - Grey Stone Path",
-    "source_url": "https://polyhaven.com/a/grey_stone_path",
-    "license": "CC0-1.0",
-    "author": "Amal Kumar"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/stone_pathway",
-    "source_name": "Poly Haven - Stone Pathway",
-    "source_url": "https://polyhaven.com/a/stone_pathway",
-    "license": "CC0-1.0",
-    "author": "Amal Kumar"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/rustic_stone_wall",
-    "source_name": "Poly Haven - Rustic Stone Wall",
-    "source_url": "https://polyhaven.com/a/rustic_stone_wall",
-    "license": "CC0-1.0",
-    "author": "Dimitrios Savva"
-  },
-  {
     "path": "asset-library/Textures/polyhaven/stacked_stone_wall",
     "source_name": "Poly Haven - Stacked Stone Wall",
     "source_url": "https://polyhaven.com/a/stacked_stone_wall",
     "license": "CC0-1.0",
     "author": "Dimitrios Savva"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/terracotta_floor_tiles",
-    "source_name": "Poly Haven - Terracotta Floor Tiles",
-    "source_url": "https://polyhaven.com/a/terracotta_floor_tiles",
-    "license": "CC0-1.0",
-    "author": "Dimitrios Savva"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/blue_painted_planks",
-    "source_name": "Poly Haven - Blue Painted Planks",
-    "source_url": "https://polyhaven.com/a/blue_painted_planks",
-    "license": "CC0-1.0",
-    "author": "Rob Tuytel"
   },
   {
     "path": "asset-library/Textures/polyhaven/distressed_painted_planks",
@@ -168,27 +98,6 @@
     "author": "Rob Tuytel, Rico Cilliers"
   },
   {
-    "path": "asset-library/Models/polyhaven/shrub_01",
-    "source_name": "Poly Haven - Shrub 01",
-    "source_url": "https://polyhaven.com/a/shrub_01",
-    "license": "CC0-1.0",
-    "author": "Rico Cilliers"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/shrub_02",
-    "source_name": "Poly Haven - Shrub 02",
-    "source_url": "https://polyhaven.com/a/shrub_02",
-    "license": "CC0-1.0",
-    "author": "Rico Cilliers"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/shrub_03",
-    "source_name": "Poly Haven - Shrub 03",
-    "source_url": "https://polyhaven.com/a/shrub_03",
-    "license": "CC0-1.0",
-    "author": "Rico Cilliers"
-  },
-  {
     "path": "asset-library/Models/polyhaven/shrub_sorrel_01",
     "source_name": "Poly Haven - Shrub Sorrel 01",
     "source_url": "https://polyhaven.com/a/shrub_sorrel_01",
@@ -217,25 +126,11 @@
     "author": "Jenelle van Heerden, Rico Cilliers"
   },
   {
-    "path": "asset-library/Models/polyhaven/flower_empodium",
-    "source_name": "Poly Haven - Flower Empodium",
-    "source_url": "https://polyhaven.com/a/flower_empodium",
-    "license": "CC0-1.0",
-    "author": "Jenelle van Heerden, Rico Cilliers"
-  },
-  {
     "path": "asset-library/Models/polyhaven/periwinkle_plant",
     "source_name": "Poly Haven - Periwinkle Plant",
     "source_url": "https://polyhaven.com/a/periwinkle_plant",
     "license": "CC0-1.0",
     "author": "Amal Kumar"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/grass_medium_02",
-    "source_name": "Poly Haven - Grass Medium 02",
-    "source_url": "https://polyhaven.com/a/grass_medium_02",
-    "license": "CC0-1.0",
-    "author": "Rico Cilliers"
   },
   {
     "path": "asset-library/Models/polyhaven/planter_pot_clay",
@@ -266,46 +161,11 @@
     "author": "James Ray Cock"
   },
   {
-    "path": "asset-library/Models/polyhaven/antique_ceramic_vase_01",
-    "source_name": "Poly Haven - Antique Ceramic Vase 01",
-    "source_url": "https://polyhaven.com/a/antique_ceramic_vase_01",
-    "license": "CC0-1.0",
-    "author": "James Ray Cock"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/ceramic_vase_01",
-    "source_name": "Poly Haven - Ceramic Vase 01",
-    "source_url": "https://polyhaven.com/a/ceramic_vase_01",
-    "license": "CC0-1.0",
-    "author": "James Ray Cock"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/ceramic_vase_02",
-    "source_name": "Poly Haven - Ceramic Vase 02",
-    "source_url": "https://polyhaven.com/a/ceramic_vase_02",
-    "license": "CC0-1.0",
-    "author": "James Ray Cock"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/jug_01",
-    "source_name": "Poly Haven - Jug 01",
-    "source_url": "https://polyhaven.com/a/jug_01",
-    "license": "CC0-1.0",
-    "author": "Kuutti Siitonen"
-  },
-  {
     "path": "asset-library/Models/polyhaven/outdoor_table_chair_set_01",
     "source_name": "Poly Haven - Outdoor Table Chair Set 01",
     "source_url": "https://polyhaven.com/a/outdoor_table_chair_set_01",
     "license": "CC0-1.0",
     "author": "James Ray Cock"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/painted_wooden_chair_01",
-    "source_name": "Poly Haven - Painted Wooden Chair 01",
-    "source_url": "https://polyhaven.com/a/painted_wooden_chair_01",
-    "license": "CC0-1.0",
-    "author": "Kuutti Siitonen"
   },
   {
     "path": "asset-library/Models/polyhaven/painted_wooden_bench",
@@ -315,46 +175,11 @@
     "author": "Kirill Sannikov"
   },
   {
-    "path": "asset-library/Models/polyhaven/painted_wooden_table",
-    "source_name": "Poly Haven - Painted Wooden Table",
-    "source_url": "https://polyhaven.com/a/painted_wooden_table",
-    "license": "CC0-1.0",
-    "author": "Kirill Sannikov"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/street_lamp_01",
-    "source_name": "Poly Haven - Street Lamp 01",
-    "source_url": "https://polyhaven.com/a/street_lamp_01",
-    "license": "CC0-1.0",
-    "author": "Josh Dean"
-  },
-  {
     "path": "asset-library/Models/polyhaven/street_lamp_02",
     "source_name": "Poly Haven - Street Lamp 02",
     "source_url": "https://polyhaven.com/a/street_lamp_02",
     "license": "CC0-1.0",
     "author": "Josh Dean"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/wooden_lantern_01",
-    "source_name": "Poly Haven - Wooden Lantern 01",
-    "source_url": "https://polyhaven.com/a/wooden_lantern_01",
-    "license": "CC0-1.0",
-    "author": "James Ray Cock"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/wooden_stool_01",
-    "source_name": "Poly Haven - Wooden Stool 01",
-    "source_url": "https://polyhaven.com/a/wooden_stool_01",
-    "license": "CC0-1.0",
-    "author": "Kuutti Siitonen"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/folding_wooden_stool",
-    "source_name": "Poly Haven - Folding Wooden Stool",
-    "source_url": "https://polyhaven.com/a/folding_wooden_stool",
-    "license": "CC0-1.0",
-    "author": "Ulan Cabanilla"
   },
   {
     "path": "asset-library/Models/polyhaven/tea_set_01",
@@ -448,13 +273,6 @@
     "author": "James Ray Cock"
   },
   {
-    "path": "asset-library/Models/polyhaven/wicker_basket_01",
-    "source_name": "Poly Haven - Wicker Basket 01",
-    "source_url": "https://polyhaven.com/a/wicker_basket_01",
-    "license": "CC0-1.0",
-    "author": "Kuutti Siitonen"
-  },
-  {
     "path": "asset-library/Models/polyhaven/wicker_basket_02",
     "source_name": "Poly Haven - Wicker Basket 02",
     "source_url": "https://polyhaven.com/a/wicker_basket_02",
@@ -504,13 +322,6 @@
     "author": "Monsta3D"
   },
   {
-    "path": "asset-library/Models/polyhaven/modular_electric_cables",
-    "source_name": "Poly Haven - Modular Electric Cables",
-    "source_url": "https://polyhaven.com/a/modular_electric_cables",
-    "license": "CC0-1.0",
-    "author": "Kuutti Siitonen"
-  },
-  {
     "path": "asset-library/Models/polyhaven/garden_hose_wall_mounted_01",
     "source_name": "Poly Haven - Garden Hose Wall Mounted 01",
     "source_url": "https://polyhaven.com/a/garden_hose_wall_mounted_01",
@@ -539,20 +350,6 @@
     "author": "Łukasz Dziedzic"
   },
   {
-    "path": "asset-library/Fonts/cormorantgaramond",
-    "source_name": "Cormorant Garamond by Christian Thalmann (Google Fonts)",
-    "source_url": "https://github.com/google/fonts/tree/main/ofl/cormorantgaramond",
-    "license": "OFL-1.1",
-    "author": "Christian Thalmann"
-  },
-  {
-    "path": "asset-library/Audio/generated",
-    "source_name": "Original music, ambience and SFX synthesised by Scripts/gen_audio.py",
-    "source_url": "this project",
-    "license": "Original work (CC0-1.0 dedication)",
-    "author": "Shade and Seek team"
-  },
-  {
     "path": "asset-library/Textures/generated",
     "source_name": "Original procedural textures generated by Scripts/gen_textures.py",
     "source_url": "this project",
@@ -579,13 +376,6 @@
     "source_url": "https://polyhaven.com/a/coral_stone_wall",
     "license": "CC0-1.0",
     "author": "Dimitrios Savva"
-  },
-  {
-    "path": "asset-library/Textures/polyhaven/green_metal_rust",
-    "source_name": "Poly Haven - Green Metal Rust",
-    "source_url": "https://polyhaven.com/a/green_metal_rust",
-    "license": "CC0-1.0",
-    "author": "Rob Tuytel"
   },
   {
     "path": "asset-library/Models/polyhaven/standing_chalkboard_01",
@@ -642,20 +432,6 @@
     "source_url": "https://polyhaven.com/a/weed_plant_02",
     "license": "CC0-1.0",
     "author": "Rob Tuytel, Rico Cilliers"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/rock_face_01",
-    "source_name": "Poly Haven - Rock Face 01",
-    "source_url": "https://polyhaven.com/a/rock_face_01",
-    "license": "CC0-1.0",
-    "author": "Dario Barresi"
-  },
-  {
-    "path": "asset-library/Models/polyhaven/rock_face_02",
-    "source_name": "Poly Haven - Rock Face 02",
-    "source_url": "https://polyhaven.com/a/rock_face_02",
-    "license": "CC0-1.0",
-    "author": "Dario Barresi, Rico Cilliers"
   },
   {
     "path": "asset-library/Models/polyhaven/large_iron_gate",

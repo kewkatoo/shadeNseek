@@ -73,7 +73,7 @@ The autoplay route finishes in ~1:40 (title to end card about 1:50).
 | `ShadeSunSubsystem` | Sun queries + `-sunmap` QA image |
 | `ShadeInteractables` | Lemon cart (push), café awning (hold to tug), washing line (hold; deterministic sea gusts lift the sheets), shutter (tug; opens, holds, creaks shut), flower pot (nudge off a ledge, only from the wall), nap cats / Biscotto, zones, sound scatter |
 | `ShadeGameMode` | Run flow (title, intro, play, bell-tower finale with the moving sun, reunion cinematic, end), objectives, narration, music |
-| `ShadeHUD` | Custom-painted Slate UI: cinematic title (Cormorant Garamond wordmark, text menu), ceramic-tile objective card, button-circle world prompts with hold rings, heat-haze exposure warning, storybook subtitles, pause and end cards |
+| `ShadeHUD` | Custom-painted Slate UI: cinematic title (Fraunces wordmark, text menu), ceramic-tile objective card, button-circle world prompts with hold rings, heat-haze exposure warning, storybook subtitles, pause and end cards |
 | `ShadePlayerController` | Enhanced Input built in code, pause menu |
 | `ShadeAutoplayComponent` | `-autoplay` route driver using the same Shade API as the player's input |
 
@@ -83,12 +83,13 @@ Everything in `Content/Shade` is rebuilt from `asset-library/` by scripts:
    (also the CC0 sky HDRI `evening_road_01_puresky`)
    `python -I Scripts/fetch_ambientcg.py .` - CC0 ambientCG texture sets (cobbles, flags, travertine, lime plaster, roof tiles,
    painted wood, fabrics, ivy) in the same `_diff/_nor_dx/_arm` layout
-2. `python -I Scripts/fetch_fonts.py .` - Fraunces + Nunito (the UI) and Cormorant Garamond (OFL), static weights baked from the
-   variable fonts; stages the UI fonts
+2. `python -I Scripts/fetch_fonts.py .` - Fraunces + Nunito (the UI), static weights baked from the variable fonts; stages the
+   UI fonts. (It also fetches Cormorant Garamond, the old UI face, which the game no longer uses.) Lato, Lobster and Kalam stay
+   in `asset-library/Fonts` because `gen_textures.py` paints the shop signs with them.
 3. `python -I Scripts/prep_audio.py` - cuts, layers, loops and loudness-normalises the CC0 recordings in `asset-library/Audio/`
    (Freesound HQ previews, FreePD music, Kenney) into `asset-library/Audio/game/*.wav` (48 kHz, per-category LUFS, -1 dBTP);
    `python -I Scripts/qa_audio.py` checks every file for clipping, hiss/hum, loudness, loop seams and clicks. In game a
-   master-bus limiter catches stacked peaks. (`gen_audio.py` made the old synthesised set in `Audio/generated`, no longer used.)
+   master-bus limiter catches stacked peaks. (`gen_audio.py` made the old synthesised set; it was removed from the repo, and the script can regenerate it.)
 4. `python -I Scripts/gen_textures.py .` - awning stripes, majolica tiles, bougainvillea cards, signs, fabrics, fur strands…
 5. The cat: `python -I Scripts/blender/cat_sdf.py .` (SDF sculpt + marching cubes) then
    `blender -b --factory-startup --python Scripts/blender/make_cat.py -- .` (ears, eyes, whiskers, tabby coat, skeleton,
