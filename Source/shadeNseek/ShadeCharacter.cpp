@@ -1199,14 +1199,14 @@ void AShadeCharacter::UpdateIdle(float Dt)
 	if (!bSitting && IdleTime > 5.f && Exposure < 0.05f)
 	{
 		bSitting = true;
-		Rig->SetPose(ECatPose::Sit, 0.9f);
+		Rig->SetPose(ECatPose::Sit, 1.3f);  // rump first, then the forepaws settle (see UShadeCatRig::BlendShaped)
 	}
 	else if (bSitting && !bStill)
 	{
 		bSitting = false;
 		if (Rig->GetPose() == ECatPose::Sit)
 		{
-			Rig->SetPose(ECatPose::Locomote, 0.25f);
+			Rig->SetPose(ECatPose::Locomote, 0.32f);
 		}
 	}
 }

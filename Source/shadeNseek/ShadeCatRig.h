@@ -154,6 +154,8 @@ public:
 	void SetPose(ECatPose Pose, float BlendTime = 0.45f);
 	ECatPose GetPose() const { return TargetPose; }
 	float GetPoseWeight(ECatPose Pose) const { return PoseW[static_cast<int32>(Pose)]; }
+	/** True once the current pose change has finished. */
+	bool IsPoseSettled() const { return TransS >= 1.f; }
 	void Land(float Strength);
 	/** Wake-up: big yawn and stretch (Biscotto). */
 	void Yawn() { YawnTime = 0.f; }
@@ -182,6 +184,38 @@ private:
 	void ComputeLocomotion(float Dt, FCatPoseParams& P);
 	void ComputeSit(FCatPoseParams& P) const;
 	void ComputeSleep(FCatPoseParams& P) const;
+	/** Little movements of a cat at rest: tail-tip flicks, glances, a forepaw shifted now and then. */
+	void UpdateIdleLife(float Dt);
+
+	// Pose transitions. Poses come in families (locomotion incl. pushing, sit, sleep); between two of them every body
+	// part moves on its own schedule instead of one linear cross-fade: out of a loaf the head comes up, the forepaws step
+	// out one at a time, then the chest pushes up on them; sitting down the rump goes first; getting up it rises first.
+	enum : int32 { FamLoco = 0, FamSit = 1, FamSleep = 2, FamSnap = 3 };
+	static int32 FamilyOf(ECatPose Pose) { return Pose == ECatPose::Sit ? FamSit : (Pose == ECatPose::Sleep ? FamSleep : FamLoco); }
+	void FamilyParams(int32 Fam, const FCatPoseParams& Loco, FCatPoseParams& Dst) const;
+	void BlendShaped(const FCatPoseParams& A, const FCatPoseParams& B, FCatPoseParams& Out) const;
+	int32 TransFrom = FamLoco;
+	int32 TransTo = FamLoco;
+	int32 SnapFam = FamLoco;     // family a snapshot was mostly in
+	float TransS = 1.f;          // 0..1 progress of the current transition (linear; the schedules ease it)
+	float TransDur = 0.45f;
+	FCatPoseParams Snap;         // the body as it was when a transition was interrupted
+	FCatPoseParams LastP;
+	float PushAmt = 0.f;
+	float PushRate = 2.5f;
+	float FamW[3] = { 1.f, 0.f, 0.f };
+	float SeatedW = 0.f;         // 0 = pure locomotion, 1 = sitting / lying
+	bool bHoldGait = false;      // seated: the gait leaves the paws where the pose put them
+
+	// Idle life
+	FShadeSpring TailFlick, GlanceYawS, GlancePitchS, GlanceRollS;
+	float FlickTimer = 2.f;
+	float GlanceTimer = 2.5f;
+	float GlanceYaw = 0.f, GlancePitch = 0.f, GlanceRoll = 0.f;
+	float ShuffleTimer = 6.f;
+	float ShuffleT = 10.f;
+	int32 ShufflePaw = 0;
+	float BreathPhase = 0.f;
 	void UpdateGait(float Dt, float SpeedN, const FVector& VelRig, const FVector& VelWorld);
 	void UpdateTail(float Dt, const FCatPoseParams& P, const FVector& RootRig, const FQuat& PelvisQ);
 	void ApplyAction(FCatPoseParams& P);

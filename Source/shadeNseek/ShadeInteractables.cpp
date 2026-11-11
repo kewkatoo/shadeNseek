@@ -999,9 +999,10 @@ void AShadeNapCat::Tick(float DeltaSeconds)
 	if (bAwake)
 	{
 		WakeTime += Dt;
-		if (WakeTime > 1.6f && Rig->GetPose() == ECatPose::Sleep)
+		if (WakeTime > 1.2f && Rig->GetPose() == ECatPose::Sleep)
 		{
-			Rig->SetPose(ECatPose::Sit, 1.1f);
+			// Up out of the loaf while the yawn finishes: forepaws out one at a time, then the chest up over them.
+			Rig->SetPose(ECatPose::Sit, 2.3f);
 			Rig->Excitement = 0.8f;
 		}
 	}

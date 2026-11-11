@@ -263,6 +263,29 @@ void UShadeCatRig::SetPose(ECatPose Pose, float BlendTime)
 {
 	TargetPose = Pose;
 	BlendRate = 1.f / FMath::Max(BlendTime, 0.05f);
+	const int32 Fam = FamilyOf(Pose);
+	if (Fam == FamLoco)
+	{
+		PushRate = BlendRate;  // pushing is a layer on locomotion, eased in and out on its own
+	}
+	if (Fam == TransTo)
+	{
+		return;
+	}
+	if (TransS < 1.f)
+	{
+		// Changed its mind halfway: carry on from the body as it is now, not from either end.
+		Snap = LastP;
+		SnapFam = FamW[FamSit] >= FamW[FamLoco] && FamW[FamSit] >= FamW[FamSleep] ? FamSit : (FamW[FamSleep] > FamW[FamLoco] ? FamSleep : FamLoco);
+		TransFrom = FamSnap;
+	}
+	else
+	{
+		TransFrom = TransTo;
+	}
+	TransTo = Fam;
+	TransS = 0.f;
+	TransDur = FMath::Max(BlendTime, 0.05f);
 }
 
 void UShadeCatRig::Land(float Strength)
@@ -316,23 +339,31 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	}
 	const float Dt = FMath::Clamp(DeltaTime, 1e-4f, 0.05f);
 	Time += Dt;
-	for (int32 i = 0; i < static_cast<int32>(ECatPose::Count); ++i)
-	{
-		PoseW[i] = FMath::FInterpConstantTo(PoseW[i], i == static_cast<int32>(TargetPose) ? 1.f : 0.f, Dt, BlendRate);
-	}
 	const FTransform CT = Mesh->GetComponentTransform();
 	RigToWorld = FTransform(CT.GetRotation() * RigToComp, CT.GetLocation(), FVector::OneVector);
 
 	using namespace CatBone;
-	const float LocoW = PoseW[(int32)ECatPose::Locomote] + PoseW[(int32)ECatPose::Push];
-	const float PushW = PoseW[(int32)ECatPose::Push];
-	const float SitW = PoseW[(int32)ECatPose::Sit];
-	const float SleepW = PoseW[(int32)ECatPose::Sleep];
+	// Where the current pose change has got to, and how much of each family is in the body.
+	TransS = FMath::Min(1.f, TransS + Dt / TransDur);
+	PushAmt = FMath::FInterpConstantTo(PushAmt, TargetPose == ECatPose::Push ? 1.f : 0.f, Dt, PushRate);
+	{
+		const float WTo = ShadeEase::Smooth(TransS);
+		FamW[FamLoco] = FamW[FamSit] = FamW[FamSleep] = 0.f;
+		FamW[TransTo] += WTo;
+		FamW[TransFrom == FamSnap ? SnapFam : TransFrom] += 1.f - WTo;
+	}
+	SeatedW = 1.f - FamW[FamLoco];
+	PoseW[(int32)ECatPose::Locomote] = FamW[FamLoco] * (1.f - PushAmt);
+	PoseW[(int32)ECatPose::Push] = FamW[FamLoco] * PushAmt;
+	PoseW[(int32)ECatPose::Sit] = FamW[FamSit];
+	PoseW[(int32)ECatPose::Sleep] = FamW[FamSleep];
+	const float SleepW = FamW[FamSleep];
+	// Seated, and until the body is mostly up again, the gait doesn't tidy the paws back under the body.
+	bHoldGait = TransTo != FamLoco || TransS < 0.65f;
 
-	FCatPoseParams P, Tmp;
-	ComputeLocomotion(Dt, Tmp);
-	P.Add(Tmp, LocoW);
-	if (PushW > 0.f)
+	FCatPoseParams Loco;
+	ComputeLocomotion(Dt, Loco);
+	if (PushAmt > 0.f)
 	{
 		// Shoving the cart with the head and shoulders: low, neck stretched forward, ears back, tail down.
 		FCatPoseParams A;
@@ -343,14 +374,40 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 		A.HeadPitch = -14.f;
 		A.EarBack = 14.f;
 		for (int32 i = 0; i < 8; ++i) { A.TailPitch[i] = -14.f; }
-		P.Add(A, PushW);
+		Loco.Add(A, PushAmt);
 	}
-	if (SitW > 0.f) { ComputeSit(Tmp); P.Add(Tmp, SitW); }
-	if (SleepW > 0.f) { ComputeSleep(Tmp); P.Add(Tmp, SleepW); }
+	UpdateIdleLife(Dt);
+	FCatPoseParams P;
+	if (TransS >= 1.f)
+	{
+		FamilyParams(TransTo, Loco, P);
+	}
+	else
+	{
+		FCatPoseParams From, To;
+		FamilyParams(TransFrom, Loco, From);
+		FamilyParams(TransTo, Loco, To);
+		BlendShaped(From, To, P);
+	}
+	LastP = P;
+	if (TransTo != FamLoco && TransS >= 1.f && bGrounded)
+	{
+		// Sitting or lying, the gait's paws are wherever the pose has put them: getting up then starts from there (the
+		// body rises over planted paws and the hind paws step back under the hips) instead of sliding them home.
+		for (int32 l = 0; l < 4; ++l)
+		{
+			FCatLeg& L = Legs[l];
+			L.PlantWorld = L.BallWorld = ToWorld(P.Ball[l]);
+			L.bPlanted = true;
+			L.SwingT = 1.f;
+			L.bInit = true;
+		}
+	}
 	ApplyAction(P);
 
-	// Breathing (slower and deeper asleep), yawn + stretch, blinks.
-	Breath = FMath::Sin(Time * (SleepW > 0.5f ? 1.5f : 2.4f));
+	// Breathing (slower and deeper asleep; the rate eases, the phase never jumps), yawn + stretch.
+	BreathPhase += Dt * FMath::Lerp(2.4f, 1.5f, SleepW);
+	Breath = FMath::Sin(BreathPhase);
 	P.SpinePitch[2] += Breath * (0.5f + 1.1f * SleepW);
 	P.SpinePitch[3] -= Breath * 0.4f * (0.4f + SleepW);
 	YawnTime += Dt;
@@ -488,7 +545,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		L.PrevPhase = Ph;
 	}
 	// Standing (or barely moving): re-step the paw that drifted most from under the body, one at a time.
-	if (SpeedN < 20.f && Swinging == 0 && StepCooldown <= 0.f)
+	if (SpeedN < 20.f && Swinging == 0 && StepCooldown <= 0.f && !bHoldGait)
 	{
 		int32 Best = INDEX_NONE;
 		float BestD = 3.8f * M;
@@ -761,25 +818,36 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 
 void UShadeCatRig::ComputeSit(FCatPoseParams& P) const
 {
-	// Upright sit: rump on the ground, chest raised on straight front legs, hind legs folded beside the belly
-	// with the hocks flat, tail wrapped around the front paws.
+	// Upright sit: rump on the ground, chest raised on straight, near-vertical forelegs with the forepaws under the
+	// shoulders, hind legs folded beside the belly with the hocks flat, tail wrapped around the front paws. The chest is
+	// only carried as high as the forelegs reach (31 deg of back; at 41 the forepaws hung 4-5 cm off the ground).
 	P.Zero();
 	const float M = MeshScale;
 	P.PelvisOffset = FVector(2.f, 0.f, -11.f) * M;
-	P.BodyPitch = 26.f;
-	P.SpinePitch[1] = 6.f;
+	P.BodyPitch = 20.f;
+	P.SpinePitch[1] = 2.f;
 	P.SpinePitch[2] = 6.f;
 	P.SpinePitch[3] = 3.f;
-	P.NeckPitch = -6.f;
+	P.NeckPitch = -0.5f;
 	P.HeadPitch = 3.f;
+	// Never quite still: the weight drifts a little from side to side, the head glances round (or mostly holds whatever it
+	// is looking at), now and then tilting; the ears keep the alertness of the moment.
+	P.BodyRoll = 0.8f * FMath::Sin(Time * 0.29f);
+	P.SpineYaw[2] = 1.5f * FMath::Sin(Time * 0.21f + 1.f);
+	const float GlanceK = bHasLook ? 0.25f : 1.f;
+	P.HeadYaw = FMath::Clamp(HeadYawS.Value + GlanceYawS.Value * GlanceK, -65.f, 65.f);
+	P.HeadPitch += 0.7f * HeadPitchS.Value + GlancePitchS.Value * GlanceK;
+	P.HeadRoll = GlanceRollS.Value * GlanceK;
+	P.EarBack = 0.6f * EarBackS.Value;
+	P.EarOut = 0.6f * EarOutS.Value;
 	for (int32 l = 0; l < 4; ++l)
 	{
 		const FVector H = Legs[l].Home;
 		if (Legs[l].bFront)
 		{
-			P.Ball[l] = FVector(H.X - 0.5f, H.Y * 0.9f, H.Z) * M;
-			P.Meta[l] = 12.f;
-			P.Scap[l] = 4.f;
+			P.Ball[l] = FVector(H.X + 1.f, H.Y * 0.9f, H.Z) * M;
+			P.Meta[l] = 10.f;
+			P.Scap[l] = -6.f;
 		}
 		else
 		{
@@ -787,9 +855,26 @@ void UShadeCatRig::ComputeSit(FCatPoseParams& P) const
 			P.Meta[l] = 86.f;
 		}
 	}
+	if (ShuffleT < 0.55f)
+	{
+		// A forepaw lifted and set down again, the weight shifted off it first.
+		const float Sh = ShadeEase::Bump(ShuffleT, 0.f, 0.55f);
+		const int32 l = ShufflePaw;
+		P.Ball[l].Z += 1.7f * M * Sh;
+		P.Ball[l].X += 0.5f * M * Sh;
+		P.Meta[l] -= 30.f * Sh;
+		P.Curl[l] += 25.f * Sh;
+		P.BodyRoll -= Legs[l].Side * 1.6f * Sh;
+	}
+	// Tail wrapped round the forepaws; the tip flicks and creeps.
 	static const float TP[8] = { -40.f, -62.f, -45.f, -16.f, -6.f, -4.f, -2.f, 0.f };
 	static const float TY[8] = { 8.f, 22.f, 44.f, 66.f, 86.f, 102.f, 116.f, 126.f };
-	for (int32 i = 0; i < 8; ++i) { P.TailPitch[i] = TP[i]; P.TailYaw[i] = TY[i]; }
+	for (int32 i = 0; i < 8; ++i)
+	{
+		const float Tip = Sat((i - 3) / 4.f);
+		P.TailPitch[i] = TP[i] + FMath::Abs(TailFlick.Value) * 0.35f * Sat((i - 4) / 3.f);
+		P.TailYaw[i] = TY[i] + TailFlick.Value * Tip + 5.f * FMath::Sin(Time * 0.7f - i * 0.5f) * Sat((i - 4) / 3.f);
+	}
 }
 
 void UShadeCatRig::ComputeSleep(FCatPoseParams& P) const
@@ -830,7 +915,165 @@ void UShadeCatRig::ComputeSleep(FCatPoseParams& P) const
 	}
 	static const float TP[8] = { -30.f, -46.f, -26.f, -8.f, -3.f, -2.f, -1.f, 0.f };
 	static const float TY[8] = { 14.f, 30.f, 55.f, 80.f, 100.f, 120.f, 136.f, 146.f };
-	for (int32 i = 0; i < 8; ++i) { P.TailPitch[i] = TP[i]; P.TailYaw[i] = TY[i]; }
+	// Even dozing, the tip of the tail twitches now and then.
+	for (int32 i = 0; i < 8; ++i)
+	{
+		P.TailPitch[i] = TP[i] + FMath::Abs(TailFlick.Value) * 0.15f * Sat((i - 5) / 2.f);
+		P.TailYaw[i] = TY[i] + 0.35f * TailFlick.Value * Sat((i - 4) / 3.f);
+	}
+}
+
+void UShadeCatRig::UpdateIdleLife(float Dt)
+{
+	// Tail-tip flicks: a sprung kick that overshoots once and settles (the tail's own springs soften it further).
+	FlickTimer -= Dt;
+	if (FlickTimer <= 0.f)
+	{
+		FlickTimer = FMath::FRandRange(1.6f, 4.8f);
+		TailFlick.Velocity += (FMath::RandBool() ? 1.f : -1.f) * FMath::FRandRange(180.f, 280.f);
+	}
+	TailFlick.Update(0.f, 60.f, 7.f, Dt);
+	// Glances: somewhere else every few seconds (now and then straight ahead again), sometimes with a tilt of the head.
+	GlanceTimer -= Dt;
+	if (GlanceTimer <= 0.f)
+	{
+		GlanceTimer = FMath::FRandRange(1.4f, 4.2f);
+		const bool bAhead = FMath::FRand() < 0.3f;
+		GlanceYaw = bAhead ? 0.f : FMath::FRandRange(-38.f, 38.f);
+		GlancePitch = bAhead ? 0.f : FMath::FRandRange(-9.f, 9.f);
+		GlanceRoll = FMath::FRand() < 0.25f ? FMath::FRandRange(-9.f, 9.f) : 0.f;
+	}
+	GlanceYawS.Update(GlanceYaw, 55.f, 13.f, Dt);
+	GlancePitchS.Update(GlancePitch, 55.f, 13.f, Dt);
+	GlanceRollS.Update(GlanceRoll, 40.f, 11.f, Dt);
+	// Sitting, a forepaw is shifted every so often.
+	ShuffleT += Dt;
+	ShuffleTimer -= Dt;
+	if (ShuffleTimer <= 0.f)
+	{
+		ShuffleTimer = FMath::FRandRange(5.f, 11.f);
+		if (TransTo == FamSit && TransS >= 1.f && ActW < 0.01f && bGrounded)
+		{
+			ShuffleT = 0.f;
+			ShufflePaw = FMath::RandRange(0, 1);
+		}
+	}
+}
+
+// =====================================================================================================================
+// Pose transitions
+// =====================================================================================================================
+
+void UShadeCatRig::FamilyParams(int32 Fam, const FCatPoseParams& Loco, FCatPoseParams& Dst) const
+{
+	switch (Fam)
+	{
+	case FamSit: ComputeSit(Dst); break;
+	case FamSleep: ComputeSleep(Dst); break;
+	case FamSnap: Dst = Snap; break;
+	default: Dst = Loco; break;
+	}
+}
+
+void UShadeCatRig::BlendShaped(const FCatPoseParams& A, const FCatPoseParams& B, FCatPoseParams& O) const
+{
+	const float M = MeshScale;
+	const float S = TransS;
+	auto Win = [](float X, float Lo, float Hi) { return ShadeEase::Smooth((X - Lo) / (Hi - Lo)); };
+	// Weight toward B of each part of the body, and how high a paw that travels is lifted on the way.
+	float WBody = ShadeEase::Smooth(S), WHead = WBody, WTail = WBody, WScap = WBody;
+	float WPaw[4] = { WBody, WBody, WBody, WBody };
+	float Arc[4] = { 0.f, 0.f, 0.f, 0.f };
+	bool bLoaf = false;
+	float LoafPaw[2] = { 0.f, 0.f };
+	float LoafUp = 0.f;
+	const int32 F = TransFrom, T = TransTo;
+	if ((F == FamSleep && T == FamSit) || (F == FamSit && T == FamSleep))
+	{
+		// Up out of a loaf: the head comes up; the chest lifts a little off the folded forelegs; the forepaws come out
+		// from under it one at a time and lie flat ahead (a sphinx); then the chest pushes up over them on straightening
+		// forelegs; the hind paws shuffle into the sit and the tail wraps round last. Lying down is the same, backwards.
+		const float U = T == FamSit ? S : 1.f - S;
+		auto ToB = [T](float W) { return T == FamSit ? W : 1.f - W; };
+		LoafUp = Win(U, 0.48f, 0.95f);
+		LoafPaw[0] = Win(U, 0.1f, 0.36f);
+		LoafPaw[1] = Win(U, 0.28f, 0.54f);
+		WBody = WScap = ToB(0.15f * Win(U, 0.f, 0.25f) + 0.85f * LoafUp);
+		WHead = ToB(Win(U, 0.f, 0.35f));
+		WTail = ToB(Win(U, 0.45f, 1.f));
+		WPaw[0] = ToB(LoafPaw[0]);
+		WPaw[1] = ToB(LoafPaw[1]);
+		WPaw[2] = ToB(Win(U, 0.55f, 0.92f));
+		WPaw[3] = ToB(Win(U, 0.6f, 0.95f));
+		Arc[0] = Arc[1] = 1.6f * M;
+		Arc[2] = Arc[3] = 1.f * M;
+		bLoaf = true;
+	}
+	else if (F == FamLoco && T == FamSit)
+	{
+		// Sitting down: the rump goes down first and the hind paws tuck forward under it, then the forepaws settle.
+		WBody = WScap = Win(S, 0.f, 0.8f);
+		WPaw[2] = Win(S, 0.05f, 0.6f);
+		WPaw[3] = Win(S, 0.12f, 0.65f);
+		WPaw[0] = Win(S, 0.45f, 0.82f);
+		WPaw[1] = Win(S, 0.5f, 0.87f);
+		WHead = ShadeEase::Smooth(S);
+		WTail = Win(S, 0.35f, 1.f);
+		Arc[0] = Arc[1] = 1.4f * M;
+		Arc[2] = Arc[3] = 1.2f * M;
+	}
+	else if (F == FamSit && T == FamLoco)
+	{
+		// Getting up: tail and rump come up first and the chest levels; the paws stay planted (the gait steps them).
+		WBody = WScap = Win(S, 0.f, 0.85f);
+		WPaw[2] = WPaw[3] = Win(S, 0.f, 0.85f);
+		WPaw[0] = WPaw[1] = Win(S, 0.1f, 0.9f);
+		WHead = Win(S, 0.f, 0.7f);
+		WTail = Win(S, 0.f, 0.6f);
+	}
+
+	O = B;
+	O.PelvisOffset = FMath::Lerp(A.PelvisOffset, B.PelvisOffset, WBody);
+	O.BodyPitch = FMath::Lerp(A.BodyPitch, B.BodyPitch, WBody);
+	O.BodyRoll = FMath::Lerp(A.BodyRoll, B.BodyRoll, WBody);
+	for (int32 i = 0; i < 4; ++i)
+	{
+		O.SpineYaw[i] = FMath::Lerp(A.SpineYaw[i], B.SpineYaw[i], WBody);
+		O.SpinePitch[i] = FMath::Lerp(A.SpinePitch[i], B.SpinePitch[i], WBody);
+	}
+	O.NeckPitch = FMath::Lerp(A.NeckPitch, B.NeckPitch, WHead);
+	O.HeadPitch = FMath::Lerp(A.HeadPitch, B.HeadPitch, WHead);
+	O.HeadYaw = FMath::Lerp(A.HeadYaw, B.HeadYaw, WHead);
+	O.HeadRoll = FMath::Lerp(A.HeadRoll, B.HeadRoll, WHead);
+	O.EarBack = FMath::Lerp(A.EarBack, B.EarBack, WHead);
+	O.EarOut = FMath::Lerp(A.EarOut, B.EarOut, WHead);
+	O.Lid = FMath::Lerp(A.Lid, B.Lid, WHead);
+	for (int32 l = 0; l < 4; ++l)
+	{
+		const float W = WPaw[l];
+		O.Ball[l] = FMath::Lerp(A.Ball[l], B.Ball[l], W);
+		O.Ball[l].Z += FMath::Min(Arc[l], 0.35f * FVector::Dist(A.Ball[l], B.Ball[l])) * FMath::Sin(PI * W);
+		O.Meta[l] = FMath::Lerp(A.Meta[l], B.Meta[l], W);
+		O.Curl[l] = FMath::Lerp(A.Curl[l], B.Curl[l], W);
+	}
+	if (bLoaf)
+	{
+		// Each forepaw: folded back under the chest -> flat on the ground ahead of it as it comes out -> upright under the
+		// shoulder as the chest rises over it.
+		const FCatPoseParams& PSleep = T == FamSit ? A : B;
+		const FCatPoseParams& PSit = T == FamSit ? B : A;
+		for (int32 l = 0; l < 2; ++l)
+		{
+			O.Meta[l] = FMath::Lerp(FMath::Lerp(PSleep.Meta[l], 75.f, LoafPaw[l]), PSit.Meta[l], LoafUp);
+		}
+	}
+	O.Scap[0] = FMath::Lerp(A.Scap[0], B.Scap[0], WScap);
+	O.Scap[1] = FMath::Lerp(A.Scap[1], B.Scap[1], WScap);
+	for (int32 i = 0; i < 8; ++i)
+	{
+		O.TailPitch[i] = FMath::Lerp(A.TailPitch[i], B.TailPitch[i], WTail);
+		O.TailYaw[i] = FMath::Lerp(A.TailYaw[i], B.TailYaw[i], WTail);
+	}
 }
 
 // =====================================================================================================================
@@ -948,15 +1191,62 @@ void UShadeCatRig::Solve(const FCatPoseParams& P)
 	const FQuat BodyQ = FRotator(P.BodyPitch, 0.f, P.BodyRoll).Quaternion();
 	const FVector Right = BodyQ.RotateVector(FVector::RightVector);
 
-	// Spine chain from the rump forward.
+	// Spine chain from the rump forward (Bow: extra pitch at the mid-back, see below).
 	const FVector PPel = RP(Pelvis) + P.PelvisOffset;
 	const FQuat QPel = BodyQ * PY(P.SpinePitch[0], P.SpineYaw[0]);
 	const FVector PS1 = PPel + QPel.RotateVector(RP(Spine1) - RP(Pelvis));
-	const FQuat Q1 = QPel * PY(P.SpinePitch[1], P.SpineYaw[1]);
-	const FVector PS2 = PS1 + Q1.RotateVector(RP(Spine2) - RP(Spine1));
-	const FQuat Q2 = Q1 * PY(P.SpinePitch[2], P.SpineYaw[2]);
-	const FVector PS3 = PS2 + Q2.RotateVector(RP(Spine3) - RP(Spine2));
-	const FQuat Q3 = Q2 * PY(P.SpinePitch[3], P.SpineYaw[3]);
+	FQuat Q1, Q2, Q3;
+	FVector PS2, PS3;
+	auto BuildSpine = [&](float Bow)
+	{
+		Q1 = QPel * PY(P.SpinePitch[1] + Bow, P.SpineYaw[1]);
+		PS2 = PS1 + Q1.RotateVector(RP(Spine2) - RP(Spine1));
+		Q2 = Q1 * PY(P.SpinePitch[2], P.SpineYaw[2]);
+		PS3 = PS2 + Q2.RotateVector(RP(Spine3) - RP(Spine2));
+		Q3 = Q2 * PY(P.SpinePitch[3], P.SpineYaw[3]);
+	};
+	BuildSpine(0.f);
+	if (SeatedW > 0.001f && bGrounded)
+	{
+		// Sitting, lying or getting up, the forepaws stay on the ground: if the chest is carried higher than the forelegs
+		// reach, it bows forward until they do (with a little bend left in the elbows) - a paw never hangs in the air.
+		auto FrontOver = [&]()
+		{
+			float Ov = -1e6f;
+			for (int32 l = 0; l < 2; ++l)
+			{
+				if (bActFront[l])
+				{
+					continue;
+				}
+				const int32* C = GLegBones[l];
+				const FVector ScapTop = PS3 + Q3.RotateVector(RP(C[0]) - RP(Spine3));
+				const FVector Root = ScapTop + (Q3 * PY(P.Scap[l], 0.f)).RotateVector(RP(C[1]) - RP(C[0]));
+				const float A = FMath::DegreesToRadians(P.Meta[l]);
+				const FVector WristT = P.Ball[l] - FVector(FMath::Sin(A), 0.f, -FMath::Cos(A)) * (BoneLen[C[3]] * M);
+				Ov = FMath::Max(Ov, FVector::Dist(Root, WristT) - 0.97f * (BoneLen[C[1]] + BoneLen[C[2]]) * M);
+			}
+			return Ov;
+		};
+		float Bow = 0.f;
+		for (int32 It = 0; It < 3; ++It)
+		{
+			const float Ov = FrontOver();
+			if (Ov <= 0.f)
+			{
+				break;
+			}
+			BuildSpine(Bow - 2.f);
+			const float PerDeg = (Ov - FrontOver()) / 2.f;
+			if (PerDeg < 0.02f)
+			{
+				break;
+			}
+			Bow -= FMath::Min(Ov / PerDeg, 25.f);
+			BuildSpine(Bow);
+		}
+		BuildSpine(FMath::Max(Bow, -30.f) * Sat(SeatedW * 4.f));
+	}
 	Set(Pelvis, PPel, QPel * RestRot[Pelvis]);
 	TailRootRig = PPel + QPel.RotateVector(RP(Tail1) - RP(Pelvis));
 	TailPelvisDelta = QPel;

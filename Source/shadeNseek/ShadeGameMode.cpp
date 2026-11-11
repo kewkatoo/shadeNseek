@@ -921,12 +921,12 @@ void AShadeGameMode::TickReunion(float Dt)
 		ReunionStep = 3;
 		Say(LOCTEXT("Reunion", "There you are. Welcome home, little shadow."), 4.5f);
 	}
-	if (ReunionStep == 3 && ReunionTime > 6.4f)
+	if (ReunionStep == 3 && ReunionTime > 7.2f)  // Biscotto is up and sitting by ~6.3 s: hold on him a moment
 	{
 		ReunionStep = 4;
 		FadeTo(1.f, 0.7f, FLinearColor(0.02f, 0.015f, 0.03f));
 	}
-	if (ReunionStep == 4 && ReunionTime > 7.1f)
+	if (ReunionStep == 4 && ReunionTime > 7.9f)
 	{
 		// Cut (a long blend would fly the camera through the houses) to the wide sunset shot, then fade up.
 		ReunionStep = 5;
@@ -943,7 +943,7 @@ void AShadeGameMode::TickReunion(float Dt)
 		}
 		FadeTo(0.f, 1.4f, FLinearColor(0.02f, 0.015f, 0.03f));
 	}
-	if (ReunionStep == 5 && ReunionTime > 9.4f)
+	if (ReunionStep == 5 && ReunionTime > 10.2f)
 	{
 		ReunionStep = 6;
 		MusicTarget = 0.52f;
