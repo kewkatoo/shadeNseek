@@ -50,8 +50,9 @@ def grid(nx, ny, fn):
 def front(x):
     """Where the slope starts (y) and how high (z): right behind the upper rows, coming forward and down to the sea
     beyond both ends of the town."""
-    k = max(0.0, abs(x - 1500.0) - 7000.0)
-    return -3400.0 + k * 0.6, max(-1300.0, 1700.0 - k * 0.38)
+    # the wings stay north of the terrace line, so the sea views from the piazza and the terrace stay open
+    k = max(0.0, abs(x - 1500.0) - 9500.0)
+    return -3400.0 + k * 0.25, max(-1300.0, 1700.0 - k * 0.3)
 
 
 def ripple(x, d):
@@ -80,8 +81,12 @@ def mountain_pt(u, v):
     v = 1.0 - v
     x = X0 + (X1 - X0) * u
     fy, fz = front(x)
-    if v <= 0.0:  # skirt below the front edge (never shows an open seam)
-        return (x, fy + 40.0, fz - 4000.0)
+    if v <= 0.0:
+        # Behind the town the edge drops straight down (hidden by the upper rows); beyond the town it runs down into the
+        # sea as a sloping apron, like a headland, instead of showing a bare vertical wall.
+        if -3500.0 < x < 6500.0:
+            return (x, fy + 40.0, fz - 4000.0)
+        return (x, fy + max(400.0, (fz + 1400.0) * 1.1), -1400.0)
     d = DMAX * ((v - 1.0 / 72.0) / (1.0 - 1.0 / 72.0)) ** 1.7 if v > 1.0 / 72.0 else 0.0
     return (x, fy - d, height(x, d))
 
@@ -99,7 +104,7 @@ trees = [eal.load_asset(p) for p in ("/Game/Shade/Props/island_tree_01/SM_island
          if eal.does_asset_exist(p)]
 placed = 0
 for _ in range(900):
-    if placed >= 140 or not trees:
+    if placed >= 50 or not trees:  # masked Nanite foliage is costly even far away; 50 read the same at this distance
         break
     x = RB.uniform(-9000.0, 13000.0)
     d = RB.uniform(300.0, 9000.0) ** 1.0
@@ -109,7 +114,7 @@ for _ in range(900):
     if slope > 1.1 or RB.random() > 0.55:
         continue
     t = actors.spawn_actor_from_object(RB.choice(trees), V(x, fy - d, z0 - 40.0), unreal.Rotator(0, RB.uniform(0, 360), 0))
-    s = RB.uniform(0.45, 0.95)
+    s = RB.uniform(0.6, 1.1)
     t.set_actor_scale3d(V(s, s, s))
     t.set_folder_path("Mountains")
     c = t.static_mesh_component
