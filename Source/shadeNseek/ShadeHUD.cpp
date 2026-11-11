@@ -19,6 +19,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Engine.h"
+#include "Engine/Texture2D.h"
 #include "Camera/PlayerCameraManager.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
@@ -96,6 +97,7 @@ namespace
 		float S;
 		FVector2D Size;
 		FSlateResourceHandle Solid;
+		const TMap<FName, FSlateBrush>* Glyphs = nullptr;  // key glyph brushes owned by the HUD (may be null)
 
 		FPainter(const FGeometry& InGeo, FSlateWindowElementList& InOut, int32 InLayer)
 			: Geo(InGeo), Out(InOut), Layer(InLayer)
@@ -339,18 +341,75 @@ namespace
 			return Sz;
 		}
 
+		const FSlateBrush* GlyphFor(const TCHAR* Label) const
+		{
+			return Glyphs ? Glyphs->Find(FName(Label)) : nullptr;
+		}
+
+		static float GlyphW(const FSlateBrush& B, float H)
+		{
+			return H * static_cast<float>(B.ImageSize.X / FMath::Max(1.0, B.ImageSize.Y));
+		}
+
+		/** WASD as four small keys in a row (0.78 of the cap height), when all four glyphs are loaded. */
+		bool WasdGlyphs(const FSlateBrush* (&K)[4]) const
+		{
+			K[0] = GlyphFor(TEXT("W")); K[1] = GlyphFor(TEXT("A")); K[2] = GlyphFor(TEXT("S")); K[3] = GlyphFor(TEXT("D"));
+			return K[0] && K[1] && K[2] && K[3];
+		}
+
 		/** Width of the one keycap for Label: square/round keys stay square, longer labels grow. */
 		float KeyWidth(const FString& Label, const FSlateFontInfo& Font, float Height, bool bRound) const
 		{
+			if (!bRound)
+			{
+				const FSlateBrush* K[4];
+				if (Label == TEXT("WASD") && WasdGlyphs(K))
+				{
+					return GlyphW(*K[0], Height * 0.78f) + GlyphW(*K[1], Height * 0.78f) + GlyphW(*K[2], Height * 0.78f) + GlyphW(*K[3], Height * 0.78f) + 6.f;
+				}
+				if (const FSlateBrush* B = GlyphFor(*Label))
+				{
+					return GlyphW(*B, Height);
+				}
+			}
 			return (bRound && Label.Len() <= 1) ? Height : FMath::Max(Height, Width(Label, Font) + 20.f);
 		}
 
+		/** A glyph key: cream key whose cut-out letter shows a soft ink shadow underneath. Layers L, L+1. Returns width. */
+		float GlyphKey(const FSlateBrush& B, const FVector2D& Pos, float H, float Alpha, int32 L) const
+		{
+			const FVector2D Sz(GlyphW(B, H), H);
+			FSlateDrawElement::MakeBox(Out, Layer + L, PG(Pos + FVector2D(0.f, 2.f), Sz), &B, ESlateDrawEffect::None, A(UI::Night, 0.55f * Alpha));
+			FSlateDrawElement::MakeBox(Out, Layer + L + 1, PG(Pos, Sz), &B, ESlateDrawEffect::None, A(UI::Cream, Alpha));
+			return static_cast<float>(Sz.X);
+		}
+
 		/**
-		 * The one keycap: cream key with an ink glyph on a plaster lip. Keyboard keys are rounded squares (radius 6),
-		 * gamepad buttons circles or pills. Uses layers L..L+2. Returns width.
+		 * The one keycap: keyboard keys and the mouse use the input glyphs when loaded; otherwise (and for gamepad
+		 * buttons) a cream key with an ink label on a plaster lip - rounded squares (radius 6), circles or pills.
+		 * Uses layers L..L+2. Returns width.
 		 */
 		float Key(const FString& Label, const FVector2D& Pos, const FSlateFontInfo& Font, float Alpha, float Height = 32.f, bool bRound = false, int32 L = 4) const
 		{
+			if (!bRound)
+			{
+				const FSlateBrush* K[4];
+				if (Label == TEXT("WASD") && WasdGlyphs(K))
+				{
+					const float H = Height * 0.78f;
+					float X = 0.f;
+					for (int32 i = 0; i < 4; ++i)
+					{
+						X += GlyphKey(*K[i], Pos + FVector2D(X, (Height - H) * 0.5f), H, Alpha, L) + (i < 3 ? 2.f : 0.f);
+					}
+					return X;
+				}
+				if (const FSlateBrush* B = GlyphFor(*Label))
+				{
+					return GlyphKey(*B, Pos, Height, Alpha, L);
+				}
+			}
 			const float Lip = 3.f;
 			const float W = KeyWidth(Label, Font, Height, bRound);
 			const float R = bRound ? Height * 0.5f : 6.f;
@@ -546,6 +605,10 @@ bool SShadeOverlay::Project(const FPainter& P, const FVector& World, FVector2D& 
 int32 SShadeOverlay::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Culling, FSlateWindowElementList& Out, int32 LayerId, const FWidgetStyle& Style, bool bParentEnabled) const
 {
 	FPainter P(Geo, Out, LayerId);
+	if (const AShadeHUD* OwnerHUD = Owner.Get())
+	{
+		P.Glyphs = &OwnerHUD->GetGlyphs();
+	}
 	LastS = P.S;
 	const double Now = FPlatformTime::Seconds();
 	ItemRects.Reset();
@@ -1053,10 +1116,15 @@ void SShadeOverlay::PaintPause(const FPainter& P, double Now) const
 	const float RX = static_cast<float>(L0.X) + LeftW + ColGap;
 	P.Text(TEXT("PAWS & PADS"), FVector2D(RX, L0.Y), Kicker, A(UI::Sun, Al), 0.f, 0.f, 0.f, 20);
 	float Y = static_cast<float>(L0.Y) + KickH + 20.f;
+	float KeyCol = 110.f;  // label column: clear of the widest key (glyph WASD included)
+	for (const FRow& Row : Rows)
+	{
+		KeyCol = FMath::Max(KeyCol, P.KeyWidth(KeyLabel(Row.K, Row.Pad), KeyF, KeyH, bPad) + 22.f);
+	}
 	for (const FRow& Row : Rows)
 	{
 		P.Key(KeyLabel(Row.K, Row.Pad), FVector2D(RX, Y), KeyF, Al, KeyH, bPad, 19);
-		P.Text(Row.Label, FVector2D(RX + 110.f, Y + (KeyH - 3.f) * 0.5f), Lab, A(UI::Cream, 0.92f * Al), 0.f, 0.5f, 0.f, 20);
+		P.Text(Row.Label, FVector2D(RX + KeyCol, Y + (KeyH - 3.f) * 0.5f), Lab, A(UI::Cream, 0.92f * Al), 0.f, 0.5f, 0.f, 20);
 		Y += RowH;
 	}
 }
@@ -1229,6 +1297,27 @@ void AShadeHUD::BeginPlay()
 		else
 		{
 			UE_LOG(LogShade, Warning, TEXT("UI font missing: %s"), *Path);
+		}
+	}
+
+	// Input glyphs (Kenney Input Prompts, CC0): white keys with cut-out letters, cropped to the key and tinted in Key().
+	// Letter keys and the mouse only - SPACE / SHIFT / ESC keep the painted keycap, whose label stays legible at 30 px.
+	const TCHAR* GlyphNames[] = { TEXT("W"), TEXT("A"), TEXT("S"), TEXT("D"), TEXT("E"), TEXT("MOUSE") };
+	for (const TCHAR* G : GlyphNames)
+	{
+		const FString Path = FString::Printf(TEXT("/Game/Shade/UI/Glyphs/T_Key_%s.T_Key_%s"), G, G);
+		if (UTexture2D* Tex = LoadObject<UTexture2D>(nullptr, *Path))
+		{
+			GlyphTextures.Add(Tex);
+			FSlateBrush B;
+			B.SetResourceObject(Tex);
+			B.ImageSize = FVector2D(Tex->GetSizeX(), Tex->GetSizeY());
+			B.DrawAs = ESlateBrushDrawType::Image;
+			GlyphBrushes.Add(FName(G), B);
+		}
+		else
+		{
+			UE_LOG(LogShade, Warning, TEXT("UI glyph missing: %s (keycap falls back to text)"), *Path);
 		}
 	}
 

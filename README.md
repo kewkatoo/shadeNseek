@@ -32,7 +32,8 @@ shadowless, so you can slip back into place.
     Shipping). The render budget (`AShadeGameMode::ApplyRenderBudget`: High scalability, Lumen with the
     irradiance-volume final gather, two shadow cascades, no hardware occlusion queries, dynamic resolution that TSR
     upscales - tuned for 90-120 fps on a laptop RTX 4050) is applied by code at startup; `-epic` skips it.
-    `unreal/sns_tri_audit.py` lists placed meshes by classic (non-Nanite) triangles
+    `unreal/sns_tri_audit.py` lists placed meshes by classic (non-Nanite) triangles; `unreal/sns_qa_clipping.py` reports every
+    dressing prop that clips into a wall / railing / other prop or floats or sinks (mesh-accurate, `Saved/QA/clipping.tsv`)
 - `Scripts/run_game.ps1` launches a standalone game window with any of those flags. Recording guide: `Docs/PLAYTHROUGH.md`.
 - **Packaged build:** `Scripts/package_game.ps1` cooks a standalone Windows game into `Dist/Packaged/Windows/`
   (run `shadeNseek.exe`, same flags work). `Scripts/make_submission.ps1` builds the source + asset-library zips in `Dist/`.
@@ -73,7 +74,7 @@ The autoplay route finishes in ~1:40 (title to end card about 1:50).
 | `ShadeSunSubsystem` | Sun queries + `-sunmap` QA image |
 | `ShadeInteractables` | Lemon cart (push), café awning (hold to tug), washing line (hold; deterministic sea gusts lift the sheets), shutter (tug; opens, holds, creaks shut), flower pot (nudge off a ledge, only from the wall), nap cats / Biscotto, zones, sound scatter |
 | `ShadeGameMode` | Run flow (title, intro, play, bell-tower finale with the moving sun, reunion cinematic, end), objectives, narration, music |
-| `ShadeHUD` | Custom-painted Slate UI: cinematic title (Fraunces wordmark, text menu), ceramic-tile objective card, button-circle world prompts with hold rings, heat-haze exposure warning, storybook subtitles, pause and end cards |
+| `ShadeHUD` | Custom-painted Slate UI: cinematic title (Fraunces wordmark, text menu), ceramic-tile objective card, keyboard / mouse glyphs (Kenney Input Prompts, CC0) on the keycaps, button-circle world prompts with hold rings, heat-haze exposure warning, storybook subtitles, pause and end cards |
 | `ShadePlayerController` | Enhanced Input built in code, pause menu |
 | `ShadeAutoplayComponent` | `-autoplay` route driver using the same Shade API as the player's input |
 
@@ -86,23 +87,33 @@ Everything in `Content/Shade` is rebuilt from `asset-library/` by scripts:
 2. `python -I Scripts/fetch_fonts.py .` - Fraunces + Nunito (the UI), static weights baked from the variable fonts; stages the
    UI fonts. (It also fetches Cormorant Garamond, the old UI face, which the game no longer uses.) Lato, Lobster and Kalam stay
    in `asset-library/Fonts` because `gen_textures.py` paints the shop signs with them.
-3. `python -I Scripts/prep_audio.py` - cuts, layers, loops and loudness-normalises the CC0 recordings in `asset-library/Audio/`
-   (Freesound HQ previews, FreePD music, Kenney) into `asset-library/Audio/game/*.wav` (48 kHz, per-category LUFS, -1 dBTP);
+3. `python -I Scripts/prep_audio.py` - cuts, layers, loops and loudness-normalises the recordings in `asset-library/Audio/`
+   (lossless Radio Aporee field recordings from the coast - public domain; "Home Was You" by Scott Buckley - CC BY 4.0;
+   Freesound HQ previews of CC0 originals; Kenney; OpenGameArt) into `asset-library/Audio/game/*.wav` (48 kHz, per-category
+   LUFS, -1 dBTP);
    `python -I Scripts/qa_audio.py` checks every file for clipping, hiss/hum, loudness, loop seams and clicks. In game a
-   master-bus limiter catches stacked peaks. (`gen_audio.py` made the old synthesised set; it was removed from the repo, and the script can regenerate it.)
+   master-bus limiter catches stacked peaks, and area reverbs (vault, lanes, open piazza / terrace) follow Shade. (`gen_audio.py` made the old synthesised set; it was removed from the repo, and the script can regenerate it.)
 4. `python -I Scripts/gen_textures.py .` - awning stripes, majolica tiles, bougainvillea cards, signs, fabrics, fur strands…
+   `python -I Scripts/prep_glyphs.py .` - crops the HUD key glyphs from Kenney's Input Prompts (CC0) into `asset-library/UI/game`
 5. The cat: `python -I Scripts/blender/cat_sdf.py .` (SDF sculpt + marching cubes) then
    `blender -b --factory-startup --python Scripts/blender/make_cat.py -- .` (ears, eyes, whiskers, tabby coat, skeleton,
    heat-diffused weights, fur shells -> FBX). `Scripts/rebuild_cat.ps1 -Gallery` runs the whole cat chain incl. UE import.
-6. inside UE (`Scripts/run_ue_python.ps1 -Script <file>`): `unreal/sns_import.py` (runs `sns_cat_reimport.py` for the cat) →
+6. inside UE (`Scripts/run_ue_python.ps1 -Script <file>`): `unreal/sns_import.py` (runs `sns_cat_reimport.py` for the cat;
+   `SNS_ONLY=ui` imports the key glyphs) →
    `sns_fix_masks.py` → `sns_fix_flowers.py` (alpha-tested foliage materials for props whose masks arrived later) →
    `sns_materials.py` (add `-WithRHI` to see shader compile errors) → `sns_props.py` → `sns_fix_trees.py` →
    `sns_nanite_props.py` (Nanite on every dense prop - the create option alone does not stick in 5.8) →
    `sns_meshes.py` → `sns_level.py` (houses are generated with GeometryScript, windows cut with booleans; the start
-   passage's bridge house comes from `sns_bridge.py`, which can also regenerate just that mesh; it ends by running
-   `sns_lighting.py`: HDRI sky dome, sun, bounce fill, sky light, fog, post, cinematic cameras - rerun it alone to iterate).
+   passage's bridge house comes from `sns_bridge.py`, which can also regenerate just that mesh; every piece of dressing near
+   the route is placed through `sns_fit.py`, which rests it on the surface below and slides it clear of walls, railings and
+   other props or leaves it out; it ends by running `sns_backdrop.py` (the mountain behind the town and the seabed) and
+   `sns_lighting.py`: HDRI sky dome, sun, bounce fill, sky light, fog, post, cinematic cameras - both can be rerun alone).
    After `sns_props.py` the raw Interchange imports in `Content/Shade/Props/*/Mesh` are unreferenced and can be deleted.
 7. `python -I Scripts/make_credits.py .` - `asset-library/CREDITS.md` + `manifest.json`
 
-Third-party assets: Poly Haven and ambientCG (CC0) models/textures/HDRI, Freesound / FreePD / Kenney (CC0) sounds and music,
-and Google Fonts (OFL). Every file and its licence is listed in `asset-library/CREDITS.md` and `manifest.json`.
+Third-party assets: Poly Haven and ambientCG (CC0) models/textures/HDRI, Radio Aporee field recordings (Public Domain Mark),
+Freesound / Kenney / OpenGameArt (CC0) sounds, Kenney Input Prompts (CC0) and Google Fonts (OFL). Every file and its licence
+is listed in `asset-library/CREDITS.md` and `manifest.json`.
+
+Music: "Home Was You" by Scott Buckley (www.scottbuckley.com.au), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/) - keep this credit in the description of any video of the game.

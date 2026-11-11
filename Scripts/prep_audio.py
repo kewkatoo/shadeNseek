@@ -1,4 +1,4 @@
-"""Turn the CC0 / public-domain source recordings in asset-library/Audio/<source>/ into game-ready WAVs.
+"""Turn the CC0 / public-domain / CC BY source recordings in asset-library/Audio/<source>/ into game-ready WAVs.
 
 Output: asset-library/Audio/game/<UE_NAME>.wav - 48 kHz, 16-bit PCM (TPDF dither), mono for point-source SFX and
 footsteps, stereo for music / ambience / 2D stingers. Every output is cut from the source(s) listed in TABLE below,
@@ -7,7 +7,7 @@ optionally de-noised (gentle spectral gating with a noise profile from the sourc
 loudness-normalised to a per-category target (ITU-R BS.1770 K-weighted, gated integrated LUFS) and run through a
 4x-oversampled look-ahead limiter with a -1 dBTP ceiling. Scripts/qa_audio.py checks the result.
 
-Sources and licences: asset-library/Audio/manifest_audio.json (all CC0 1.0).
+Sources and licences: asset-library/Audio/manifest_audio.json (CC0 1.0, Public Domain Mark 1.0; the music CC BY 4.0).
 Needs: Python 3.11, numpy, scipy, soundfile (libsndfile >= 1.1 for mp3). No ffmpeg.
 Run:   python -I Scripts/prep_audio.py [only_this_name ...]
 """
@@ -27,22 +27,25 @@ OUT = os.path.join(RAW, "game")
 SR = 48000
 CEILING_DBTP = -1.0
 
-# Loudness targets (LUFS) per category.
+# Loudness targets (LUFS) per category. Raised 3 dB in the second quality pass: a full run measured ~-25 LUFS
+# integrated (quiet next to other games / videos); the master limiter still catches stacked peaks.
 TARGET = {
-    "music": -18.0,   # MUS_*
-    "amb": -24.0,     # ambience beds
-    "foot": -26.0,    # paws
-    "foley": -24.0,   # jump / land (body foley, a touch above paws)
-    "ui": -22.0,      # menu sounds, timer tick
-    "env": -22.0,     # distant world one-shots (gulls)
-    "sfx": -20.0,     # puzzle / interaction SFX
-    "sting": -18.0,   # solve / objective stingers
+    "music": -15.0,   # MUS_*
+    "amb": -21.0,     # ambience beds
+    "foot": -23.0,    # paws
+    "foley": -21.0,   # jump / land (body foley, a touch above paws)
+    "ui": -19.0,      # menu sounds, timer tick
+    "env": -19.0,     # distant world one-shots (gulls)
+    "sfx": -17.0,     # puzzle / interaction SFX
+    "sting": -15.0,   # solve / objective stingers
 }
 
 FS = "freesound/"
 KI = "kenney/interface-sounds/"
 KM = "kenney/impact-sounds/"
-PD = "freepd/"
+AP = "aporee/"         # Radio Aporee field recordings (Public Domain Mark), lossless excerpts
+SB = "scottbuckley/"   # music, CC BY 4.0
+OG = "opengameart/"
 # The glockenspiel sample sounds at ~2801 Hz (F7): playback rates that put it on F6 / C6 for the menu open / close pair.
 GLOCK_F6 = 0.5
 GLOCK_C6 = 1046.5 / 2801.0
@@ -65,26 +68,25 @@ def L(src, start=0.0, end=None, gain=0.0, at=0.0, rate=1.0, chan=None, fade=None
 # =====================================================================================================================
 TABLE = [
     # ---- Music ------------------------------------------------------------------------------------------------------
-    # "Wisdom in the Sun" (Kevin MacLeod, FreePD): warm guitars, gentle bass and bells. Full piece with its natural
-    # ending (the last ~0.8 s of the archived MP3 has a damaged frame; the outro is already fading there).
-    dict(name="MUS_Theme", layers=[L(PD + "wisdom_in_the_sun_kevin_macleod.mp3", 0.0, 154.4)], ch=2, cat="music",
-         loop=0, fin=0.01, fout=4.0),
-    # "Champ de tournesol" (Komiku, FreePD): last section (from the 65.5 s section boundary) to its natural ending.
-    dict(name="MUS_Reunion", layers=[L(PD + "champ_de_tournesol_komiku.mp3", 65.30, 117.9)], ch=2, cat="music",
-         loop=0, fin=0.25, fout=3.0),
+    # "Home Was You" (Scott Buckley, CC BY 4.0): piano, strings, accordion and soft folk percussion. The theme is the
+    # long build (0:18-3:35) - a ~2 minute run rides the swell; the reunion is the solo-piano coda that reprises it.
+    dict(name="MUS_Theme", layers=[L(SB + "home_was_you_scott_buckley.mp3", 18.0, 215.0)], ch=2, cat="music",
+         loop=0, fin=1.5, fout=6.0),
+    dict(name="MUS_Reunion", layers=[L(SB + "home_was_you_scott_buckley.mp3", 203.0, 269.0)], ch=2, cat="music",
+         loop=0, fin=1.0, fout=4.0),
 
     # ---- Ambience beds (stereo, seamless loops) ---------------------------------------------------------------------
-    # Mediterranean waves against cliff rocks + gentle lapping against moored boats (harbour).
+    # Lossless 24-bit field recordings from the coast (Radio Aporee, public domain): sea against the rocks in Naples +
+    # water lapping at jetty rocks in Villefranche-sur-Mer.
     dict(name="AMB_Sea_Loop", ch=2, cat="amb", loop=4.0, layers=[
-        L(FS + "648860_Sea_Waves_Against_Rocks.ogg", 0.5, 88.0),
-        L(FS + "637945_water_lake_waves_light_gentle_lap_at_boa.ogg", 4.0, 91.5, gain=-7.0)]),
-    # Cicadas on a sunny afternoon in Bolano (La Spezia, Liguria) with the small town faintly in the distance.
+        L(AP + "aporee_67253_naples_waves_on_rocks.flac", 3.0, 78.0),
+        L(AP + "aporee_27701_villefranche_jetty_lapping.flac", 5.0, 80.0, gain=-6.0)]),
+    # Cicadas in the pines of the Certosa park, Padula (Campania) - the steady stretch before a crow passes.
     dict(name="AMB_Village_Loop", ch=2, cat="amb", loop=4.0, hp=60,
-         layers=[L(FS + "584218_Cicale_Bolano_08_08_21.ogg", 196.0, 296.0)]),
-    # NEW town bed: Italian piazza murmur (Padua, after lunch) + café terrace cutlery/talk + swifts passing overhead.
+         layers=[L(AP + "aporee_64774_padula_cicadas.flac", 2.0, 52.0)]),
+    # Town bed: café terrace on the little square of Corniglia (Cinque Terre) + swifts passing overhead.
     dict(name="AMB_Town_Loop", ch=2, cat="amb", loop=4.0, hp=50, layers=[
-        L(FS + "832691_Italian_Square_at_Sunday_Lunch_Time_Piaz.ogg", 4.0, 98.0),
-        L(FS + "320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg", 10.0, 104.0, gain=-9.0),
+        L(AP + "aporee_65200_corniglia_cafe_terrace.flac", 4.0, 98.0),
         L(FS + "690331_swifts_birds.ogg", 60.0, 154.0, gain=-5.0)]),
 
     # ---- World one-shots --------------------------------------------------------------------------------------------
@@ -110,7 +112,8 @@ TABLE = [
         L(KM + "impactSoft_medium_001.ogg", gain=-6.0, at=0.01)]),
     # Room noise ~40 dB under the trill: 10 dB of gentle de-noising.
     dict(name="SFX_Mrrp", ch=1, cat="sfx", hp=80, dn=10, layers=[L(FS + "200336_Cat_trilling.ogg", 7.66, 8.45)]),
-    dict(name="SFX_Purr_Loop", ch=1, cat="sfx", loop=1.5, hp=35, layers=[L(FS + "553962_Cat_purr.ogg", 4.0, 16.0)]),
+    # A clean, lossless sleepy purr loop (Kerzoven, OpenGameArt, CC0).
+    dict(name="SFX_Purr_Loop", ch=1, cat="sfx", loop=0.5, hp=35, layers=[L(OG + "kerzoven_cat_purrsleepy_loop.wav")]),
 
     # ---- Shade (sun damage) -----------------------------------------------------------------------------------------
     dict(name="SFX_Sizzle_Loop", ch=1, cat="sfx", loop=1.0, hp=80, layers=[L(FS + "468911_Bacon_Sizzling.ogg", 4.0, 10.0)]),

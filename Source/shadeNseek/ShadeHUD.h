@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "Styling/SlateBrush.h"
 #include "ShadeHUD.generated.h"
 
 class SShadeOverlay;
+class UTexture2D;
 class SWidget;
 class SOverlay;
 struct FStandaloneCompositeFont;
@@ -44,10 +46,16 @@ public:
 	/** Faces: "Display"/"DisplayItalic" (Fraunces SemiBold / SemiBold Italic), "Body"/"BodyBold"/"BodyHeavy" (Nunito SemiBold / Bold / ExtraBold). Missing files fall back to Roboto. */
 	FSlateFontInfo Font(FName Face, float Size, int32 LetterSpacing = 0) const;
 
+	/** Keyboard / mouse glyphs (Kenney Input Prompts, CC0) by key label: W A S D E MOUSE. */
+	const TMap<FName, FSlateBrush>& GetGlyphs() const { return GlyphBrushes; }
+
 private:
 	TSharedPtr<SOverlay> Root;
 	TSharedPtr<SShadeOverlay> Overlay;
 	TMap<FName, TSharedPtr<FStandaloneCompositeFont>> Fonts;
+	UPROPERTY()
+	TArray<TObjectPtr<UTexture2D>> GlyphTextures;
+	TMap<FName, FSlateBrush> GlyphBrushes;
 	EShadeMenu Menu = EShadeMenu::None;
 	double MenuOpenTime = 0.0;
 };

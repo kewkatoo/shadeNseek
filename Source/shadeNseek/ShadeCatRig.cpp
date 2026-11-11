@@ -38,7 +38,26 @@ namespace
 	float StrideFor(float SpeedN) { return FMath::Clamp(24.f + 0.18f * SpeedN, 26.f, 66.f); }
 	float DutyFor(float SpeedN) { return FMath::Lerp(FMath::Lerp(0.6f, 0.5f, Sat((SpeedN - 40.f) / 70.f)), 0.36f, Sat((SpeedN - 120.f) / 110.f)); }
 	FQuat PY(float Pitch, float Yaw) { return FRotator(Pitch, Yaw, 0.f).Quaternion(); }
-	FQuat Frame(const FVector& X, const FVector& Y) { return FRotationMatrix::MakeFromXY(X, Y).ToQuat(); }
+	/** Rotation whose X is X and whose Y is as close to Y as possible. Degenerate input (zero / NaN X, X parallel to Y),
+	 *  which a single frame of coincident IK points can produce, falls back to a valid frame instead of an ensure. */
+	FQuat Frame(const FVector& X, const FVector& Y)
+	{
+		FVector XN = X.GetSafeNormal();
+		if (XN.IsNearlyZero() || XN.ContainsNaN())
+		{
+			XN = FVector::ForwardVector;
+		}
+		FVector YN = Y.ContainsNaN() ? FVector::ZeroVector : Y - XN * FVector::DotProduct(Y, XN);
+		if (!YN.Normalize())
+		{
+			YN = FVector::CrossProduct(FVector::UpVector, XN);
+			if (!YN.Normalize())
+			{
+				YN = FVector::RightVector;
+			}
+		}
+		return FRotationMatrix::MakeFromXY(XN, YN).ToQuat();
+	}
 
 	/** Analytic two-bone IK. Pole is the direction the middle joint should bend toward. */
 	void SolveTwoBone(const FVector& A, const FVector& T, float L1, float L2, const FVector& Pole, FVector& OutMid, FVector& OutEnd)
@@ -976,7 +995,7 @@ void UShadeCatRig::Apply()
 	for (int32 i = 0; i < N; ++i)
 	{
 		const int32 b = BoneOf[i];
-		if (b != INDEX_NONE && Out[b].bSet)
+		if (b != INDEX_NONE && Out[b].bSet && !Out[b].Rot.ContainsNaN() && !Out[b].Pos.ContainsNaN())
 		{
 			CompPose[i] = FTransform(RigToComp * Out[b].Rot, RigToComp.RotateVector(Out[b].Pos) * InvS, RefComp[i].GetScale3D());
 		}

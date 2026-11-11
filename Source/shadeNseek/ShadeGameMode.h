@@ -9,6 +9,7 @@ class AShadeCharacter;
 class AShadeNapCat;
 class ACameraActor;
 class UAudioComponent;
+class UReverbEffect;
 class ADirectionalLight;
 
 USTRUCT()
@@ -214,6 +215,11 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UAudioComponent> AmbTown;
 	float TownLevel = 0.f;
+
+	/** Area reverbs on positional sounds (UE's built-in reverb): 0 vaulted passage, 1 stone lanes / stairs, 2 open piazza and terrace. */
+	UPROPERTY()
+	TArray<TObjectPtr<UReverbEffect>> Reverbs;
+	int32 ReverbArea = -1;
 	bool bAudioCapDone = false;
 
 	float MusicTarget = 0.5f;

@@ -11,6 +11,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/PoseableMeshComponent.h"
 #include "Components/AudioComponent.h"
+#include "Sound/ReverbEffect.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/PointLight.h"
@@ -225,6 +226,19 @@ void AShadeGameMode::StartPlay()
 	}
 
 	ShadeAssets::PreloadAudio();
+	// Area reverbs (EAX-style presets): a long stone tail under the vault, a short slap between the lane walls and on
+	// the stairs, a light open space on the piazza and the terrace. Only positional sounds send to reverb.
+	auto MakeReverb = [this](float Density, float Diffusion, float Gain, float GainHF, float Decay, float DecayHF, float RefGain, float RefDelay,
+		float LateGain, float LateDelay)
+	{
+		UReverbEffect* R = NewObject<UReverbEffect>(this);
+		R->Density = Density; R->Diffusion = Diffusion; R->Gain = Gain; R->GainHF = GainHF; R->DecayTime = Decay; R->DecayHFRatio = DecayHF;
+		R->ReflectionsGain = RefGain; R->ReflectionsDelay = RefDelay; R->LateGain = LateGain; R->LateDelay = LateDelay; R->AirAbsorptionGainHF = 0.994f;
+		Reverbs.Add(R);
+	};
+	MakeReverb(1.f, 1.f, 0.32f, 0.76f, 2.7f, 0.79f, 0.25f, 0.013f, 1.58f, 0.020f);    // vault: stone corridor
+	MakeReverb(1.f, 0.3f, 0.32f, 0.73f, 1.49f, 0.86f, 0.25f, 0.007f, 0.99f, 0.011f);  // lanes / stairs: alley
+	MakeReverb(1.f, 0.5f, 0.32f, 0.40f, 1.49f, 0.67f, 0.07f, 0.007f, 0.14f, 0.011f);  // piazza / terrace: open town
 	// Master bus limiter: the sounds are loudness-matched offline (prep_audio.py); this only catches stacked peaks
 	// (bell tolls over the music, a pot smash during the score) so the mix never clips.
 	if (USubmixEffectDynamicsProcessorPreset* Limiter = NewObject<USubmixEffectDynamicsProcessorPreset>(this))
@@ -251,17 +265,17 @@ void AShadeGameMode::StartPlay()
 	}
 	if (USoundBase* S = ShadeAssets::Sound(TEXT("AMB_Sea_Loop")))
 	{
-		AmbSea = UGameplayStatics::SpawnSound2D(this, S, 0.32f, 1.f, 0.f, nullptr, true, false);
+		AmbSea = UGameplayStatics::SpawnSound2D(this, S, 0.42f, 1.f, 0.f, nullptr, true, false);
 	}
 	if (USoundBase* S = ShadeAssets::Sound(TEXT("AMB_Village_Loop")))
 	{
-		AmbVillage = UGameplayStatics::SpawnSound2D(this, S, 0.42f, 1.f, 0.f, nullptr, true, false);
+		AmbVillage = UGameplayStatics::SpawnSound2D(this, S, 0.55f, 1.f, 0.f, nullptr, true, false);
 	}
 	if (USoundBase* S = ShadeAssets::Sound(TEXT("AMB_Town_Loop")))
 	{
 		AmbTown = UGameplayStatics::SpawnSound2D(this, S, 0.f, 1.f, 0.f, nullptr, true, false);
 	}
-	MusicTarget = 0.5f;
+	MusicTarget = 0.65f;
 
 	SetPhase(EShadePhase::Title);
 	FadeAlpha = 1.f;
@@ -536,7 +550,7 @@ void AShadeGameMode::NotifyEvent(FName EventName, AActor* Source)
 		SetPhase(EShadePhase::Finale);
 		FinaleTime = 0.f;
 		BellsRung = 0;
-		MusicTarget = 0.28f;
+		MusicTarget = 0.36f;
 	}
 	if (EventName == TEXT("Evaporated") && !bNew)
 	{
@@ -639,9 +653,22 @@ void AShadeGameMode::Tick(float DeltaSeconds)
 	{
 		const AShadeCharacter* S = GetShade();
 		const float X = S ? S->GetActorLocation().X : 0.f;
-		const float Want = (Phase == EShadePhase::Title ? 0.25f : 0.38f) * (1.f - ShadeEase::Smooth((X - 2450.f) / 700.f));
+		const float Want = (Phase == EShadePhase::Title ? 0.32f : 0.5f) * (1.f - ShadeEase::Smooth((X - 2450.f) / 700.f));
 		TownLevel = ShadeEase::Approach(TownLevel, Want, 1.5f, Dt);
 		AmbTown->SetVolumeMultiplier(TownLevel);
+	}
+
+	// Area reverb follows Shade (title / end: the open town).
+	if (Reverbs.Num() == 3)
+	{
+		const AShadeCharacter* S = GetShade();
+		const float X = (S && Phase != EShadePhase::Title) ? S->GetActorLocation().X : 2000.f;
+		const int32 Area = X < -150.f ? 0 : (X < 1700.f ? 1 : (X < 2500.f ? 2 : (X < 3330.f ? 1 : 2)));
+		if (Area != ReverbArea)
+		{
+			ReverbArea = Area;
+			UGameplayStatics::ActivateReverbEffect(this, Reverbs[Area], TEXT("ShadeArea"), 0.f, Area == 2 ? 0.45f : 0.7f, 0.8f);
+		}
 	}
 
 	// Toast expiry
@@ -771,7 +798,7 @@ void AShadeGameMode::TickFinale(float Dt)
 	}
 	if (FinaleTime > SunDelay + SunDuration && !HasEvent(TEXT("TowerShadeArrived")))
 	{
-		MusicTarget = 0.45f;
+		MusicTarget = 0.58f;
 		NotifyEvent(TEXT("TowerShadeArrived"), this);
 	}
 }
@@ -787,7 +814,7 @@ void AShadeGameMode::BeginReunion(AShadeNapCat* Cat)
 	ReunionTime = 0.f;
 	ReunionStep = 0;
 	MusicTarget = 0.f;
-	ShadeAssets::Play2D(this, TEXT("MUS_Reunion"), 0.85f);
+	ShadeAssets::Play2D(this, TEXT("MUS_Reunion"), 1.f);
 
 	// Where the cat's shadow belongs: opposite the sun.
 	FVector ToSun = FVector(0, 0, 1);
@@ -912,7 +939,7 @@ void AShadeGameMode::TickReunion(float Dt)
 	if (ReunionStep == 5 && ReunionTime > 9.4f)
 	{
 		ReunionStep = 6;
-		MusicTarget = 0.4f;
+		MusicTarget = 0.52f;
 		SetPhase(EShadePhase::Ended);
 		UE_LOG(LogShade, Log, TEXT("SHADE_COMPLETE t=%.1f evaporations=%d utc=%s"), RunTime, GetShade() ? GetShade()->GetEvaporations() : -1, *FDateTime::UtcNow().ToIso8601());
 	}

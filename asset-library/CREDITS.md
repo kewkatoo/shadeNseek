@@ -66,12 +66,15 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Models/polyhaven/wine_barrel_01` | James Ray Cock | https://polyhaven.com/a/wine_barrel_01 |
 | `Models/polyhaven/wine_bottles_01` | Rico Cilliers, Jurita Burger | https://polyhaven.com/a/wine_bottles_01 |
 | `Models/polyhaven/wooden_bucket_01` | James Ray Cock | https://polyhaven.com/a/wooden_bucket_01 |
+| `Textures/polyhaven/aerial_grass_rock` | Rob Tuytel | https://polyhaven.com/a/aerial_grass_rock |
+| `Textures/polyhaven/aerial_rocks_02` | Rob Tuytel | https://polyhaven.com/a/aerial_rocks_02 |
 | `Textures/polyhaven/blue_plaster_weathered` | Amal Kumar | https://polyhaven.com/a/blue_plaster_weathered |
 | `Textures/polyhaven/coast_sand_01` | Rob Tuytel | https://polyhaven.com/a/coast_sand_01 |
 | `Textures/polyhaven/coral_stone_wall` | Dimitrios Savva | https://polyhaven.com/a/coral_stone_wall |
 | `Textures/polyhaven/distressed_painted_planks` | Rob Tuytel | https://polyhaven.com/a/distressed_painted_planks |
 | `Textures/polyhaven/fabric_pattern_07` | Rob Tuytel | https://polyhaven.com/a/fabric_pattern_07 |
 | `Textures/polyhaven/marble_cliff_02` | Amal Kumar | https://polyhaven.com/a/marble_cliff_02 |
+| `Textures/polyhaven/marble_cliff_05` | Amal Kumar | https://polyhaven.com/a/marble_cliff_05 |
 | `Textures/polyhaven/painted_plaster_wall` | Amal Kumar | https://polyhaven.com/a/painted_plaster_wall |
 | `Textures/polyhaven/rough_wood` | Rob Tuytel | https://polyhaven.com/a/rough_wood |
 | `Textures/polyhaven/stacked_stone_wall` | Dimitrios Savva | https://polyhaven.com/a/stacked_stone_wall |
@@ -79,6 +82,7 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Textures/polyhaven/weathered_planks` | Dario Barresi, Dimitrios Savva | https://polyhaven.com/a/weathered_planks |
 | `Textures/polyhaven/white_rough_plaster` | Rob Tuytel | https://polyhaven.com/a/white_rough_plaster |
 | `Textures/polyhaven/white_stucco` | Amal Kumar | https://polyhaven.com/a/white_stucco |
+| `Textures/polyhaven/worn_rock_natural_01` | Rob Tuytel, Dimitrios Savva | https://polyhaven.com/a/worn_rock_natural_01 |
 
 ## ambientCG (CC0 1.0 - public domain, https://docs.ambientcg.com/license/)
 
@@ -97,48 +101,54 @@ No Fab / Unreal Marketplace / Megascans content is used. Engine content is only 
 | `Textures/ambientcg/Tiles143` | ambientCG / Lennart Demes | https://ambientcg.com/a/Tiles143 |
 | `Textures/ambientcg/Travertine009` | ambientCG / Lennart Demes | https://ambientcg.com/a/Travertine009 |
 
-## Audio (CC0 1.0 - public domain; Freesound, FreePD, Kenney)
+## Audio (CC0 1.0, Public Domain Mark 1.0, CC BY 4.0 - see each row)
 
 Game-ready files are built from these by `Scripts/prep_audio.py` into `asset-library/Audio/game`. Freesound files are the
-public HQ previews of CC0 originals. FreePD (closed in 2025) is cited through Internet Archive copies of its pages.
+public HQ previews of CC0 originals; the Radio Aporee field recordings (mirrored on Internet Archive) are stored as
+lossless excerpts. CC BY 4.0 music must be credited wherever the game or a video of it is published:
+"Home Was You" by Scott Buckley (www.scottbuckley.com.au), licensed under CC BY 4.0.
 
-| File | Title | Author | Source |
-|---|---|---|---|
-| `Audio/freepd/champ_de_tournesol_komiku.mp3` | FreePD - Champ de tournesol (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture) | Komiku | https://web.archive.org/web/20241128211244/https://freepd.com/romantic.php |
-| `Audio/freepd/wisdom_in_the_sun_kevin_macleod.mp3` | FreePD - Wisdom in the Sun (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture) | Kevin MacLeod | https://web.archive.org/web/20241216000928/https://freepd.com/misc.php |
-| `Audio/freesound/155660_cig_extinguish.ogg` | Freesound - cig_extinguish.wav (HQ preview of the CC0 original) | the_semen_incident | https://freesound.org/people/the_semen_incident/sounds/155660/ |
-| `Audio/freesound/156996_Freewheel_clicks.ogg` | Freesound - Freewheel clicks.wav (HQ preview of the CC0 original) | donkpow | https://freesound.org/people/donkpow/sounds/156996/ |
-| `Audio/freesound/200336_Cat_trilling.ogg` | Freesound - Cat trilling (HQ preview of the CC0 original) | jsbarrett | https://freesound.org/people/jsbarrett/sounds/200336/ |
-| `Audio/freesound/208111_Poof_of_Smoke.ogg` | Freesound - Poof of Smoke (HQ preview of the CC0 original) | Planman | https://freesound.org/people/Planman/sounds/208111/ |
-| `Audio/freesound/244982_Wing_Flap_Flag_Flapping_5a.ogg` | Freesound - Wing Flap (Flag Flapping) 5a (HQ preview of the CC0 original) | ani_music | https://freesound.org/people/ani_music/sounds/244982/ |
-| `Audio/freesound/265583_Wooden_Door_01.ogg` | Freesound - Wooden Door 01 (HQ preview of the CC0 original) | aglinder | https://freesound.org/people/aglinder/sounds/265583/ |
-| `Audio/freesound/276882_Bumping_apples_Pouring_Apples.ogg` | Freesound - Bumping apples Pouring Apples (HQ preview of the CC0 original) | ScratchnSniff | https://freesound.org/people/ScratchnSniff/sounds/276882/ |
-| `Audio/freesound/320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg` | Freesound - Bukarest 2015 Restaurant Terasse mittags MS.WAV (HQ preview of the CC0 original) | tribord | https://freesound.org/people/tribord/sounds/320026/ |
-| `Audio/freesound/330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg` | Freesound - Cloth Flapping On A Clothesline Thickly (HQ preview of the CC0 original) | leonelmail | https://freesound.org/people/leonelmail/sounds/330638/ |
-| `Audio/freesound/330639_Cloth_Flapping_On_A_Clothesline_Gently.ogg` | Freesound - Cloth Flapping On A Clothesline Gently (HQ preview of the CC0 original) | leonelmail | https://freesound.org/people/leonelmail/sounds/330639/ |
-| `Audio/freesound/348924_Glockenspiel_46_f4_04.ogg` | Freesound - Glockenspiel_46_f4_04 (HQ preview of the CC0 original) | cabled_mess | https://freesound.org/people/cabled_mess/sounds/348924/ |
-| `Audio/freesound/391448_Shirt_Whoosh_1.ogg` | Freesound - Shirt Whoosh 1.wav (HQ preview of the CC0 original) | saturdaysoundguy | https://freesound.org/people/saturdaysoundguy/sounds/391448/ |
-| `Audio/freesound/394222_Large_rope_pulley_operated.ogg` | Freesound - Large rope pulley operated.wav (HQ preview of the CC0 original) | mikewest | https://freesound.org/people/mikewest/sounds/394222/ |
-| `Audio/freesound/437077_G52-06-Buckboard_Wagon.ogg` | Freesound - G52-06-Buckboard Wagon.wav (HQ preview of the CC0 original) | craigsmith | https://freesound.org/people/craigsmith/sounds/437077/ |
-| `Audio/freesound/444799_Pivoting_Shutters_Opening_and_Closing.ogg` | Freesound - Pivoting Shutters Opening and Closing .wav (HQ preview of the CC0 original) | ross_sinc | https://freesound.org/people/ross_sinc/sounds/444799/ |
-| `Audio/freesound/462462_Seagulls_gaviotas_clean_wildtrack.ogg` | Freesound - Seagulls / gaviotas clean wildtrack.WAV (HQ preview of the CC0 original) | Soojay | https://freesound.org/people/Soojay/sounds/462462/ |
-| `Audio/freesound/468911_Bacon_Sizzling.ogg` | Freesound - Bacon Sizzling (HQ preview of the CC0 original) | timothyd4y | https://freesound.org/people/timothyd4y/sounds/468911/ |
-| `Audio/freesound/472587_Reversed_Discovery_Sound.ogg` | Freesound - Reversed Discovery Sound.wav (HQ preview of the CC0 original) | DeVern | https://freesound.org/people/DeVern/sounds/472587/ |
-| `Audio/freesound/553962_Cat_purr.ogg` | Freesound - Cat-purr.wav (HQ preview of the CC0 original) | clareboots | https://freesound.org/people/clareboots/sounds/553962/ |
-| `Audio/freesound/563355_Celesta_Chime.ogg` | Freesound - Celesta Chime.wav (HQ preview of the CC0 original) | nicholasdaryl | https://freesound.org/people/nicholasdaryl/sounds/563355/ |
-| `Audio/freesound/584218_Cicale_Bolano_08_08_21.ogg` | Freesound - Cicale Bolano 08-08-21.WAV (HQ preview of the CC0 original) | nicolo.ciuffi | https://freesound.org/people/nicolo.ciuffi/sounds/584218/ |
-| `Audio/freesound/610703_Good_answer_harp_glissando.ogg` | Freesound - Good answer harp glissando.wav (HQ preview of the CC0 original) | oggraphics | https://freesound.org/people/oggraphics/sounds/610703/ |
-| `Audio/freesound/611469_Church_Bell.ogg` | Freesound - Church Bell.wav (HQ preview of the CC0 original) | Kalomina | https://freesound.org/people/Kalomina/sounds/611469/ |
-| `Audio/freesound/637945_water_lake_waves_light_gentle_lap_at_boa.ogg` | Freesound - water lake waves light gentle lap at boats on beach.flac (HQ preview of the CC0 original) | kyles | https://freesound.org/people/kyles/sounds/637945/ |
-| `Audio/freesound/648860_Sea_Waves_Against_Rocks.ogg` | Freesound - Sea Waves Against Rocks (HQ preview of the CC0 original) | emainta | https://freesound.org/people/emainta/sounds/648860/ |
-| `Audio/freesound/656727_Pouring_Potatoes_Onto_a_Table.ogg` | Freesound - Pouring Potatoes Onto a Table.wav (HQ preview of the CC0 original) | dhallcomposer | https://freesound.org/people/dhallcomposer/sounds/656727/ |
-| `Audio/freesound/690331_swifts_birds.ogg` | Freesound - swifts birds.wav (HQ preview of the CC0 original) | bruno.auzet | https://freesound.org/people/bruno.auzet/sounds/690331/ |
-| `Audio/freesound/776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg` | Freesound - SFX-TeaPot,Ceramic,Wobble,Stop2 (HQ preview of the CC0 original) | soundandmelodies | https://freesound.org/people/soundandmelodies/sounds/776201/ |
-| `Audio/freesound/810043_Breaking_pot_short.ogg` | Freesound - Breaking pot short (HQ preview of the CC0 original) | anna_bliss | https://freesound.org/people/anna_bliss/sounds/810043/ |
-| `Audio/freesound/816261_Broomstick_whoosh_2_Soft_low_OKM1.ogg` | Freesound - Broomstick whoosh 2 - Soft low OKM1 (HQ preview of the CC0 original) | Sadiquecat | https://freesound.org/people/Sadiquecat/sounds/816261/ |
-| `Audio/freesound/832691_Italian_Square_at_Sunday_Lunch_Time_Piaz.ogg` | Freesound - Italian Square at Sunday Lunch Time, Piazza del Duomo, Padua, Sunday (HQ preview of the CC0 original) | bassimat | https://freesound.org/people/bassimat/sounds/832691/ |
-| `Audio/freesound/864782_Walking_In_Socks.ogg` | Freesound - Walking In Socks (HQ preview of the CC0 original) | IENBA | https://freesound.org/people/IENBA/sounds/864782/ |
-| `Audio/kenney/impact-sounds` | Kenney - Impact Sounds (impactWood_light_000/002, impactWood_heavy_001, impactPlank_medium_002, impactSoft_medium_001, impactSoft_heavy_002; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds |
-| `Audio/kenney/interface-sounds` | Kenney - Interface Sounds (pluck_002; licence file included) | Kenney (kenney.nl) | https://kenney.nl/assets/interface-sounds |
+| File | Title | Author | Licence | Source |
+|---|---|---|---|---|
+| `Audio/aporee/aporee_27701_villefranche_jetty_lapping.flac` | Villefranche-sur-Mer sea sounds - jetty rocks at the waterline (0:00-1:40) | RorySmith | PDM-1.0 | https://archive.org/details/aporee_27701_31933 |
+| `Audio/aporee/aporee_64774_padula_cicadas.flac` | Padula, Parco della Certosa - cicadas (0:00-1:00) | Giuseppe Bergamino | PDM-1.0 | https://archive.org/details/aporee_64774_74800 |
+| `Audio/aporee/aporee_65200_corniglia_cafe_terrace.flac` | Corniglia (Vernazza) - café terrace on the little square (0:00-2:00) | Jean-François Cavro | PDM-1.0 | https://archive.org/details/aporee_65200_75297 |
+| `Audio/aporee/aporee_67253_naples_waves_on_rocks.flac` | Napoli, Via Eldorado - sea against the rocks (0:25-1:45) | timmermans.noa | PDM-1.0 | https://archive.org/details/aporee_67253_77804 |
+| `Audio/freesound/155660_cig_extinguish.ogg` | Freesound - cig_extinguish.wav (HQ preview of the CC0 original) | the_semen_incident | CC0-1.0 | https://freesound.org/people/the_semen_incident/sounds/155660/ |
+| `Audio/freesound/156996_Freewheel_clicks.ogg` | Freesound - Freewheel clicks.wav (HQ preview of the CC0 original) | donkpow | CC0-1.0 | https://freesound.org/people/donkpow/sounds/156996/ |
+| `Audio/freesound/200336_Cat_trilling.ogg` | Freesound - Cat trilling (HQ preview of the CC0 original) | jsbarrett | CC0-1.0 | https://freesound.org/people/jsbarrett/sounds/200336/ |
+| `Audio/freesound/208111_Poof_of_Smoke.ogg` | Freesound - Poof of Smoke (HQ preview of the CC0 original) | Planman | CC0-1.0 | https://freesound.org/people/Planman/sounds/208111/ |
+| `Audio/freesound/244982_Wing_Flap_Flag_Flapping_5a.ogg` | Freesound - Wing Flap (Flag Flapping) 5a (HQ preview of the CC0 original) | ani_music | CC0-1.0 | https://freesound.org/people/ani_music/sounds/244982/ |
+| `Audio/freesound/265583_Wooden_Door_01.ogg` | Freesound - Wooden Door 01 (HQ preview of the CC0 original) | aglinder | CC0-1.0 | https://freesound.org/people/aglinder/sounds/265583/ |
+| `Audio/freesound/276882_Bumping_apples_Pouring_Apples.ogg` | Freesound - Bumping apples Pouring Apples (HQ preview of the CC0 original) | ScratchnSniff | CC0-1.0 | https://freesound.org/people/ScratchnSniff/sounds/276882/ |
+| `Audio/freesound/330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg` | Freesound - Cloth Flapping On A Clothesline Thickly (HQ preview of the CC0 original) | leonelmail | CC0-1.0 | https://freesound.org/people/leonelmail/sounds/330638/ |
+| `Audio/freesound/330639_Cloth_Flapping_On_A_Clothesline_Gently.ogg` | Freesound - Cloth Flapping On A Clothesline Gently (HQ preview of the CC0 original) | leonelmail | CC0-1.0 | https://freesound.org/people/leonelmail/sounds/330639/ |
+| `Audio/freesound/348924_Glockenspiel_46_f4_04.ogg` | Freesound - Glockenspiel_46_f4_04 (HQ preview of the CC0 original) | cabled_mess | CC0-1.0 | https://freesound.org/people/cabled_mess/sounds/348924/ |
+| `Audio/freesound/391448_Shirt_Whoosh_1.ogg` | Freesound - Shirt Whoosh 1.wav (HQ preview of the CC0 original) | saturdaysoundguy | CC0-1.0 | https://freesound.org/people/saturdaysoundguy/sounds/391448/ |
+| `Audio/freesound/394222_Large_rope_pulley_operated.ogg` | Freesound - Large rope pulley operated.wav (HQ preview of the CC0 original) | mikewest | CC0-1.0 | https://freesound.org/people/mikewest/sounds/394222/ |
+| `Audio/freesound/437077_G52-06-Buckboard_Wagon.ogg` | Freesound - G52-06-Buckboard Wagon.wav (HQ preview of the CC0 original) | craigsmith | CC0-1.0 | https://freesound.org/people/craigsmith/sounds/437077/ |
+| `Audio/freesound/444799_Pivoting_Shutters_Opening_and_Closing.ogg` | Freesound - Pivoting Shutters Opening and Closing .wav (HQ preview of the CC0 original) | ross_sinc | CC0-1.0 | https://freesound.org/people/ross_sinc/sounds/444799/ |
+| `Audio/freesound/462462_Seagulls_gaviotas_clean_wildtrack.ogg` | Freesound - Seagulls / gaviotas clean wildtrack.WAV (HQ preview of the CC0 original) | Soojay | CC0-1.0 | https://freesound.org/people/Soojay/sounds/462462/ |
+| `Audio/freesound/468911_Bacon_Sizzling.ogg` | Freesound - Bacon Sizzling (HQ preview of the CC0 original) | timothyd4y | CC0-1.0 | https://freesound.org/people/timothyd4y/sounds/468911/ |
+| `Audio/freesound/472587_Reversed_Discovery_Sound.ogg` | Freesound - Reversed Discovery Sound.wav (HQ preview of the CC0 original) | DeVern | CC0-1.0 | https://freesound.org/people/DeVern/sounds/472587/ |
+| `Audio/freesound/563355_Celesta_Chime.ogg` | Freesound - Celesta Chime.wav (HQ preview of the CC0 original) | nicholasdaryl | CC0-1.0 | https://freesound.org/people/nicholasdaryl/sounds/563355/ |
+| `Audio/freesound/610703_Good_answer_harp_glissando.ogg` | Freesound - Good answer harp glissando.wav (HQ preview of the CC0 original) | oggraphics | CC0-1.0 | https://freesound.org/people/oggraphics/sounds/610703/ |
+| `Audio/freesound/611469_Church_Bell.ogg` | Freesound - Church Bell.wav (HQ preview of the CC0 original) | Kalomina | CC0-1.0 | https://freesound.org/people/Kalomina/sounds/611469/ |
+| `Audio/freesound/656727_Pouring_Potatoes_Onto_a_Table.ogg` | Freesound - Pouring Potatoes Onto a Table.wav (HQ preview of the CC0 original) | dhallcomposer | CC0-1.0 | https://freesound.org/people/dhallcomposer/sounds/656727/ |
+| `Audio/freesound/690331_swifts_birds.ogg` | Freesound - swifts birds.wav (HQ preview of the CC0 original) | bruno.auzet | CC0-1.0 | https://freesound.org/people/bruno.auzet/sounds/690331/ |
+| `Audio/freesound/776201_SFX_TeaPot_Ceramic_Wobble_Stop2.ogg` | Freesound - SFX-TeaPot,Ceramic,Wobble,Stop2 (HQ preview of the CC0 original) | soundandmelodies | CC0-1.0 | https://freesound.org/people/soundandmelodies/sounds/776201/ |
+| `Audio/freesound/810043_Breaking_pot_short.ogg` | Freesound - Breaking pot short (HQ preview of the CC0 original) | anna_bliss | CC0-1.0 | https://freesound.org/people/anna_bliss/sounds/810043/ |
+| `Audio/freesound/816261_Broomstick_whoosh_2_Soft_low_OKM1.ogg` | Freesound - Broomstick whoosh 2 - Soft low OKM1 (HQ preview of the CC0 original) | Sadiquecat | CC0-1.0 | https://freesound.org/people/Sadiquecat/sounds/816261/ |
+| `Audio/freesound/864782_Walking_In_Socks.ogg` | Freesound - Walking In Socks (HQ preview of the CC0 original) | IENBA | CC0-1.0 | https://freesound.org/people/IENBA/sounds/864782/ |
+| `Audio/kenney/impact-sounds` | Kenney - Impact Sounds (impactWood_light_000/002, impactWood_heavy_001, impactPlank_medium_002, impactSoft_medium_001, impactSoft_heavy_002; licence file included) | Kenney (kenney.nl) | CC0-1.0 | https://kenney.nl/assets/impact-sounds |
+| `Audio/kenney/interface-sounds` | Kenney - Interface Sounds (pluck_002; licence file included) | Kenney (kenney.nl) | CC0-1.0 | https://kenney.nl/assets/interface-sounds |
+| `Audio/opengameart/kerzoven_cat_purrsleepy_loop.wav` | Cat Purr & Meow - cat_purrsleepy_loop | Kerzoven | CC0-1.0 | https://opengameart.org/content/cat-purr-meow |
+| `Audio/scottbuckley/home_was_you_scott_buckley.mp3` | "Home Was You" - Scott Buckley (320 kb/s) | Scott Buckley (www.scottbuckley.com.au) | CC-BY-4.0 | https://www.scottbuckley.com.au/library/home-was-you/ |
+
+## Other (CC0 1.0 - public domain)
+
+| Asset | Author(s) | Source |
+|---|---|---|
+| `UI/kenney_input_prompts` | Kenney | https://kenney.nl/assets/input-prompts |
 
 Note: `Textures/polyhaven/fabric_pattern_07/fabric_pattern_07_diff_1k.jpg` is Poly Haven's `col_1` colourway, renamed.

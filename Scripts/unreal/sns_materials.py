@@ -388,26 +388,63 @@ def build_majolica():
 
 
 def build_water():
-    g = Graph("M_Water")
-    wp = g.wpos()
-    xy = g.mask(wp, r=True, g=True)
-    uvw = g.div(xy, g.scalar("WaveScale", 900.0))
-    p1 = g.node(unreal.MaterialExpressionPanner, speed_x=0.006, speed_y=0.011)
-    g.link(uvw, p1, "Coordinate")
-    p2 = g.node(unreal.MaterialExpressionPanner, speed_x=-0.009, speed_y=0.004)
-    g.link(g.mul(uvw, g.const(2.3)), p2, "Coordinate")
+    """Single Layer Water: colour comes from absorption / scattering of the water column, so the sea is turquoise over
+    the sandy shelf off the beach and deep blue where the seabed falls away, with a real sun glint at golden hour."""
+    g = Graph("M_Water", shading=unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
+    xy = g.mask(g.wpos(), r=True, g=True)
     wn = tex("T_WaterNormal")
-    n1 = g.texs(wn, S_NORMAL, (p1, ""))
-    n2 = g.texs(wn, S_NORMAL, (p2, ""))
-    n = g.add((n1, "RGB"), (n2, "RGB"))
-    normal = g.lerp(g.const3((0, 0, 1)), n, g.scalar("NormalStrength", 0.55))
-    # Deep sea far out, turquoise over the sandy shallows near the beach.
-    shore = g.sat(g.div(g.sub(g.mask(wp, g=True), g.scalar("ShoreY", 3000.0)), g.scalar("ShoreFade", 2500.0)))
-    col = g.lerp(g.vec("Shallow", (0.03, 0.2, 0.22)), g.vec("Deep", (0.005, 0.035, 0.075)), shore)
-    g.out(col, MP.MP_BASE_COLOR)
-    g.out(g.scalar("Roughness", 0.06), MP.MP_ROUGHNESS)
-    g.out(g.const(1.0), MP.MP_SPECULAR)
-    g.out(normal, MP.MP_NORMAL)
+
+    def layer(scale, sx, sy):
+        p = g.node(unreal.MaterialExpressionPanner, speed_x=sx, speed_y=sy)
+        g.link(g.div(xy, g.const(scale)), p, "Coordinate")
+        return (g.texs(wn, S_NORMAL, (p, "")), "RGB")
+
+    n = g.add(g.add(layer(700.0, 0.006, 0.011), layer(260.0, -0.010, 0.005)), layer(2600.0, 0.002, -0.004))
+    # calmer far out: full ripples near the shore, a gentle swell at the horizon (no shimmer)
+    far = g.sat(g.div((g.node(unreal.MaterialExpressionPixelDepth), ""), g.scalar("FlattenDistance", 60000.0)))
+    strength = g.lerp(g.scalar("NormalStrength", 0.45), g.scalar("FarNormalStrength", 0.15), far)
+    g.out(g.lerp(g.const3((0, 0, 1)), n, strength), MP.MP_NORMAL)
+    g.out(g.scalar("Roughness", 0.045), MP.MP_ROUGHNESS)
+    g.out(g.const(0.5), MP.MP_SPECULAR)
+    g.out(g.vec("SurfaceColor", (0.005, 0.035, 0.075)), MP.MP_BASE_COLOR)
+    g.out(g.scalar("FoamOpacity", 0.0), MP.MP_OPACITY)
+    o = g.node(unreal.MaterialExpressionSingleLayerWaterMaterialOutput)
+    g.link(g.vec("Scattering", (0.012, 0.045, 0.055)), o, "ScatteringCoefficients")   # 1/m
+    g.link(g.vec("Absorption", (0.42, 0.075, 0.048)), o, "AbsorptionCoefficients")    # 1/m: clear Mediterranean water
+    g.link(g.scalar("PhaseG", 0.2), o, "PhaseG")
+    return g.finish()
+
+
+def build_terrain():
+    """Mountain backdrop: limestone cliff on steep faces, rock with green scrub on the slopes, grassy rock on shelves.
+    World-projected at two scales (no visible repeats across hundreds of metres); slope from the vertex normal. Colour
+    only - at this distance the vertex normals carry the relief and the fog does the rest."""
+    g = Graph("M_Terrain")
+    wp = g.wpos()
+    S1 = g.scalar("Scale", 2400.0)
+    S2 = g.scalar("Scale2", 9000.0)
+    nrm = (g.node(unreal.MaterialExpressionVertexNormalWS), "")
+    nz = g.mask(nrm, b=True)
+    ax = g.absv(g.mask(nrm, r=True))
+    ay = g.absv(g.mask(nrm, g=True))
+    xy = g.mask(wp, r=True, g=True)
+    uv_x = g.div(g.append(g.mask(wp, g=True), g.mask(wp, b=True)), S1)   # faces turned towards +-X
+    uv_y = g.div(g.append(g.mask(wp, r=True), g.mask(wp, b=True)), S1)   # faces turned towards +-Y (the sea)
+    rock = g.lerp((g.texs(ph("marble_cliff_05", "diff"), S_COLOR, uv_y), "RGB"), (g.texs(ph("marble_cliff_05", "diff"), S_COLOR, uv_x), "RGB"),
+                  g.sat(g.div(ax, g.add(g.add(ax, ay), g.const(0.001)))))
+    scrub = g.lerp((g.texs(ph("aerial_rocks_02", "diff"), S_COLOR, g.div(xy, S1)), "RGB"),
+                   (g.texs(ph("aerial_rocks_02", "diff"), S_COLOR, g.div(xy, S2)), "RGB"), g.const(0.5))
+    grass = g.lerp((g.texs(ph("aerial_grass_rock", "diff"), S_COLOR, g.div(xy, S1)), "RGB"),
+                   (g.texs(ph("aerial_grass_rock", "diff"), S_COLOR, g.div(xy, S2)), "RGB"), g.const(0.5))
+    mn = macro_noise(g, 26000.0)
+    flat = g.sat(g.div(g.sub(nz, g.scalar("GrassFrom", 0.82)), g.const(0.12)))
+    steep = g.sat(g.div(g.sub(g.scalar("CliffBelow", 0.62), nz), g.const(0.14)))
+    ground = g.lerp(scrub, grass, g.mul(flat, g.lerp(g.const(0.35), g.const(1.0), mn)))
+    col = g.lerp(ground, g.mul(rock, g.vec("RockTint", (1.0, 0.97, 0.92))), steep)
+    col = g.mul(col, g.lerp(g.const(0.85), g.const(1.12), mn))
+    g.out(g.mul(col, g.scalar("Brightness", 1.0)), MP.MP_BASE_COLOR)
+    g.out(g.scalar("Roughness", 0.92), MP.MP_ROUGHNESS)
+    g.out(g.const(0.3), MP.MP_SPECULAR)
     return g.finish()
 
 
@@ -655,7 +692,9 @@ def build_instances(M):
     ground = {"MacroAmount": 0.2, "DirtAmount": 0.0}
     mi("MI_Cobble", S, dict(ground, Tiling=1.0), {"Tint": (1.08, 1.0, 0.9)}, surf("PavingStones150"))
     mi("MI_Flag", S, dict(ground, Tiling=0.8, RoughMul=1.9, Brightness=0.86), {"Tint": (1.02, 0.98, 0.94)}, surf("Tiles143"))
-    mi("MI_StepStone", S, dict(ground, Tiling=1.1, RoughMul=12.0, Brightness=0.8), {"Tint": (1.0, 0.97, 0.92)}, surf("Travertine009"))
+    # natural limestone for stairs, sills, door steps and benches (the travertine's veins read as wood grain)
+    mi("MI_StepStone", S, dict(ground, Tiling=0.9, RoughMul=1.0, Brightness=0.95, NormalStrength=0.8), {"Tint": (1.0, 0.97, 0.92)},
+       surf("worn_rock_natural_01"))
     mi("MI_Terracotta", S, dict(ground, Tiling=1.6, RoughMul=2.5), None, surf("GlazedTerracotta001"))
     mi("MI_Sand", S, dict(ground, Tiling=0.6), None, surf("coast_sand_01"))
     mi("MI_Cliff", S, {"Tiling": 0.35, "MacroAmount": 0.25}, {"Tint": (0.95, 0.9, 0.84)}, surf("marble_cliff_02"))
@@ -714,7 +753,7 @@ FLAT_ARM = tex("T_FlatARM")
 WHITE = tex("T_White")
 M = {}
 for fn in (build_surface, build_paint, build_prop, build_foliage, build_card, build_cloth, build_iron, build_glass, build_emissive,
-           build_majolica, build_water, build_shade_body, build_shade_shell, build_shade_eye, build_shade_whisker,
+           build_majolica, build_water, build_terrain, build_shade_body, build_shade_shell, build_shade_eye, build_shade_whisker,
            build_cat_fur, build_cat_shell, build_cat_eye, build_cat_whisker, build_wisp):
     try:
         m = fn()

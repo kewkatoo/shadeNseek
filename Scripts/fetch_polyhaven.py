@@ -39,6 +39,9 @@ TEXTURES = {
     # asset-quality pass (2026-11): beams/posts/cart wood without plank seams, limestone rubble for the retaining
     # masses, painted+rusted iron detail for railings
     "rough_wood": "2k", "coral_stone_wall": "2k", "green_metal_rust": "1k",
+    # quality pass 2 (2026-11-11): natural stone for stairs / sills / benches (the travertine read as wood), and the
+    # Amalfi-style mountain backdrop (limestone cliffs, rock with green scrub, grassy rock)
+    "worn_rock_natural_01": "2k", "marble_cliff_05": "2k", "aerial_rocks_02": "2k", "aerial_grass_rock": "2k",
 }
 TEX_MAPS = ["Diffuse", "nor_dx", "arm"]
 

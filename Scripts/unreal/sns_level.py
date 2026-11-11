@@ -20,11 +20,13 @@ import math
 import os
 import random
 import sys
+import zlib
 
 sys.path.append(os.path.dirname(__file__))
 import unreal  # noqa: E402
 from sngeo import (GT, T, V, append, box, cyl, extrude, arch_poly, subtract, save, mat, new, log, eal, opts)  # noqa: E402
 from sns_bridge import build_bridge_mesh  # noqa: E402
+from sns_fit import Fitter  # noqa: E402
 
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 lvl = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -170,10 +172,21 @@ FACE = {"+y": ((1, 0), (0, 1)), "-y": ((-1, 0), (0, -1)), "+x": ((0, -1), (1, 0)
 DECOR = []  # (kind, world_pos, yaw_out, extra)
 
 
+def route_ground(x, y):
+    """Walkable ground height in front of the route houses: lane / piazza 0, the 17 stairs, the church terrace."""
+    if 2650 <= x < 3330 and -160 <= y <= 160:
+        return min(17, int((x - 2650) // 40) + 1) * (300.0 / 17.0)
+    if x >= 3330:
+        return 300.0 if y < 250 else 260.0
+    return 0.0
+
+
 class House:
     def __init__(self, name, x0, x1, y0, y1, z0, h, wall=None, faces=("+y",), rng=None, roof="flat", detail=1.0,
-                 door=None, shop=False, floors=None, balconies=True, arches=0.3, glass_glow=False):
-        self.rng = rng or random.Random(hash(name) & 0xffff)
+                 door=None, shop=False, floors=None, balconies=True, arches=0.3, glass_glow=False, ground=None):
+        # crc32, not hash(): str hashes are salted per process, so every rebuild used to reshuffle the facades
+        self.rng = rng or random.Random(zlib.crc32(name.encode()) & 0xffff)
+        self.ground = ground  # (x, y) -> ground z in front of a face: ground-floor openings below it are left out
         self.name, self.z0, self.h = name, z0, h
         self.cx, self.cy = (x0 + x1) / 2, (y0 + y1) / 2
         self.w, self.d = x1 - x0, y1 - y0
@@ -328,6 +341,11 @@ class House:
             for f in range(nfl):
                 for c in range(ncol):
                     u = -L / 2 + 30 + pitch * (c + 0.5) + rng.uniform(-10, 10)
+                    if f == 0 and self.ground is not None:
+                        # stairs / terrace in front of this face: no door or window below the ground there
+                        gz = max(self.ground(*self.world(self.P(face, u + du, 0, 40))[:2]) for du in (-60, 0, 60)) - self.z0
+                        if (c == door_col and gz > 2.0) or gz > 75.0:
+                            continue
                     if f == 0:
                         if c == door_col:
                             if self.shop:
@@ -436,7 +454,6 @@ house("N0", -1000, -100, -900, -160, 0, 900, wall="MI_Wall_Cream", faces=("+y",)
 house("S0", -1000, -250, 160, 760, 0, 820, wall="MI_Wall_Peach", faces=("-y", "+y"), door=("-y", 200))
 bsm = build_bridge_mesh()  # sns_bridge.py: vault cut 2 cm inside the house fronts (no z-fighting)
 place(bsm, (-450, 0, 0), folder=F)
-place(prop("street_lamp_02"), (-450, -150, 280), (0, 90, 0), 1.0, F)
 blocker(-1010, 0, 200, 40, 340, 400)
 house("W0", -1400, -1000, -160, 160, 0, 700, wall="MI_Wall_White", faces=("+x",), door=("+x", 0))
 
@@ -448,8 +465,9 @@ for (n, x0, x1, h, w, door) in north:
 # sea-side row (faces the lane = -Y, and the sea = +Y); the gap at x 900..1080 is the sunlit alley
 south = [("S1", -250, 300, 600, "MI_Wall_White", -80), ("S2", 300, 900, 650, "MI_Wall_Rose", None), ("S3", 1080, 1700, 620, "MI_Wall_Cream", 200)]
 for (n, x0, x1, h, w, door) in south:
-    house(n, x0, x1, 160, 760, 0, h, wall=w, faces=("-y", "+y", "+x" if n == "S3" else "-x"), door=("-y", door) if door is not None else None,
-          roof=R.choice(["flat", "vault"]))
+    # S1 / S2 west walls are party walls (S0 / S1 stand against them): windows there would be buried in the neighbour
+    house(n, x0, x1, 160, 760, 0, h, wall=w, faces=("-y", "+y", "+x") if n == "S3" else ("-y", "+y"),
+          door=("-y", door) if door is not None else None, roof=R.choice(["flat", "vault"]))
 # Caffe Rosa: north side of the piazza, a shopfront and the sign
 house("Caffe", 1700, 2500, -900, -160, 0, 820, wall="MI_Wall_Ochre", faces=("+y",), door=("+y", -150), shop=True)
 place(mesh("SM_Card"), (1950, -158, 330), (0, -90, 0), (1, 2.6, 0.65), "Piazza", mats=[mat("MI_Sign_Caffe")], collision=False)
@@ -461,10 +479,10 @@ else:
 # lane 2 + stairs
 # Sea-side stair houses with two sunlit gaps between them (P3 x 2660..2860, P4 x 3000..3150). Their gap-facing walls are
 # blank party walls: window details there would drop stray patches of shade into the gaps.
-house("S4a", 2500, 2660, 160, 760, 0, 650, wall="MI_Wall_Salmon", faces=("-y", "+y"), roof="vault")
-house("S4b", 2860, 3000, 160, 760, 0, 800, wall="MI_Wall_Lemon", faces=("-y", "+y"), roof="flat")
-house("N5", 2500, 3330, -900, -160, 0, 1000, wall="MI_Wall_White", faces=("+y",), door=("+y", -250), roof="pergola")
-house("Azzurra", 3150, 3330, 160, 760, 0, 750, wall="MI_Wall_Sky", faces=("-y", "+y", "+x"), roof="flat")
+house("S4a", 2500, 2660, 160, 760, 0, 650, wall="MI_Wall_Salmon", faces=("-y", "+y"), roof="vault", ground=route_ground)
+house("S4b", 2860, 3000, 160, 760, 0, 800, wall="MI_Wall_Lemon", faces=("-y", "+y"), roof="flat", ground=route_ground)
+house("N5", 2500, 3330, -900, -160, 0, 1000, wall="MI_Wall_White", faces=("+y",), door=("+y", -250), roof="pergola", ground=route_ground)
+house("Azzurra", 3150, 3330, 160, 760, 0, 750, wall="MI_Wall_Sky", faces=("-y", "+y", "+x"), roof="flat", ground=route_ground)
 # Iron railings + invisible walls along the open gaps and the terrace's seaward edge (railings never block the sun).
 for (x0, z0, x1, z1) in ((2660, 17.65, 2860, 105.9), (3000, 158.8, 3150, 229.4)):
     run, rise = x1 - x0, z1 - z0
@@ -515,7 +533,7 @@ for x in range(1700, 2500, 200):
 blocker(4260, 262, 380, 900, 20, 200)
 blocker(2100, 572, 100, 820, 20, 200)
 blocker(4700, -150, 400, 20, 900, 300)
-house("E1", 4350, 4800, -1400, -560, 300, 800, faces=("+y", "-x"), roof="tiles")
+house("E1", 4350, 4800, -1400, -560, 300, 800, faces=("+y",), roof="tiles")  # its west wall stands against the church
 def high_side_y(sm, above):
     """Which local Y side the part of a mesh above `above` cm sits on (-1 / +1): e.g. a settle's back."""
     c = unreal.DynamicMesh()
@@ -538,9 +556,10 @@ def high_side_y(sm, above):
 # backrest filled that frame. The blue settle stands further along the church wall instead, back to the wall.
 place(mesh("SM_Bench_Stone"), (3894, -430, 300), (0, 0, 0), 1.0, F)
 settle = prop("painted_wooden_sofa")
+SETTLE_YAW = 0.0
 if settle:
     back = high_side_y(settle, 85.0)  # side of the backrest in the mesh's own Y (+1 placed it seaward at yaw 180)
-    place(settle, (4250, -480, 300), (0, 180 if back < 0 else 0, 0), 46.0 / 56.0, F, sun=False)
+    SETTLE_YAW = 180.0 if back < 0 else 0.0  # placed with the dressing (fitted against the church front)
     log("settle back side", back)
 # low stone wall + planter in front of Casa Azzurra (the pot sits on its east end)
 wall = box(115, 60, 80, 0, (0, 0, 40), bev=3.0)
@@ -642,13 +661,14 @@ target("SunFinale", 0, 0, 3000, SUN_FINALE)
 target("Gallery", 2100, 180, 0, (0, 0, 0))
 
 # Autoplay route (all points are in shade at the moment they're used)
-for (tag, x, y, z) in (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), ("AP_SunBack", 780, -60, 0), ("AP_CartGrab", 400, 95, 0),
-                       ("AP_Alley1", 840, -15, 0), ("AP_Alley2", 1000, -12, 0), ("AP_Alley3", 1220, -30, 0), ("AP_Cord", 1672, 58, 0),
-                       ("AP_Piazza0", 1690, -125, 0), ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0),
-                       ("AP_Pulley", 2640, 65, 0), ("AP_WashStart", 2632, 20, 0), ("AP_WashMid", 2760, 20, 53), ("AP_WashEnd", 2885, 20, 106),
-                       ("AP_ShutterCord", 2980, 65, 159), ("AP_ShutterMid", 3075, 40, 194), ("AP_ShutterEnd", 3185, 40, 247),
-                       ("AP_AzzurraCord", 3305, 70, 300), ("AP_WallJump", 3395, 45, 300), ("AP_WallTop", 3395, 128, 380), ("AP_PotNudge", 3402, 130, 380),
-                       ("AP_WallDown", 3400, 30, 300), ("AP_Terrace", 3480, -150, 300), ("AP_Porch", 3760, -100, 300), ("AP_Biscotto", 3880, -372, 300)):
+AP_ROUTE = (("AP_Lane1", 200, -60, 0), ("AP_SunTouch", 906, -60, 0), ("AP_SunBack", 780, -60, 0), ("AP_CartGrab", 400, 95, 0),
+            ("AP_Alley1", 840, -15, 0), ("AP_Alley2", 1000, -12, 0), ("AP_Alley3", 1220, -30, 0), ("AP_Cord", 1672, 58, 0),
+            ("AP_Piazza0", 1690, -125, 0), ("AP_Piazza1", 1800, -110, 0), ("AP_Piazza2", 2440, -110, 0), ("AP_Steps1", 2600, -40, 0),
+            ("AP_Pulley", 2640, 65, 0), ("AP_WashStart", 2632, 20, 0), ("AP_WashMid", 2760, 20, 53), ("AP_WashEnd", 2885, 20, 106),
+            ("AP_ShutterCord", 2980, 65, 159), ("AP_ShutterMid", 3075, 40, 194), ("AP_ShutterEnd", 3185, 40, 247),
+            ("AP_AzzurraCord", 3305, 70, 300), ("AP_WallJump", 3395, 45, 300), ("AP_WallTop", 3395, 128, 380), ("AP_PotNudge", 3402, 130, 380),
+            ("AP_WallDown", 3400, 30, 300), ("AP_Terrace", 3480, -150, 300), ("AP_Porch", 3760, -100, 300), ("AP_Biscotto", 3880, -372, 300))
+for (tag, x, y, z) in AP_ROUTE:
     waypoint(tag, x, y, z)
 
 # Cameras: see sns_lighting.py (TitleCam / EndCam + QA candidates)
@@ -699,12 +719,20 @@ festoon(1720, 90, 2480, -158, 520, n=16, sag=60)
 festoon(3560, -555, 4400, -555, 760, n=16, sag=50)
 
 # =====================================================================================================================
-# 5. Dressing along the route
+# 5. Dressing along the route. Near the route every piece goes through sns_fit.Fitter: it rests on the surface below it
+#    and slides away from walls / railings / other props until nothing interpenetrates, or it is left out.
+#    Scripts/unreal/sns_qa_clipping.py re-checks the saved map independently.
 # =====================================================================================================================
 F = "Dressing"
 POTS = [("potted_plant_01", None), ("potted_plant_02", None), ("potted_plant_04", None), ("planter_pot_clay", None)]
 FLOWERS = [("flower_gazania", i) for i in range(3)] + [("flower_heliophila", i) for i in range(3)] + [("flower_ursinia", i) for i in range(3)] + \
           [("periwinkle_plant", i) for i in range(3)] + [("shrub_sorrel_01", i) for i in range(3)]
+FIT = Fitter(corridor=[(x, y) for (_, x, y, _) in AP_ROUTE], clear=[(3894, -430, 120)])  # Biscotto's slab stays free
+FIT.register_level(actors.get_all_level_actors())
+
+
+def near_route(x, y):
+    return -1500 < x < 5000 and -1000 < y < 800
 
 
 def pick(cat):
@@ -716,99 +744,145 @@ def pick(cat):
     return None
 
 
-def pot_cluster(x, y, z, n=3, spread=45, h=(45, 95)):
+def put(sm, x, y, z, yaw=0.0, scale=1.0, folder=F, kind="prop", collision=True, sun=False, shadow=True, **fit):
+    """Fitted placement near the route (plain placement further out). Returns the actor, or None if nothing fits."""
+    if sm is None:
+        return None
+    if not near_route(x, y):
+        return place(sm, (x, y, z), (0, yaw, 0), scale, folder, collision=collision, sun=sun, shadow=shadow)
+    xf = FIT.fit(sm, x, y, z, yaw, scale, **fit)
+    if xf is None:
+        log("dressing left out", sm.get_name(), round(x), round(y), round(z))
+        return None
+    t, s = xf.translation, xf.scale3d
+    a = place(sm, (t.x, t.y, t.z), (0, yaw, 0), (s.x, s.y, s.z), folder, collision=collision, sun=sun, shadow=shadow)
+    FIT.add(sm, xf, kind)
+    return a
+
+
+def put_h(sm, x, y, z, h, yaw=0.0, **kw):
+    return put(sm, x, y, z, yaw, h / height_of(sm), **kw) if sm else None
+
+
+def pot_cluster(x, y, z, n=3, spread=45, h=(40, 80), slide=(0.0, 1.0), support=("ground",), folder=F):
+    lat = (-slide[1], slide[0])
     for k in range(n):
-        sm = pick(POTS)
-        place_h(sm, (x + R.uniform(-spread, spread), y + R.uniform(-spread * 0.4, spread * 0.4), z), R.uniform(*h), (0, R.uniform(0, 360), 0), folder=F, sun=False)
+        put_h(pick(POTS), x + R.uniform(-spread, spread), y + R.uniform(-spread * 0.4, spread * 0.4), z, R.uniform(*h), R.uniform(0, 360),
+              folder=folder, slide=slide, max_slide=32, lat=lat, lat_steps=(14, -14, 28, -28, 45, -45), support=support)
 
 
 for (kind, (x, y, z), yaw, extra) in DECOR:
+    nx, ny = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))            # out of the wall
+    tx, ty = math.cos(math.radians(yaw - 90)), math.sin(math.radians(yaw - 90))  # along the wall
     if kind == "sill" and R.random() < 0.75:
-        place(mesh("SM_WindowBox"), (x, y, z), (0, yaw - 90, 0), (extra / 80 * 0.95, 1, 1), F, collision=False)
+        # The box sits on the sill and only moves a few cm out; an ajar shutter in the way means no box at all.
+        wb = put(mesh("SM_WindowBox"), x, y, z, yaw - 90, (extra / 80 * 0.95, 1, 1), kind="windowbox", collision=False,
+                 support=("house",), slide=(nx, ny), max_slide=8, tol=0.8)
+        if wb is None:
+            continue
+        b = wb.get_actor_location()
         for k in range(3):
             fl = pick(FLOWERS)
-            ox = math.cos(math.radians(yaw - 90)) * R.uniform(-extra * 0.35, extra * 0.35)
-            oy = math.sin(math.radians(yaw - 90)) * R.uniform(-extra * 0.35, extra * 0.35)
-            place_h(fl, (x + ox, y + oy, z + 18), R.uniform(22, 38), (0, R.uniform(0, 360), 0), folder=F, collision=False)
+            if not fl:
+                continue
+            off = R.uniform(-extra * 0.32, extra * 0.32)
+            s = R.uniform(20, 32) / height_of(fl)
+            # facing out of the wall and a little flatter front-to-back so the leaves stay out of the plaster
+            put(fl, b.x + tx * off, b.y + ty * off, b.z + 20, yaw + R.uniform(-25, 25), (s * 0.7, s, s), kind="flower", collision=False,
+                support=("windowbox",), slide=(nx, ny), max_slide=6, tol=2.5, skip=("flower", "windowbox"))
     elif kind == "balcony":
-        pot_cluster(x, y, z, 2, extra * 0.3, (40, 80))
+        pot_cluster(x, y, z, 2, extra * 0.3, (35, 60), slide=(-nx, -ny), support=("house",))
         if R.random() < 0.6:
             place(mesh("SM_BougainClump_A"), (x, y, z + 150), (0, R.uniform(0, 360), 0), R.uniform(0.9, 1.3), F, collision=False)
     elif kind == "door":
-        side = math.radians(yaw - 90)
         for s in (-1, 1):
             if R.random() < 0.75:
-                place_h(pick(POTS), (x + math.cos(side) * s * (extra * 0.5 + 40), y + math.sin(side) * s * (extra * 0.5 + 40), z), R.uniform(55, 110),
-                        (0, R.uniform(0, 360), 0), folder=F, sun=False)
+                put_h(pick(POTS), x + tx * s * (extra * 0.5 + 40), y + ty * s * (extra * 0.5 + 40), z, R.uniform(45, 90), R.uniform(0, 360),
+                      slide=(nx, ny), max_slide=30, lat=(tx * s, ty * s), lat_steps=(12, 24))
         if R.random() < 0.6:
-            lx = x + math.cos(side) * (extra * 0.5 + 25) - math.cos(math.radians(yaw)) * 25
-            ly = y + math.sin(side) * (extra * 0.5 + 25) - math.sin(math.radians(yaw)) * 25
-            place(prop("street_lamp_02"), (lx, ly, 255), (0, yaw + 180, 0), 1.0, F, collision=False)
-            if abs(ly) < 1000 and -1200 < lx < 5000:
-                warm_light((lx + math.cos(math.radians(yaw)) * 30, ly + math.sin(math.radians(yaw)) * 30, 270), 170, 450)
+            lamp = put(prop("street_lamp_02"), x + tx * (extra * 0.5 + 25) - nx * 25, y + ty * (extra * 0.5 + 25) - ny * 25, 255, yaw + 180, 1.0,
+                       kind="mounted", collision=False, rest=False, slide=(nx, ny), max_slide=30, lat=(tx, ty), lat_steps=(15, -15), tol=2.0)
+            if lamp:
+                l = lamp.get_actor_location()
+                if abs(l.y) < 1000 and -1200 < l.x < 5000:
+                    warm_light((l.x + nx * 30, l.y + ny * 30, 270), 170, 450)
     elif kind == "drape" and R.random() < 0.75:
         place(mesh(R.choice(["SM_BougainDrape", "SM_BougainClump_B", "SM_LeafyClump", "SM_BougainClump_A"])), (x, y, z), (0, R.uniform(0, 360), 0),
               R.uniform(0.9, 1.5), F, collision=False)
     elif kind == "ac":
-        place(prop("exterior_aircon_unit"), (x, y, z), (0, yaw + 90, 0), 0.5, F, collision=False)
+        put(prop("exterior_aircon_unit"), x - nx * 12, y - ny * 12, z, yaw + 90, 0.5, kind="mounted", collision=False, rest=False,
+            slide=(nx, ny), max_slide=40, lat=(tx, ty), lat_steps=(40, -40, 80, -80), tol=2.0)
     elif kind == "roofpergola":
         place(mesh("SM_BougainDrape"), (x, y, z), (0, R.uniform(0, 360), 0), (extra / 200, 1.2, 0.8), F, collision=False)
-    elif kind == "shop":
-        pass
 
-# Lane clutter (north side, out of the shade path; nothing tall on the seaward side of the route)
-for (x, y) in ((-60, -120), (330, -125), (760, -128), (1250, -122), (1590, -120), (2560, -125)):
-    pot_cluster(x, y, 0, R.randint(2, 3), 40)
-place(prop("wine_barrel_01"), (620, -120, 0), (0, 25, 0), 0.9, F, sun=False)
-place(prop("wicker_basket_02"), (690, -128, 0), (0, 70, 0), 1.0, F, sun=False)
-place(prop("wooden_bucket_01"), (1380, -130, 0), (0, 0, 0), 1.0, F, sun=False)
-place(prop("watering_can_metal_01"), (1420, -128, 0), (0, 130, 0), 1.0, F, sun=False)
-place(prop("painted_wooden_bench"), (2150, -122, 0), (0, 0, 0), 1.0, "Piazza", sun=False)
-place(prop("concrete_cat_statue"), (-760, -120, 0), (0, 30, 0), 0.6, F, sun=False)
-place(prop("garden_hose_wall_mounted_01"), (380, -156, 70), (0, 90, 0), 1.0, F, collision=False)
-place(prop("lion_head"), (2380, -158, 120), (0, 90, 0), 0.6, "Piazza", collision=False)
-place(prop("lifebuoy"), (2470, 548, 120), (0, 0, 0), 1.0, "Piazza", collision=False)
-place(prop("marble_bust_01"), (4060, -540, 300), (0, 90, 0), 1.0, F, sun=False)
+# Lane clutter (north side, out of the shade path; nothing tall on the seaward side of the route). The pieces placed
+# first win their spot, so the one-off props go before the pot clusters fill in around them.
+LANE = dict(slide=(0, 1), max_slide=30, lat=(1, 0), lat_steps=(15, -15, 30, -30))
+put(prop("planter_box_01"), 505, -128, 0, 4, 1.0, slide=(0, 1), max_slide=30, lat=(1, 0), lat_steps=(20, -20, 40, -40))  # by the cart, clear of doors
+put(prop("wine_barrel_01"), 620, -120, 0, 25, 0.9, **LANE)
+put(prop("wicker_basket_02"), 690, -128, 0, 70, 1.0, **LANE)
+put(prop("wooden_bucket_01"), 1380, -130, 0, 0, 1.0, **LANE)
+put(prop("watering_can_metal_01"), 1420, -128, 0, 130, 1.0, **LANE)
+put(prop("painted_wooden_bench"), 2150, -122, 0, 0, 1.0, folder="Piazza", slide=(0, 1), max_slide=20, lat=(1, 0), lat_steps=(20, -20))
+put(prop("concrete_cat_statue"), -760, -120, 0, 30, 0.6, **LANE)
+# wall-mounted pieces start a little inside the wall and slide out until they just touch it
+WALL = dict(kind="mounted", collision=False, rest=False, tol=2.0)
+put(prop("garden_hose_wall_mounted_01"), 380, -166, 70, 90, 1.0, slide=(0, 1), max_slide=30, lat=(1, 0), lat_steps=(20, -20, 40, -40), **WALL)
+put(prop("lion_head"), 2380, -166, 120, 90, 0.6, folder="Piazza", slide=(0, 1), max_slide=25, **WALL)
+put(prop("lifebuoy"), 2470, 548, 120, 0, 1.0, folder="Piazza", slide=(-1, 0), max_slide=30, **WALL)
+put(prop("street_lamp_02"), -450, -166, 280, 90, 1.0, folder="Houses", slide=(0, 1), max_slide=50, **WALL)
+put(prop("marble_bust_01"), 4060, -540, 300, 90, 1.0, slide=(0, 1), max_slide=40, lat=(1, 0), lat_steps=(25, -25))
+if settle:
+    put(settle, 4250, -480, 300, SETTLE_YAW, 46.0 / 56.0, folder="Church", slide=(0, 1), max_slide=40, lat=(1, 0), lat_steps=(30, -30))
 # CC0 dressing (asset-library/manifest_assets_new.json): chairs and pots at doorsteps, lemons in a planter by the cart,
 # succulents / ferns / weeds in the wall seams, a wrought-iron gate closing the terrace. sun=False: small props never
 # make gameplay shade.
 for (kind, (x, y, z), yaw, extra) in DECOR:
     if kind == "door" and abs(y) < 200 and -1000 < x < 3400 and R.random() < 0.55:
-        side = math.radians(yaw - 90)
-        place(prop("painted_wooden_chair_02"), (x - math.cos(side) * (extra * 0.5 + 70), y - math.sin(side) * (extra * 0.5 + 70), z),
-              (0, yaw + R.uniform(150, 210), 0), 0.95, F, sun=False)
-place(prop("planter_box_01"), (300, -125, 0), (0, 4, 0), 1.0, F, sun=False)
-for (x, y, z) in ((1450, -125, 0), (2330, 470, 0), (3600, -520, 300)):
-    place(prop("ceramic_pot"), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.9, 1.2), F, sun=False)
+        nx, ny = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+        tx, ty = math.cos(math.radians(yaw - 90)), math.sin(math.radians(yaw - 90))
+        put(prop("painted_wooden_chair_02"), x - tx * (extra * 0.5 + 75), y - ty * (extra * 0.5 + 75), z, yaw + R.uniform(150, 210), 0.95,
+            slide=(nx, ny), max_slide=30, lat=(-tx, -ty), lat_steps=(15, 30))
+for (x, y) in ((-60, -120), (330, -125), (760, -128), (1250, -122), (1590, -120), (2560, -125)):
+    pot_cluster(x, y, 0, R.randint(2, 3), 40)
+for (x, y, z, sy) in ((1450, -125, 0, 1), (2330, 470, 0, -1), (3600, -520, 300, 1)):
+    put(prop("ceramic_pot"), x, y, z, R.uniform(0, 360), R.uniform(0.9, 1.15), slide=(0, sy), max_slide=30, lat=(1, 0), lat_steps=(20, -20, 40, -40))
 for (x, y, z, kind) in ((-140, -150, 0, "crystalline_iceplant"), (470, -152, 0, "fern_02"), (1310, -150, 0, "weed_plant_02"),
                         (1690, -150, 0, "crystalline_iceplant"), (2520, -150, 0, "fern_02"), (2700, -150, 35, "weed_plant_02"),
                         (2990, -150, 176, "crystalline_iceplant"), (3240, -150, 265, "weed_plant_02"), (3560, -545, 300, "fern_02"),
                         (4120, -545, 300, "crystalline_iceplant")):
-    p_ = prop(kind)
-    if p_:
-        place(p_, (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.9, 1.4), F, sun=False, collision=False)
+    put(prop(kind), x, y, z, R.uniform(0, 360), R.uniform(0.85, 1.15), kind="plant", collision=False, slide=(0, 1), max_slide=45,
+        lat=(1, 0), lat_steps=(20, -20), tol=3.0)
 gate = prop("large_iron_gate")
 if gate:
     place(gate, (4690, -150, 300), (0, 90, 0), 1.0, "Church", sun=False)
 # café terrace by the railing, under the canvas
+tables = []
 for (x, y, r) in ((1860, 300, 10), (2100, 250, -20), (2330, 320, 35)):
-    place(prop("outdoor_table_chair_set_01"), (x, y, 0), (0, r, 0), 1.0, "Piazza", sun=False)
-place(prop("tea_set_01"), (2100, 250, 76), (0, 20, 0), 1.0, "Piazza", collision=False)
-place(prop("wine_bottles_01"), (2330, 320, 76), (0, 0, 0), 1.0, "Piazza", collision=False)
-pot_cluster(1760, 520, 0, 3, 40, (70, 120))
-pot_cluster(2440, 520, 0, 3, 40, (70, 120))
+    tables.append(put(prop("outdoor_table_chair_set_01"), x, y, 0, r, 1.0, folder="Piazza", kind="table", slide=(0, -1), max_slide=30,
+                      lat=(1, 0), lat_steps=(25, -25)))
+for (tbl, mid, yaw_) in ((tables[1], "tea_set_01", 20), (tables[2], "wine_bottles_01", 0)):
+    if tbl:
+        l = tbl.get_actor_location()
+        put(prop(mid), l.x, l.y, l.z + 76, yaw_, 1.0, folder="Piazza", collision=False, support=("table",), max_slide=0, tol=1.5)
+pot_cluster(1760, 520, 0, 3, 40, (55, 100), slide=(0, -1))
+pot_cluster(2440, 520, 0, 3, 40, (55, 100), slide=(0, -1))
 # terrace dressing
-pot_cluster(4450, -500, 300, 3, 50, (60, 120))
-pot_cluster(3600, -500, 300, 2, 40, (60, 110))
+pot_cluster(4450, -500, 300, 3, 50, (50, 100))
+pot_cluster(3600, -500, 300, 2, 40, (50, 95))
 place(prop("island_tree_01"), (4500, 150, 300), (0, 40, 0), 0.38, "Trees", collision=False)
+log("dressing fitted", FIT.placed, "moved", FIT.moved, "left out", FIT.skipped)
 
 # Laundry lines high across the lane (catch the light on the north facades).
 def laundry(x, z, y0=-160, y1=160):
     L = y1 - y0
     place(mesh("SM_Rope_100"), (x, y0, z), (0, 90, 0), (L / 100, 1, 1), "Laundry", collision=False)
     y = y0 + 25
-    while y < y1 - 50:
+    while True:
         sm = mesh(R.choice(["SM_Sheet_White", "SM_Sheet_Blue", "SM_Sheet_Lemon", "SM_Towel_Coral", "SM_Towel_Sea", "SM_Towel_Terry"]))
+        half = width_of(sm) / 2 + 6.0
+        if y + 30 + half > y1 - 4.0:  # the last piece must hang clear of the facade
+            break
         place(sm, (x, y + 30, z), (0, 90 + R.uniform(-4, 4), 0), 1.0, "Laundry", collision=False)
         y += 85 + R.uniform(0, 40)
 
@@ -849,10 +923,7 @@ slab(-3000, 5600, -3300, -2500, 1560, 1800, "MI_Wall_Stone")
 for (x, y, z) in ((-1800, -1250, 420), (1200, -1300, 420), (4300, -1250, 420), (-600, -2100, 980), (2600, -2150, 980),
                   (-1500, 1150, -620), (2200, 1100, -620), (4200, 1900, -1180)):
     place(prop("island_tree_0" + str(R.choice([1, 2]))), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.32, 0.45), "Trees", collision=False, shadow=False)
-# mountains behind, headlands either side
-mt = prop("mountainside")
-for (x, y, s, yaw) in ((-1500, -6200, 9.0, 0), (3500, -6800, 11.0, 20), (8500, -5200, 9.0, -40), (-6500, -4200, 8.0, 50)):
-    place(mt, (x, y, 600), (0, yaw, 0), s, "Mountains", collision=False, shadow=False)
+# headlands either side (the mountain behind the town and the seabed: sns_backdrop.py, run at the end)
 for (mid, x, y, z, s, yaw) in (("coastal_cliff_01", -7500, 3000, -1600, 1.6, 75), ("coastal_cliff_02", 10500, 2500, -1600, 2.0, -80),
                                ("coastal_cliff_04", 9500, 6500, -1500, 1.4, -60), ("coast_rocks_01", 2000, 3600, -1300, 1.0, 10)):
     place(prop(mid), (x, y, z), (0, yaw, 0), s, "Coast", collision=False, shadow=False)
@@ -878,6 +949,8 @@ place(ssm, (0, 150000, -1250), folder="Coast", collision=False, shadow=False)
 spawn(gclass("ShadeSoundScatter"), (0, 0, 0), (0, 0, 0), "Audio", sound_name="SFX_Gull", variants=4, interval=unreal.Vector2D(4.0, 10.0),
       distance=unreal.Vector2D(1500.0, 4500.0), height=1100.0, volume=0.7, bias_yaw=90.0)
 
+for _stage in ("sns_backdrop.py",):
+    exec(open(os.path.join(os.path.dirname(__file__), _stage), encoding="utf-8").read(), {"__file__": os.path.join(os.path.dirname(__file__), _stage), "__name__": _stage[:-3]})
 lvl.save_current_level()
 exec(open(os.path.join(os.path.dirname(__file__), "sns_lighting.py"), encoding="utf-8").read(), {"__file__": os.path.join(os.path.dirname(__file__), "sns_lighting.py"), "__name__": "sns_lighting"})
 log("LEVEL actors", len(actors.get_all_level_actors()), "decor", len(DECOR))

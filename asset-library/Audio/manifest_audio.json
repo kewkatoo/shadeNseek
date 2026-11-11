@@ -14,20 +14,6 @@
     "author": "Kenney (kenney.nl)"
   },
   {
-    "path": "asset-library/Audio/freepd/wisdom_in_the_sun_kevin_macleod.mp3",
-    "source_name": "FreePD - Wisdom in the Sun (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture)",
-    "source_url": "https://web.archive.org/web/20241216000928/https://freepd.com/misc.php",
-    "license": "CC0-1.0",
-    "author": "Kevin MacLeod"
-  },
-  {
-    "path": "asset-library/Audio/freepd/champ_de_tournesol_komiku.mp3",
-    "source_name": "FreePD - Champ de tournesol (freepd.com closed in 2025; listing and CC0 statement verified on the Internet Archive capture)",
-    "source_url": "https://web.archive.org/web/20241128211244/https://freepd.com/romantic.php",
-    "license": "CC0-1.0",
-    "author": "Komiku"
-  },
-  {
     "path": "asset-library/Audio/freesound/155660_cig_extinguish.ogg",
     "source_name": "Freesound - cig_extinguish.wav (HQ preview of the CC0 original)",
     "source_url": "https://freesound.org/people/the_semen_incident/sounds/155660/",
@@ -75,13 +61,6 @@
     "source_url": "https://freesound.org/people/ScratchnSniff/sounds/276882/",
     "license": "CC0-1.0",
     "author": "ScratchnSniff"
-  },
-  {
-    "path": "asset-library/Audio/freesound/320026_Bukarest_2015_Restaurant_Terasse_mittags.ogg",
-    "source_name": "Freesound - Bukarest 2015 Restaurant Terasse mittags MS.WAV (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/tribord/sounds/320026/",
-    "license": "CC0-1.0",
-    "author": "tribord"
   },
   {
     "path": "asset-library/Audio/freesound/330638_Cloth_Flapping_On_A_Clothesline_Thickly.ogg",
@@ -154,25 +133,11 @@
     "author": "DeVern"
   },
   {
-    "path": "asset-library/Audio/freesound/553962_Cat_purr.ogg",
-    "source_name": "Freesound - Cat-purr.wav (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/clareboots/sounds/553962/",
-    "license": "CC0-1.0",
-    "author": "clareboots"
-  },
-  {
     "path": "asset-library/Audio/freesound/563355_Celesta_Chime.ogg",
     "source_name": "Freesound - Celesta Chime.wav (HQ preview of the CC0 original)",
     "source_url": "https://freesound.org/people/nicholasdaryl/sounds/563355/",
     "license": "CC0-1.0",
     "author": "nicholasdaryl"
-  },
-  {
-    "path": "asset-library/Audio/freesound/584218_Cicale_Bolano_08_08_21.ogg",
-    "source_name": "Freesound - Cicale Bolano 08-08-21.WAV (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/nicolo.ciuffi/sounds/584218/",
-    "license": "CC0-1.0",
-    "author": "nicolo.ciuffi"
   },
   {
     "path": "asset-library/Audio/freesound/610703_Good_answer_harp_glissando.ogg",
@@ -187,20 +152,6 @@
     "source_url": "https://freesound.org/people/Kalomina/sounds/611469/",
     "license": "CC0-1.0",
     "author": "Kalomina"
-  },
-  {
-    "path": "asset-library/Audio/freesound/637945_water_lake_waves_light_gentle_lap_at_boa.ogg",
-    "source_name": "Freesound - water lake waves light gentle lap at boats on beach.flac (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/kyles/sounds/637945/",
-    "license": "CC0-1.0",
-    "author": "kyles"
-  },
-  {
-    "path": "asset-library/Audio/freesound/648860_Sea_Waves_Against_Rocks.ogg",
-    "source_name": "Freesound - Sea Waves Against Rocks (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/emainta/sounds/648860/",
-    "license": "CC0-1.0",
-    "author": "emainta"
   },
   {
     "path": "asset-library/Audio/freesound/656727_Pouring_Potatoes_Onto_a_Table.ogg",
@@ -238,17 +189,52 @@
     "author": "Sadiquecat"
   },
   {
-    "path": "asset-library/Audio/freesound/832691_Italian_Square_at_Sunday_Lunch_Time_Piaz.ogg",
-    "source_name": "Freesound - Italian Square at Sunday Lunch Time, Piazza del Duomo, Padua, Sunday (HQ preview of the CC0 original)",
-    "source_url": "https://freesound.org/people/bassimat/sounds/832691/",
-    "license": "CC0-1.0",
-    "author": "bassimat"
-  },
-  {
     "path": "asset-library/Audio/freesound/864782_Walking_In_Socks.ogg",
     "source_name": "Freesound - Walking In Socks (HQ preview of the CC0 original)",
     "source_url": "https://freesound.org/people/IENBA/sounds/864782/",
     "license": "CC0-1.0",
     "author": "IENBA"
+  },
+  {
+    "path": "asset-library/Audio/scottbuckley/home_was_you_scott_buckley.mp3",
+    "source_name": "\"Home Was You\" - Scott Buckley (320 kb/s)",
+    "source_url": "https://www.scottbuckley.com.au/library/home-was-you/",
+    "license": "CC-BY-4.0",
+    "author": "Scott Buckley (www.scottbuckley.com.au)"
+  },
+  {
+    "path": "asset-library/Audio/aporee/aporee_67253_naples_waves_on_rocks.flac",
+    "source_name": "Napoli, Via Eldorado - sea against the rocks (0:25-1:45)",
+    "source_url": "https://archive.org/details/aporee_67253_77804",
+    "license": "PDM-1.0",
+    "author": "timmermans.noa"
+  },
+  {
+    "path": "asset-library/Audio/aporee/aporee_27701_villefranche_jetty_lapping.flac",
+    "source_name": "Villefranche-sur-Mer sea sounds - jetty rocks at the waterline (0:00-1:40)",
+    "source_url": "https://archive.org/details/aporee_27701_31933",
+    "license": "PDM-1.0",
+    "author": "RorySmith"
+  },
+  {
+    "path": "asset-library/Audio/aporee/aporee_64774_padula_cicadas.flac",
+    "source_name": "Padula, Parco della Certosa - cicadas (0:00-1:00)",
+    "source_url": "https://archive.org/details/aporee_64774_74800",
+    "license": "PDM-1.0",
+    "author": "Giuseppe Bergamino"
+  },
+  {
+    "path": "asset-library/Audio/aporee/aporee_65200_corniglia_cafe_terrace.flac",
+    "source_name": "Corniglia (Vernazza) - café terrace on the little square (0:00-2:00)",
+    "source_url": "https://archive.org/details/aporee_65200_75297",
+    "license": "PDM-1.0",
+    "author": "Jean-François Cavro"
+  },
+  {
+    "path": "asset-library/Audio/opengameart/kerzoven_cat_purrsleepy_loop.wav",
+    "source_name": "Cat Purr & Meow - cat_purrsleepy_loop",
+    "source_url": "https://opengameart.org/content/cat-purr-meow",
+    "license": "CC0-1.0",
+    "author": "Kerzoven"
   }
 ]

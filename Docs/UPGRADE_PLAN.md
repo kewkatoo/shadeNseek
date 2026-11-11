@@ -167,3 +167,36 @@ Not yet listened to: a listening pass on `asset-library/Audio/game` before impor
 - Audio: the three risky picks were replaced (buckboard wagon, potatoes + apples, glockenspiel open/close pair); every
   file passes Scripts/qa_audio.py; the in-game master mix of a full run peaks at -4.3 dBFS, ~-24 LUFS integrated.
 - Tests: one full autoplay run per step (0 evaporations), -sunmap, -camshots, 1080p UI shots with -pauseshot, -audiocap.
+
+## Part C - second quality pass (2026-11-11: assets, UI, audio, clipping and placement)
+Same contract rules: no Fab / Marketplace / Megascans, nothing NoAI-licensed, every raw source redistributable in
+`asset-library/` and logged in `manifest.json` / `CREDITS.md` (`Scripts/make_credits.py`).
+
+- **Clipping and placement.** New `Scripts/unreal/sns_qa_clipping.py` samples every dressing prop's mesh in world space and
+  measures how deep it sits inside walls, railings, steps and other props (fast winding number), plus floating / sunk props.
+  Before: 87 solid props clipping (pots 10-35 cm into walls and church pilasters, a door pot sunk ~50 cm into the stairs,
+  doorstep chairs inside pots, a pot inside Biscotto's slab, piazza pots through the railing) and windows / window boxes
+  buried in neighbouring houses or under the stairs. Fixes: dressing near the route now goes through `sns_fit.py` (rests
+  on the surface below, slides off whatever it touches, tested both ways, or is left out); Biscotto's slab is kept clear
+  for the reunion close-up; party walls (S1/S2 west, E1 west) get no windows; ground-floor openings below the stairs or
+  terrace are left out; facades are seeded with crc32 so a rebuild no longer reshuffles them; laundry hangs clear of the
+  facades. After: **0 solid props clipping or floating, 0 wall-mounted pieces clipping**; what the check still lists is
+  climbing bougainvillea hugging facades (by design).
+- **World.** The overhanging scaled rock "mountain" is replaced by `sns_backdrop.py`: a terrain of foothills and a ridge
+  ~190 m up behind the town (`M_Terrain`: Poly Haven marble_cliff_05 / aerial_rocks_02 / aerial_grass_rock by slope, two
+  scales) with trees on the lower slopes, and a seabed shelving off the beach. The sea is single-layer water (absorption /
+  scattering: turquoise over the shelf, deep blue beyond, sun glint). Stairs, sills, door steps and benches use Poly Haven
+  worn_rock_natural_01 (the travertine read as wood grain).
+- **UI.** Keyboard / mouse glyphs from Kenney's Input Prompts (CC0) on the keycaps: W A S D as four keys, a mouse for
+  LOOK, E; SPACE / SHIFT / ESC keep the painted keycap (the glyphs' labels are illegible at cap height). The pause menu's
+  label column follows the widest key.
+- **Audio.** Music: "Home Was You" by Scott Buckley (CC BY 4.0; piano, strings, accordion) - the theme is its long build,
+  the reunion its solo-piano coda. Beds: lossless 24-bit field recordings from the coast (Radio Aporee, public domain):
+  waves on the rocks in Naples, lapping at a jetty in Villefranche, cicadas in Padula (Campania), a café terrace in
+  Corniglia. Purr: a clean lossless loop (OpenGameArt, CC0). Every output passes `qa_audio.py` (47/47). Loudness targets
+  +3 dB, music / beds +2.3 dB in code, area reverbs (vault / lanes / open piazza and terrace) on positional sounds. A full
+  run now measures ~-20.7 LUFS integrated (was ~-24 to -25), true peak -4.6 dBTP, no clipping.
+- **Fix found on the way:** one frame of coincident IK points could build a rotation from a zero direction in the cat rig
+  (engine ensure + an invalid bone transform); `Frame()` now falls back to a valid frame.
+- **Credit line for videos:** Music: "Home Was You" by Scott Buckley (www.scottbuckley.com.au), CC BY 4.0. His tracks are
+  registered with YouTube Content ID, so keep that credit in the description.

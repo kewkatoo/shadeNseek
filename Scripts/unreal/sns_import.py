@@ -1,7 +1,7 @@
 """Stage A - import raw sources from asset-library/ into /Game/Shade.
 
 Run headless:  Scripts/run_ue_python.ps1 -Script Scripts/unreal/sns_import.py
-Pass SNS_ONLY=audio,textures,gentex,models,cat via environment to run a subset (gentex = generated textures only).
+Pass SNS_ONLY=audio,textures,gentex,ui,models,cat via environment to run a subset (gentex = generated textures only).
 """
 import glob
 import os
@@ -156,6 +156,22 @@ def import_models():
     log("models done")
 
 
+def import_ui():
+    # Input glyphs (Kenney Input Prompts, CC0), cropped to the key by Scripts/prep_glyphs.py: crisp UI textures, no mips.
+    for f in sorted(glob.glob(os.path.join(LIB, "UI", "game", "*.png"))):
+        name = os.path.splitext(os.path.basename(f))[0]
+        paths = import_file(f, "/Game/Shade/UI/Glyphs", name)
+        t = load(paths[0]) if paths else None
+        if not t:
+            continue
+        t.set_editor_property("srgb", True)
+        t.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
+        t.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+        t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+        eal.save_loaded_asset(t)
+    log("ui glyphs done")
+
+
 def import_cat():
     # The legacy FBX importer keeps the baked tabby vertex colours (Interchange drops them): see sns_cat_reimport.py
     exec(open(os.path.join(os.path.dirname(__file__), "sns_cat_reimport.py"), encoding="utf-8").read(), {"__file__": os.path.join(os.path.dirname(__file__), "sns_cat_reimport.py")})
@@ -167,6 +183,8 @@ if want("textures"):
     import_textures()
 elif "gentex" in ONLY:
     import_textures(polyhaven=False)
+if want("ui"):
+    import_ui()
 if want("cat"):
     import_cat()
 if want("models"):

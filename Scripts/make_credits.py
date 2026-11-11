@@ -53,6 +53,7 @@ ph += [{"path": e["path"], "author": e["author"], "source_url": e["source_url"]}
 acg = [e for e in extra if "ambientcg.com" in e["source_url"]]
 audio = [e for e in extra if e["path"].startswith("asset-library/Audio/")]
 new_fonts = [e for e in extra if e["path"].startswith("asset-library/Fonts/")]
+other = [e for e in extra if "polyhaven.com" not in e["source_url"] and e not in acg and e not in audio and e not in new_fonts]
 
 with open(os.path.join(ROOT, "manifest.json"), "w", encoding="utf-8") as f:
     json.dump(manifest, f, indent=2, ensure_ascii=False)
@@ -77,12 +78,18 @@ if acg:
     for e in sorted(acg, key=lambda e: e["path"]):
         lines.append(f"| `{e['path'].replace('asset-library/', '')}` | {e['author']} | {e['source_url']} |")
 if audio:
-    lines += ["", "## Audio (CC0 1.0 - public domain; Freesound, FreePD, Kenney)", "",
+    lines += ["", "## Audio (CC0 1.0, Public Domain Mark 1.0, CC BY 4.0 - see each row)", "",
               "Game-ready files are built from these by `Scripts/prep_audio.py` into `asset-library/Audio/game`. Freesound files are the",
-              "public HQ previews of CC0 originals. FreePD (closed in 2025) is cited through Internet Archive copies of its pages.", "",
-              "| File | Title | Author | Source |", "|---|---|---|---|"]
+              "public HQ previews of CC0 originals; the Radio Aporee field recordings (mirrored on Internet Archive) are stored as",
+              "lossless excerpts. CC BY 4.0 music must be credited wherever the game or a video of it is published:",
+              "\"Home Was You\" by Scott Buckley (www.scottbuckley.com.au), licensed under CC BY 4.0.", "",
+              "| File | Title | Author | Licence | Source |", "|---|---|---|---|---|"]
     for e in sorted(audio, key=lambda e: e["path"]):
-        lines.append(f"| `{e['path'].replace('asset-library/', '')}` | {e['source_name']} | {e['author']} | {e['source_url']} |")
+        lines.append(f"| `{e['path'].replace('asset-library/', '')}` | {e['source_name']} | {e['author']} | {e['license']} | {e['source_url']} |")
+if other:
+    lines += ["", "## Other (CC0 1.0 - public domain)", "", "| Asset | Author(s) | Source |", "|---|---|---|"]
+    for e in sorted(other, key=lambda e: e["path"]):
+        lines.append(f"| `{e['path'].replace('asset-library/', '')}` | {e['author']} | {e['source_url']} |")
 lines.append("")
 lines.append("Note: `Textures/polyhaven/fabric_pattern_07/fabric_pattern_07_diff_1k.jpg` is Poly Haven's `col_1` colourway, renamed.")
 with open(os.path.join(LIB, "CREDITS.md"), "w", encoding="utf-8") as f:
