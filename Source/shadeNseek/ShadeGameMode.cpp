@@ -849,9 +849,16 @@ void AShadeGameMode::BeginReunion(AShadeNapCat* Cat)
 			CC->PostProcessSettings.DepthOfFieldFocalDistance = FVector::Dist(CamLoc, CatLoc);
 			CC->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
 			CC->PostProcessSettings.DepthOfFieldFstop = 2.8f;
+			// The tower's shade is dim, so auto exposure opened right up and the ginger coat blew out: hold it down a
+			// little so the coat keeps its colour and the evening light stays evening.
+			CC->PostProcessSettings.bOverride_AutoExposureBias = true;
+			CC->PostProcessSettings.AutoExposureBias = 0.15f;
+			CC->PostProcessSettings.bOverride_AutoExposureMinBrightness = true;  // don't open up as far in the dark
+			CC->PostProcessSettings.AutoExposureMinBrightness = 1.25f;
 			CC->PostProcessBlendWeight = 1.f;
 		}
-		// Cinematic key + rim so Biscotto reads warm even inside the tower's shade.
+		// Soft cinematic key + rim so Biscotto reads warm inside the tower's shade without glowing (a gentle fill, not a
+		// spotlight).
 		auto AddCineLight = [this](const FVector& Loc, float Lumens, float Radius, const FLinearColor& Col)
 		{
 			APointLight* L = GetWorld()->SpawnActor<APointLight>(Loc, FRotator::ZeroRotator);
@@ -867,8 +874,8 @@ void AShadeGameMode::BeginReunion(AShadeNapCat* Cat)
 				C->SetSourceRadius(20.f);
 			}
 		};
-		AddCineLight(CatLoc - Away * 140.f + Side * 70.f + FVector(0, 0, 110.f), 260.f, 420.f, FLinearColor(1.f, 0.74f, 0.5f));
-		AddCineLight(CatLoc + Away * 80.f - Side * 50.f + FVector(0, 0, 70.f), 140.f, 260.f, FLinearColor(1.f, 0.62f, 0.32f));
+		AddCineLight(CatLoc - Away * 140.f + Side * 70.f + FVector(0, 0, 110.f), 85.f, 380.f, FLinearColor(1.f, 0.78f, 0.6f));
+		AddCineLight(CatLoc + Away * 80.f - Side * 50.f + FVector(0, 0, 70.f), 55.f, 240.f, FLinearColor(1.f, 0.66f, 0.4f));
 		CineCamera->GetCameraComponent()->bConstrainAspectRatio = false;
 		if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 		{

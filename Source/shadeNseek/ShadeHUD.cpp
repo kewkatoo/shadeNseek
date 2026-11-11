@@ -63,7 +63,7 @@ namespace UI
 		constexpr float Kicker = 14.f;              // caps, tracked
 		constexpr float Key = 15.f;
 		constexpr int32 Tracking = 120;             // kicker letter spacing, 1/1000 em
-		constexpr float NarrationWrap = 1100.f;
+		constexpr float NarrationWrap = 980.f;
 	}
 
 	/** Motion: in 0.22 s OutCubic with an 8 px rise, out 0.16 s; menu rows stagger 60 ms; toasts drop in, hold, fade. */
@@ -544,6 +544,7 @@ private:
 	TWeakObjectPtr<AShadeInteractable> PromptTarget;
 	mutable TArray<FBox2D> ItemRects;
 	mutable float LastS = 1.f;
+	mutable float ControlsShown = 0.f;  // controls strip alpha this frame (the narration card lifts over it)
 };
 
 void SShadeOverlay::UpdateSmoothing()
@@ -628,6 +629,7 @@ int32 SShadeOverlay::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const
 	}
 
 	PaintExposure(P, Now);
+	ControlsShown = 0.f;
 	if (HudAlpha > 0.01f)
 	{
 		PaintObjective(P, Now);
@@ -639,7 +641,8 @@ int32 SShadeOverlay::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const
 		const float Intro = ShadeEase::Window(G->GetPhaseTime(), 5.6f, 6.6f) * (1.f - ShadeEase::Window(G->GetRunTime(), 24.f, 26.f));
 		if (G->GetPhase() == EShadePhase::Playing && Intro > 0.01f)
 		{
-			PaintControls(P, Intro * HudAlpha, FVector2D(UI::Margin, P.Size.Y - UI::Margin - UI::StripH));
+			ControlsShown = Intro * HudAlpha;
+			PaintControls(P, ControlsShown, FVector2D(UI::Margin, P.Size.Y - UI::Margin - UI::StripH));
 		}
 	}
 	PaintLine(P, Now);
@@ -875,7 +878,8 @@ void SShadeOverlay::PaintExposure(const FPainter& P, double Now) const
 	P.Gradient(FVector2D(0, 0), FVector2D(D, P.Size.Y), Hot, Clear, Orient_Vertical, 0);
 	P.Gradient(FVector2D(P.Size.X - D, 0), FVector2D(D, P.Size.Y), Clear, Hot, Orient_Vertical, 0);
 
-	// Warning on a shade card, clear of the haze and above the narration line: burning ring + small sun, then the call.
+	// Warning on a shade card, high and centred (under the toasts): the follow camera keeps Shade in the lower middle of
+	// the frame and the narration at the bottom, so neither is ever covered. Burning ring + small sun, then the call.
 	const float Al = FMath::Clamp(E * 4.f, 0.f, 1.f);
 	const float In = ShadeEase::OutCubic(Al);
 	const FSlateFontInfo Warn = F(TEXT("BodyHeavy"), UI::Type::Body, UI::Type::Tracking, P.S);
@@ -883,7 +887,7 @@ void SShadeOverlay::PaintExposure(const FPainter& P, double Now) const
 	const float RingR = 22.f, PadL = 16.f, Gap = 16.f, PadR = 28.f, Hh = 72.f;
 	const float MsgW = FMath::Max(P.Width(TEXT("FIND SHADE"), Warn), P.Width(TEXT("TOO BRIGHT"), Warn)); // card keeps its size when the call changes
 	const float W = PadL + 2.f * (RingR + 2.f) + Gap + MsgW + PadR;
-	const FVector2D Pos(P.Size.X * 0.5f - W * 0.5f, P.Size.Y - 300.f - Hh * 0.5f + (1.f - In) * UI::Motion::Rise);
+	const FVector2D Pos(P.Size.X * 0.5f - W * 0.5f, 172.f - (1.f - In) * UI::Motion::Rise);
 	P.ShadeCard(Pos, FVector2D(W, Hh), Al, 9);
 	const FVector2D CC = Pos + FVector2D(PadL + RingR + 2.f, Hh * 0.5f);
 	P.Ring(CC, RingR, A(UI::Cream, 0.2f * Al), 2.5f, 11);
@@ -907,20 +911,34 @@ void SShadeOverlay::PaintLine(const FPainter& P, double Now) const
 	{
 		return;
 	}
-	// Narration on a shade card, centred low (above the controls strip and the letterbox); wraps at 1100, max 2 lines.
+	// Narration never covers the picture's subject. In cutscenes it is set on the bottom letterbox bar like film subtitles;
+	// in play it is a compact card at the very bottom of the frame, under Shade (the follow camera keeps the cat ~73% of
+	// the way down), lifted over the controls strip only while that shows. Wraps at 980, max 2 lines.
 	const FSlateFontInfo Font = F(TEXT("BodyBold"), UI::Type::Narration, 0, P.S);
 	const TArray<FString> Lines = P.Wrap(G->GetLine().ToString(), Font, UI::Type::NarrationWrap, 2);
 	const float LineH = P.LineHeight(Font) * 0.95f;
+	const float Box = ShadeEase::InOutCubic(G->GetLetterbox());
+	if (Box > 0.6f)
+	{
+		const float Bar = Box * 0.1f * static_cast<float>(P.Size.Y);
+		const float Top = static_cast<float>(P.Size.Y) - Bar + (Bar - Lines.Num() * LineH) * 0.5f + (1.f - In) * UI::Motion::Rise * 0.5f;
+		for (int32 i = 0; i < Lines.Num(); ++i)
+		{
+			P.Text(Lines[i], FVector2D(P.Size.X * 0.5f, Top + i * LineH), Font, A(UI::Cream, Al), 0.5f, 0.f, 0.f, 26);
+		}
+		return;
+	}
 	float MaxW = 0.f;
 	for (const FString& Ln : Lines)
 	{
 		MaxW = FMath::Max(MaxW, P.Width(Ln, Font));
 	}
-	const float PadX = 32.f, PadY = 12.f;
+	const float PadX = 28.f, PadY = 9.f;
 	const FVector2D Sz(MaxW + 2.f * PadX, Lines.Num() * LineH + 2.f * PadY);
-	const float Bottom = P.Size.Y - 128.f + (1.f - In) * UI::Motion::Rise;
+	const float Lift = FMath::Lerp(34.f, UI::Margin + UI::StripH + 14.f, FMath::Clamp(ControlsShown * 1.5f, 0.f, 1.f));
+	const float Bottom = static_cast<float>(P.Size.Y) - Lift + (1.f - In) * UI::Motion::Rise;
 	const FVector2D Pos(P.Size.X * 0.5f - Sz.X * 0.5f, Bottom - Sz.Y);
-	P.ShadeCard(Pos, Sz, Al, 12);
+	P.ShadeCard(Pos, Sz, Al * 0.92f, 12);
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
 		P.Text(Lines[i], FVector2D(P.Size.X * 0.5f, Pos.Y + PadY + i * LineH), Font, A(UI::Cream, Al), 0.5f, 0.f, 0.f, 15);

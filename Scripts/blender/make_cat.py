@@ -274,15 +274,15 @@ def eye_dist(p):
 
 
 def fur_length(p):
-    L = 0.0078
+    L = 0.0088
     if p.y > 0.178 and abs(p.z - tail_axis_z(p.y)) < 0.03:
-        return 0.0092
+        return 0.0108
     if p.y < -0.178 and p.z > 0.25:
         face = smoothstep(-0.232, -0.252, p.y)
         L = 0.0055 * (1 - face) + 0.0016 * face
-        L = max(L, 0.0085 * smoothstep(0.02, 0.033, abs(p.x)) * smoothstep(0.302, 0.28, p.z))  # cheek ruff
+        L = max(L, 0.0098 * smoothstep(0.02, 0.033, abs(p.x)) * smoothstep(0.302, 0.28, p.z))  # cheek ruff
         return L * (1 - 0.8 * smoothstep(1.6, 1.1, eye_dist(p)))
-    L = max(L, 0.0115 * smoothstep(-0.1, -0.15, p.y) * smoothstep(0.24, 0.2, p.z))           # chest ruff
+    L = max(L, 0.0135 * smoothstep(-0.1, -0.15, p.y) * smoothstep(0.24, 0.2, p.z))           # chest ruff
     L *= 0.42 + 0.58 * smoothstep(0.02, 0.12, p.z)                                         # short on the legs
     return max(L, 0.0014)
 

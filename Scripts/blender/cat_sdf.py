@@ -127,15 +127,15 @@ t0 = time.time()
 # ---------------------------------------------------------------------------------------------------------------------
 # Torso. Cats are narrow and deep-chested with a tucked waist and a rounded, muscular rump.
 # ---------------------------------------------------------------------------------------------------------------------
-ellipsoid((0, -0.075, 0.2), (0.047, 0.082, 0.066), k=0.0)               # ribcage
-ellipsoid((0, -0.122, 0.17), (0.037, 0.04, 0.05), k=0.03)               # sternum / chest ruff
-ellipsoid((0, 0.025, 0.21), (0.041, 0.085, 0.052), k=0.045)                # waist: narrower than the ribcage
+ellipsoid((0, -0.075, 0.197), (0.047, 0.082, 0.072), k=0.0)              # ribcage: deep, its floor near the elbows
+ellipsoid((0, -0.118, 0.166), (0.038, 0.042, 0.052), k=0.03)            # sternum / chest ruff
+ellipsoid((0, 0.03, 0.214), (0.038, 0.082, 0.049), k=0.045)               # waist: narrower and higher than the ribcage
 ellipsoid((0, 0.125, 0.212), (0.048, 0.066, 0.056), k=0.04)             # rump
-ellipsoid((0, 0.03, 0.178), (0.036, 0.07, 0.03), k=0.03)                # soft belly skin (primordial pouch)
+ellipsoid((0, 0.07, 0.184), (0.032, 0.05, 0.024), k=0.03)               # soft belly skin (primordial pouch), toward the hind legs
 for sx in (1, -1):
     ellipsoid((sx * 0.028, -0.095, 0.243), (0.016, 0.034, 0.016), k=0.02, R=rot(pitch=-28))  # shoulder blades
 # Neck: thick with fur, rising forward to the skull.
-round_cone((0, -0.115, 0.222), (0, -0.183, 0.272), 0.044, 0.033, k=0.03)
+round_cone((0, -0.115, 0.222), (0, -0.183, 0.272), 0.039, 0.03, k=0.03)
 ellipsoid((0, -0.155, 0.215), (0.03, 0.03, 0.04), k=0.03)               # throat fluff
 
 # ---------------------------------------------------------------------------------------------------------------------

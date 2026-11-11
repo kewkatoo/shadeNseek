@@ -1,7 +1,7 @@
 """Stage D - procedural meshes referenced by C++ and reusable set pieces (all original GeometryScript geometry).
 
 C++-referenced: SM_WispQuad, SM_LemonCart, SM_CartWheel, SM_AwningRoller, SM_AwningCanvas, SM_AwningValance, SM_AwningArm,
-                SM_Cord, SM_CordHandle
+                SM_Cord, SM_CordHandle, SM_CatCollar
 Set pieces:     SM_Railing_200, SM_Card, SM_BougainClump_*, SM_LeafyClump, SM_Sheet_*, SM_Towel_*, SM_Rope_100, SM_Dome,
                 SM_Campanile, SM_Bell, SM_Bollard, SM_Bench_Stone, SM_Planter_Long, SM_Beam_100, SM_Post_100, SM_LemonCluster
 """
@@ -184,6 +184,24 @@ def awning_parts():
     save(h, "SM_CordHandle", [mat("MI_Wood_Beam"), mat("MI_Linen_White")], collision=None)
 
 
+def cat_collar():
+    """Biscotto's collar: a red leather band round X (unit ring, radius 10; ShadeInteractables.cpp fits it to the neck
+    bones every frame) with a small brass bell on a loop at the throat (-Z)."""
+    m = new()
+    ro = unreal.GeometryScriptRevolveOptions()
+    unreal.GeometryScript_Primitives.append_torus(m, unreal.GeometryScriptPrimitiveOptions(), T(), ro, 10.0, 0.9, 40, 8, unreal.GeometryScriptPrimitiveOriginMode.CENTER)
+    GT.transform_mesh(m, T(rot=(90, 0, 0), scale=(1.0, 1.0, 1.9)))   # flatten the tube into a band, axis -> X
+    brass = new()
+    unreal.GeometryScript_Primitives.append_torus(brass, unreal.GeometryScriptPrimitiveOptions(), T(), ro, 1.1, 0.35, 12, 6, unreal.GeometryScriptPrimitiveOriginMode.CENTER)
+    GT.transform_mesh(brass, T((0, 0, -11.2), (0, 90, 90)))          # loop hanging off the band
+    append(brass, sphere(2.3, 0, (0, 0, -14.4), steps=12))          # the bell
+    append(brass, cyl(0.5, 0.9, 0, (0, 0, -17.1), steps=8))          # clapper peeking out of the slot
+    GMat.enable_material_i_ds(brass)
+    GMat.remap_material_i_ds(brass, 0, 1)
+    append(m, brass)
+    save(m, "SM_CatCollar", [mat("MI_Leather_Red"), mat("MI_Brass")], collision=None, uv_tile=20.0)
+
+
 def railing():
     m = new()
     append(m, box(200, 5, 4, 0, (100, 0, 98)))           # top rail
@@ -307,7 +325,7 @@ def street_bits():
     save(wb, "SM_WindowBox", [mat("MI_Terracotta")], collision=None, uv_tile=60.0)
 
 
-for fn in (wisp_quad, cart_wheel, lemon_cart, lemon_cluster, awning_parts, railing, cards, laundry, dome, campanile, street_bits):
+for fn in (wisp_quad, cart_wheel, lemon_cart, lemon_cluster, awning_parts, cat_collar, railing, cards, laundry, dome, campanile, street_bits):
     try:
         fn()
         log("mesh ok", fn.__name__)

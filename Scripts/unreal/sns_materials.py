@@ -415,10 +415,22 @@ def build_water():
     return g.finish()
 
 
+def triplanar(g, texture, scale, nrm, wp, sharp=4.0):
+    """World-space triplanar colour: three planar projections blended by the (sharpened) normal, so slopes never smear
+    a top-down texture into streaks."""
+    w = g.pow(g.absv(nrm), g.const(sharp))
+    w = g.div(w, g.add(g.dot(w, g.const3((1, 1, 1))), g.const(0.0001)))
+    sx = g.texs(texture, S_COLOR, g.div(g.append(g.mask(wp, g=True), g.mask(wp, b=True)), scale))
+    sy = g.texs(texture, S_COLOR, g.div(g.append(g.mask(wp, r=True), g.mask(wp, b=True)), scale))
+    sz = g.texs(texture, S_COLOR, g.div(g.mask(wp, r=True, g=True), scale))
+    return g.add(g.add(g.mul((sx, "RGB"), g.mask(w, r=True)), g.mul((sy, "RGB"), g.mask(w, g=True))), g.mul((sz, "RGB"), g.mask(w, b=True)))
+
+
 def build_terrain():
     """Mountain backdrop: limestone cliff on steep faces, rock with green scrub on the slopes, grassy rock on shelves.
-    World-projected at two scales (no visible repeats across hundreds of metres); slope from the vertex normal. Colour
-    only - at this distance the vertex normals carry the relief and the fog does the rest."""
+    World-projected at two scales (no visible repeats across hundreds of metres); slope from the vertex normal. The
+    slope layer is triplanar (a top-down projection stretched into streaks down the hillsides). Colour only - at this
+    distance the vertex normals carry the relief and the fog does the rest."""
     g = Graph("M_Terrain")
     wp = g.wpos()
     S1 = g.scalar("Scale", 2400.0)
@@ -432,8 +444,8 @@ def build_terrain():
     uv_y = g.div(g.append(g.mask(wp, r=True), g.mask(wp, b=True)), S1)   # faces turned towards +-Y (the sea)
     rock = g.lerp((g.texs(ph("marble_cliff_05", "diff"), S_COLOR, uv_y), "RGB"), (g.texs(ph("marble_cliff_05", "diff"), S_COLOR, uv_x), "RGB"),
                   g.sat(g.div(ax, g.add(g.add(ax, ay), g.const(0.001)))))
-    scrub = g.lerp((g.texs(ph("aerial_rocks_02", "diff"), S_COLOR, g.div(xy, S1)), "RGB"),
-                   (g.texs(ph("aerial_rocks_02", "diff"), S_COLOR, g.div(xy, S2)), "RGB"), g.const(0.5))
+    scrub = g.lerp(triplanar(g, ph("aerial_rocks_02", "diff"), S1, nrm, wp),
+                   (g.texs(ph("aerial_rocks_02", "diff"), S_COLOR, g.div(xy, S2)), "RGB"), g.mul(nz, g.const(0.5)))
     grass = g.lerp((g.texs(ph("aerial_grass_rock", "diff"), S_COLOR, g.div(xy, S1)), "RGB"),
                    (g.texs(ph("aerial_grass_rock", "diff"), S_COLOR, g.div(xy, S2)), "RGB"), g.const(0.5))
     mn = macro_noise(g, 26000.0)
@@ -724,7 +736,8 @@ def build_instances(M):
     mi("MI_Cobble", S, dict(ground, Tiling=1.0), {"Tint": (1.08, 1.0, 0.9)}, surf("PavingStones150"))
     mi("MI_Flag", S, dict(ground, Tiling=0.8, RoughMul=1.9, Brightness=0.86), {"Tint": (1.02, 0.98, 0.94)}, surf("Tiles143"))
     # natural limestone for stairs, sills, door steps and benches (the travertine's veins read as wood grain)
-    mi("MI_StepStone", S, dict(ground, Tiling=0.9, RoughMul=1.0, Brightness=0.95, NormalStrength=0.8), {"Tint": (1.0, 0.97, 0.92)},
+    # (finer tiling: at 0.9 the rock's pebbles read as coarse granite gravel on the benches and steps)
+    mi("MI_StepStone", S, dict(ground, Tiling=1.6, RoughMul=1.0, Brightness=0.95, NormalStrength=0.6), {"Tint": (1.0, 0.97, 0.92)},
        surf("worn_rock_natural_01"))
     mi("MI_Terracotta", S, dict(ground, Tiling=1.6, RoughMul=2.5), None, surf("GlazedTerracotta001"))
     mi("MI_Sand", S, dict(ground, Tiling=0.6), None, surf("coast_sand_01"))
@@ -773,6 +786,9 @@ def build_instances(M):
     for n in ("Caffe", "Limoni", "Street", "Menu"):
         mi(f"MI_Sign_{n}", Pp, {"RoughMul": 0.75 if n != "Street" else 0.25}, None, {"BaseColorTex": tex(f"T_Sign_{n}")})
     mi("MI_Lemon_Skin", Pp, {"RoughMul": 0.6}, {"Tint": (1.0, 0.95, 0.55)}, {"BaseColorTex": WHITE})
+    # Biscotto's collar: worn red leather and a little brass bell.
+    mi("MI_Leather_Red", Pp, {"RoughMul": 0.85}, {"Tint": (0.42, 0.055, 0.035)}, {"BaseColorTex": WHITE})
+    mi("MI_Brass", M["M_Iron"], {"Rust": 0.12}, {"Tint": (0.72, 0.5, 0.2)})
     mi("MI_CatFur", M["M_CatFur"], {"CoatDark": 0.0}, {"CoatTint": (1, 1, 1)})
     mi("MI_CatShell", M["M_CatShell"], {"CoatDark": 0.0}, {"CoatTint": (1, 1, 1)})
     mi("MI_CatEye", M["M_CatEye"])

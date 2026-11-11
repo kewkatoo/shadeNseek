@@ -54,7 +54,7 @@ AShadeCharacter::AShadeCharacter()
 	Move->GroundFriction = 7.f;
 	// ~1.1 m hop: clears the 87 cm planter wall with room to spare and reads as a cat's spring, not a launch.
 	Move->JumpZVelocity = 500.f;
-	Move->AirControl = 0.65f;
+	Move->AirControl = 0.5f;  // a cat commits to its leap: a little steering in the air, not a full turn
 	Move->MaxStepHeight = 26.f;
 	Move->SetWalkableFloorAngle(52.f);
 	Move->bCanWalkOffLedgesWhenCrouching = true;
@@ -65,7 +65,9 @@ AShadeCharacter::AShadeCharacter()
 	CameraBoom->TargetArmLength = 300.f;
 	// The boom pivots on the capsule centre (never inside the world, unlike a point above it that a hop can push
 	// into the vault ceiling); the height lives in the socket offset instead.
-	CameraBoom->SocketOffset = FVector(0.f, 0.f, 80.f);
+	// 62 cm over a 3 m boom keeps Shade about 73% of the way down the frame: low enough to see the street ahead, high
+	// enough that the narration at the bottom of the screen never covers the cat.
+	CameraBoom->SocketOffset = FVector(0.f, 0.f, 62.f);
 	CameraBoom->TargetOffset = FVector::ZeroVector;
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bEnableCameraLag = true;
@@ -180,11 +182,41 @@ void AShadeCharacter::MoveInput(const FVector2D& Axis)
 	{
 		return;
 	}
+	Locomote(Axis, GetWorld() ? GetWorld()->GetDeltaSeconds() : 1.f / 60.f);
+}
+
+void AShadeCharacter::Locomote(const FVector2D& Axis, float Dt)
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
 	const FRotator Yaw(0.f, GetControlRotation().Yaw, 0.f);
-	const FVector Fwd = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X);
-	const FVector Right = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y);
-	AddMovementInput(Fwd, Axis.Y);
-	AddMovementInput(Right, Axis.X);
+	const FVector Wish = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X) * Axis.Y + FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y) * Axis.X;
+	const float Mag = FMath::Min(Wish.Size2D(), 1.f);
+	if (Mag < 0.05f)
+	{
+		return;
+	}
+	const FVector WishDir = Wish.GetSafeNormal2D();
+	Move->bOrientRotationToMovement = false;
+	const bool bAir = Move->IsFalling();
+	const float Speed = GetVelocity().Size2D();
+	// Nimble on the spot, wider arcs at a trot, only a little twist in the air.
+	const float Quick = FMath::Clamp((Speed - 60.f) / FMath::Max(SprintSpeed - 60.f, 1.f), 0.f, 1.f);
+	const float Rate = bAir ? 150.f : FMath::Lerp(720.f, 300.f, Quick);
+	const float Cur = GetActorRotation().Yaw;
+	const float Delta = FMath::FindDeltaAngleDegrees(Cur, WishDir.Rotation().Yaw);
+	SetActorRotation(FRotator(0.f, Cur + FMath::Clamp(Delta, -Rate * Dt, Rate * Dt), 0.f));
+	if (bAir)
+	{
+		AddMovementInput(WishDir, Mag);  // AirControl does the limiting
+		return;
+	}
+	// It goes where its body points: the drive comes in as the body comes round (a sharp reversal pivots first), and the
+	// legs are slow for a moment after a hard landing.
+	const FVector Facing = GetActorForwardVector().GetSafeNormal2D();
+	const float Align = FVector::DotProduct(Facing, WishDir);
+	const float Recover = 1.f - 0.6f * FMath::Clamp(LandRecover / 0.3f, 0.f, 1.f);
+	const float Drive = Mag * Recover * FMath::Clamp((Align + 0.17f) / 1.07f, 0.f, 1.f);
+	AddMovementInput((Facing * 0.7f + WishDir * 0.3f).GetSafeNormal2D(), Drive);
 }
 
 void AShadeCharacter::LookInput(const FVector2D& Axis)
@@ -331,6 +363,7 @@ void AShadeCharacter::SetControlEnabled(bool bEnabled)
 
 void AShadeCharacter::BeginMerge(const FVector& Spot, float Duration)
 {
+	EndScramble();
 	bMerging = true;
 	MergeSpot = Spot;
 	MergeDuration = FMath::Max(Duration, 0.2f);
@@ -363,7 +396,14 @@ void AShadeCharacter::Tick(float DeltaSeconds)
 		}
 	}
 
+	LandRecover = FMath::Max(0.f, LandRecover - Dt);
+	ScrambleCooldown = FMath::Max(0.f, ScrambleCooldown - Dt);
 	UpdateAction(Dt);
+	if (bScrambling || TryScramble())
+	{
+		UpdateScramble(Dt);
+	}
+	UpdateIdle(Dt);
 	UpdateGrab(Dt);
 	UpdateHold(Dt);
 	UpdateSun(Dt);
@@ -479,6 +519,7 @@ void AShadeCharacter::Evaporate()
 	{
 		return;
 	}
+	EndScramble();
 	EvapState = 1;
 	EvapTimer = 0.f;
 	++Evaporations;
@@ -633,7 +674,7 @@ void AShadeCharacter::UpdateFocus(float Dt)
 
 bool AShadeCharacter::IsActBusy() const
 {
-	return ActStage == EActStage::Approach || ActStage == EActStage::Reach || ActStage == EActStage::Work;
+	return bScrambling || ActStage == EActStage::Approach || ActStage == EActStage::Reach || ActStage == EActStage::Work;
 }
 
 void AShadeCharacter::StartAction(AShadeInteractable* Target)
@@ -922,6 +963,157 @@ void AShadeCharacter::UpdateAction(float Dt)
 	}
 }
 
+// =====================================================================================================================
+// Ledge scramble and sitting
+// =====================================================================================================================
+
+bool AShadeCharacter::TryScramble()
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (bScrambling || ScrambleCooldown > 0.f || !Move->IsFalling() || !bControlEnabled || EvapState != 0 || bMerging
+		|| ActStage != EActStage::None || Grabbed.IsValid() || HoldTarget.IsValid())
+	{
+		return false;
+	}
+	// Around the top of a hop (not shooting up past the edge, not dropping fast), pushing at the wall it faces.
+	const FVector V = GetVelocity();
+	if (V.Z > 260.f || V.Z < -320.f)
+	{
+		return false;
+	}
+	const FVector Face = GetActorForwardVector().GetSafeNormal2D();
+	const FRotator Yaw(0.f, GetControlRotation().Yaw, 0.f);
+	const FVector Wish = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X) * PendingMove.Y + FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y) * PendingMove.X;
+	if (Wish.Size2D() < 0.3f || FVector::DotProduct(Wish.GetSafeNormal2D(), Face) < 0.5f)
+	{
+		return false;
+	}
+	UWorld* W = GetWorld();
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(ShadeScramble), false, this);
+	const FVector Loc = GetActorLocation();
+	const float Feet = Loc.Z - GCapsuleHalf;
+	FHitResult Wall;
+	if (!W->LineTraceSingleByChannel(Wall, Loc, Loc + Face * (GCapsuleRadius + 22.f), ECC_Pawn, Q) || Wall.bStartPenetrating
+		|| Wall.ImpactNormal.Z > 0.4f || FVector::DotProduct(Wall.ImpactNormal.GetSafeNormal2D(), -Face) < 0.6f)
+	{
+		return false;
+	}
+	// The top of it, a little in from the face: a walkable edge the paws reach, but only just above the feet (the hop
+	// nearly made it - this smooths a near miss, it doesn't climb walls).
+	const FVector In = Wall.ImpactPoint - Wall.ImpactNormal.GetSafeNormal2D() * 8.f;
+	FHitResult Top;
+	if (!W->LineTraceSingleByChannel(Top, FVector(In.X, In.Y, Feet + 60.f), FVector(In.X, In.Y, Feet - 2.f), ECC_Pawn, Q) || Top.bStartPenetrating
+		|| Top.ImpactNormal.Z < 0.75f)
+	{
+		return false;
+	}
+	const float Rise = Top.ImpactPoint.Z - Feet;
+	if (Rise < 6.f || Rise > 24.f)
+	{
+		return false;
+	}
+	// Somewhere to stand on top, a body length in from the edge, with room for the whole cat.
+	const FVector Edge(Wall.ImpactPoint.X, Wall.ImpactPoint.Y, Top.ImpactPoint.Z);
+	const FVector Stand = Edge + Face * (GCapsuleRadius + 3.f);
+	FHitResult Floor;
+	if (!W->LineTraceSingleByChannel(Floor, Stand + FVector(0, 0, 30.f), Stand - FVector(0, 0, 8.f), ECC_Pawn, Q) || Floor.ImpactNormal.Z < 0.75f
+		|| FMath::Abs(Floor.ImpactPoint.Z - Top.ImpactPoint.Z) > 6.f)
+	{
+		return false;
+	}
+	const FVector Dest(Stand.X, Stand.Y, Floor.ImpactPoint.Z + GCapsuleHalf + 1.5f);
+	if (W->OverlapBlockingTestByChannel(Dest, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(GCapsuleRadius - 1.f, GCapsuleHalf - 1.f), Q))
+	{
+		return false;
+	}
+	// The way there must be open: straight up beside the wall, then over the edge (an overlap test alone can't tell a
+	// spot inside a thick triangle-mesh wall from open air).
+	const FVector Raised(Loc.X, Loc.Y, Dest.Z);
+	FHitResult Path;
+	if (W->LineTraceSingleByChannel(Path, Loc, Raised + FVector(0, 0, GCapsuleHalf * 0.5f), ECC_Pawn, Q)
+		|| W->LineTraceSingleByChannel(Path, Raised, Dest, ECC_Pawn, Q)
+		|| W->LineTraceSingleByChannel(Path, Raised - FVector(0, 0, GCapsuleHalf * 0.5f), Dest - FVector(0, 0, GCapsuleHalf * 0.5f), ECC_Pawn, Q))
+	{
+		return false;
+	}
+	bScrambling = true;
+	ScrambleT = 0.f;
+	ScrambleFrom = Loc;
+	ScrambleTo = Dest;
+	ScrambleEdge = Edge;
+	ScrambleFace = Face;
+	Move->StopMovementImmediately();
+	Move->SetMovementMode(MOVE_Flying);
+	ShadeAssets::PlayAt(this, TEXT("SFX_Land"), Edge, 0.3f, 1.25f);
+	return true;
+}
+
+void AShadeCharacter::UpdateScramble(float Dt)
+{
+	if (!bScrambling)
+	{
+		return;
+	}
+	ScrambleT = FMath::Min(1.f, ScrambleT + Dt / 0.36f);
+	const float T = ScrambleT;
+	// Up first (front paws on the edge, hind legs scrabbling at the wall), then over the top.
+	const float Up = ShadeEase::OutCubic(FMath::Clamp(T / 0.6f, 0.f, 1.f));
+	const float Over = ShadeEase::InOutCubic(FMath::Clamp((T - 0.35f) / 0.65f, 0.f, 1.f));
+	FVector P = FMath::Lerp(ScrambleFrom, ScrambleTo, Over);
+	P.Z = FMath::Lerp(ScrambleFrom.Z, ScrambleTo.Z, Up);
+	SetActorLocation(P, false);
+	SetActorRotation(FMath::RInterpTo(GetActorRotation(), ScrambleFace.Rotation(), Dt, 14.f));
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, ScrambleFace).GetSafeNormal();
+	Rig->ActW = 1.f - ShadeEase::Smooth((T - 0.62f) / 0.38f);
+	Rig->ActRear = 0.5f * (1.f - Over);
+	Rig->ActLean = 0.45f;
+	Rig->ActMeta = 150.f;
+	Rig->ActCurl = -55.f;
+	Rig->ActPawW[0] = Rig->ActPawW[1] = 1.f;
+	Rig->ActPawWorld[0] = ScrambleEdge + ScrambleFace * 4.f - Right * 4.f + FVector(0, 0, 1.f);
+	Rig->ActPawWorld[1] = ScrambleEdge + ScrambleFace * 4.f + Right * 4.f + FVector(0, 0, 1.f);
+	if (T >= 1.f)
+	{
+		EndScramble();
+	}
+}
+
+void AShadeCharacter::EndScramble()
+{
+	if (!bScrambling)
+	{
+		return;
+	}
+	bScrambling = false;
+	ScrambleCooldown = 0.4f;
+	Rig->ActW = 0.f;
+	if (GetCharacterMovement()->MovementMode == MOVE_Flying)
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+}
+
+void AShadeCharacter::UpdateIdle(float Dt)
+{
+	const bool bStill = bControlEnabled && EvapState == 0 && !bMerging && !bScrambling && JumpWindup <= 0.f
+		&& !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() < 4.f && PendingMove.IsNearlyZero()
+		&& ActStage == EActStage::None && !Grabbed.IsValid() && !HoldTarget.IsValid();
+	IdleTime = bStill ? IdleTime + Dt : 0.f;
+	if (!bSitting && IdleTime > 5.f && Exposure < 0.05f)
+	{
+		bSitting = true;
+		Rig->SetPose(ECatPose::Sit, 0.9f);
+	}
+	else if (bSitting && !bStill)
+	{
+		bSitting = false;
+		if (Rig->GetPose() == ECatPose::Sit)
+		{
+			Rig->SetPose(ECatPose::Locomote, 0.25f);
+		}
+	}
+}
+
 void AShadeCharacter::UpdateGrab(float Dt)
 {
 	AShadeLemonCart* Cart = Grabbed.Get();
@@ -1161,6 +1353,10 @@ void AShadeCharacter::Landed(const FHitResult& Hit)
 	Super::Landed(Hit);
 	const float Impact = FMath::Clamp(-GetVelocity().Z / 700.f, 0.f, 1.2f);
 	Rig->Land(Impact);
+	if (Impact > 0.85f)
+	{
+		LandRecover = 0.32f * FMath::Min(Impact, 1.f);  // a real drop (well past an ordinary hop): legs take it, a beat to recover
+	}
 	ShadeAssets::PlayAt(this, TEXT("SFX_Land"), GetActorLocation(), 0.25f + 0.5f * Impact);
 	if (Impact > 0.3f)
 	{
@@ -1176,4 +1372,7 @@ void AShadeCharacter::OnJumped_Implementation()
 {
 	Super::OnJumped_Implementation();
 	ShadeAssets::PlayAt(this, TEXT("SFX_Jump"), GetActorLocation(), 0.45f);
+	// A running cat leaps long: a little extra reach along the body at a trot (a standing hop goes straight up).
+	const float Run = FMath::Clamp((GetVelocity().Size2D() - WalkSpeed) / FMath::Max(SprintSpeed - WalkSpeed, 1.f), 0.f, 1.f);
+	GetCharacterMovement()->Velocity += GetActorForwardVector().GetSafeNormal2D() * 40.f * Run;
 }

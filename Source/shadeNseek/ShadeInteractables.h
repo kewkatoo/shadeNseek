@@ -518,6 +518,10 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Cat")
 	TObjectPtr<UShadeCatRig> Rig;
 
+	/** Biscotto's red collar and brass bell, fitted round the neck bones every frame. */
+	UPROPERTY(VisibleAnywhere, Category = "Cat")
+	TObjectPtr<UStaticMeshComponent> Collar;
+
 	void WakeUp();
 	void SetHasShadow(bool bShadow);
 	bool IsAwake() const { return bAwake; }

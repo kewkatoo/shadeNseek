@@ -907,6 +907,8 @@ AShadeNapCat::AShadeNapCat()
 	Mesh->SetupAttachment(Root);
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Rig = CreateDefaultSubobject<UShadeCatRig>(TEXT("Rig"));
+	Collar = MakeMesh(this, TEXT("Collar"), Root);
+	NoCollision(Collar);
 	FocusPoint->SetRelativeLocation(FVector(0.f, 0.f, 45.f));
 }
 
@@ -932,6 +934,9 @@ void AShadeNapCat::BeginPlay()
 	{
 		EyeMID->SetVectorParameterValue(TEXT("LidColor"), CoatTint * FLinearColor(0.6f, 0.26f, 0.075f) * (1.f - 0.82f * CoatDark));
 	}
+	DefaultMesh(Collar, TEXT("SM_CatCollar"));
+	Collar->SetVisibility(bIsBiscotto);
+	Collar->SetCastShadow(false);
 	Rig->Init(Mesh);
 	Mesh->SetRelativeRotation(FRotator(0.f, Rig->GetFacingYaw(), 0.f));
 	Mesh->SetRelativeScale3D(FVector(CatScale * Rig->GetUnitScale()));
@@ -1004,6 +1009,21 @@ void AShadeNapCat::Tick(float DeltaSeconds)
 	if (EyeMID)
 	{
 		EyeMID->SetScalarParameterValue(TEXT("Lid"), Rig->GetEyeLid());
+	}
+	if (Collar && Collar->IsVisible())
+	{
+		// Round the base of the neck, a third of the way up from the shoulders: an oval that dips into the throat ruff
+		// (sized from the neck bone so it fits whatever the cat's scale), bell hanging at the throat.
+		const FVector N = Mesh->GetBoneLocation(TEXT("neck"));
+		const FVector H = Mesh->GetBoneLocation(TEXT("head"));
+		const float Len = FVector::Dist(N, H);
+		if (Len > 1.f)
+		{
+			const FVector Axis = (H - N) / Len;
+			const FMatrix Frame = FRotationMatrix::MakeFromXZ(Axis, FVector::UpVector);
+			Collar->SetWorldLocationAndRotation(N + Axis * (0.36f * Len) - Frame.GetUnitAxis(EAxis::Z) * (0.2f * Len), Frame.Rotator());
+			Collar->SetWorldScale3D(FVector(0.05f * Len, 0.049f * Len, 0.066f * Len));
+		}
 	}
 	if (Purr)
 	{

@@ -925,7 +925,9 @@ for (x, y, z) in ((-1800, -1250, 420), (1200, -1300, 420), (4300, -1250, 420), (
     place(prop("island_tree_0" + str(R.choice([1, 2]))), (x, y, z), (0, R.uniform(0, 360), 0), R.uniform(0.32, 0.45), "Trees", collision=False, shadow=False)
 # headlands either side (the mountain behind the town and the seabed: sns_backdrop.py, run at the end)
 for (mid, x, y, z, s, yaw) in (("coastal_cliff_01", -7500, 3000, -1600, 1.6, 75), ("coastal_cliff_02", 10500, 2500, -1600, 2.0, -80),
-                               ("coastal_cliff_04", 9500, 6500, -1500, 1.4, -60), ("coast_rocks_01", 2000, 3600, -1300, 1.0, 10)):
+                               ("coastal_cliff_04", 9500, 6500, -1500, 1.4, -60)):
+    # (coast_rocks_01 was dropped: a 66 x 52 m field of rocks at most 2.8 m out of the water - through the water they
+    # read as brown scraps floating round the pier)
     place(prop(mid), (x, y, z), (0, yaw, 0), s, "Coast", collision=False, shadow=False)
 # beach + pier + boats
 slab(-3000, 6000, 2300, 3300, -1235, 300, "MI_Sand")

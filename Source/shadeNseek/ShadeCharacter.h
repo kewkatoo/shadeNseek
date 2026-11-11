@@ -128,6 +128,15 @@ protected:
 	/** Physical interactions: walk up, face it, rear up, paws on, push / tug / swat, let go (see StartAction). */
 	void UpdateAction(float Dt);
 	void StartAction(AShadeInteractable* Target);
+	/** Body-led locomotion: Shade turns toward where it is asked to go (quickly when slow, in wider arcs at a trot, only a
+	 *  little in the air) and runs where its body points, pivoting on the spot instead of sliding sideways. */
+	void Locomote(const FVector2D& Axis, float Dt);
+	/** A hop that just misses a ledge: the front paws hook the edge and Shade scrambles up and over. */
+	bool TryScramble();
+	void UpdateScramble(float Dt);
+	void EndScramble();
+	/** Standing still in the shade for a while, Shade sits down; it gets up the moment it is asked to go. */
+	void UpdateIdle(float Dt);
 	void BeginLet();
 	void CancelAction();
 	/** Movement and new interactions are locked while the paws are working (not while letting go). */
@@ -209,6 +218,18 @@ protected:
 	bool bSprint = false;
 	bool bInvulnerable = false;
 	float JumpWindup = 0.f;
+
+	// Locomotion feel
+	float LandRecover = 0.f;      // seconds of slowed legs after a hard landing
+	float IdleTime = 0.f;         // seconds standing still with nothing asked of it
+	bool bSitting = false;
+	bool bScrambling = false;
+	float ScrambleT = 0.f;        // 0..1 through the scramble
+	float ScrambleCooldown = 0.f;
+	FVector ScrambleFrom = FVector::ZeroVector;
+	FVector ScrambleTo = FVector::ZeroVector;
+	FVector ScrambleEdge = FVector::ZeroVector;  // top of the edge the paws hook (world)
+	FVector ScrambleFace = FVector::ForwardVector;
 
 	// Sun
 	float Exposure = 0.f;
