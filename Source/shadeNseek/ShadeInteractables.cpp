@@ -40,6 +40,15 @@ namespace
 		C->SetCollisionResponseToChannel(ECC_Sunlight, ECR_Block);
 	}
 
+	/** A cord from Top down to the handle at Bottom (actor space); pulling the handle stretches it. */
+	void PoseCord(UStaticMeshComponent* Cord, UStaticMeshComponent* Handle, const FVector& Top, const FVector& Bottom)
+	{
+		Cord->SetRelativeLocation(Bottom);
+		Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
+		Cord->SetRelativeScale3D(FVector(FMath::Max((Top - Bottom).Size(), 1.f) / 100.f, 1.f, 1.f));
+		Handle->SetRelativeLocation(Bottom);
+	}
+
 	void NoCollision(UPrimitiveComponent* C)
 	{
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -159,6 +168,12 @@ FVector AShadeLemonCart::GetInteractLocation() const
 FVector AShadeLemonCart::GetFocusLocation() const
 {
 	return GetActorLocation() - GetActorForwardVector() * (GrabDistance - 40.f) + FVector(0.f, 0.f, 105.f);
+}
+
+FVector AShadeLemonCart::GetContactLocation(const FVector& From) const
+{
+	// The tailboard's outer face (x -100 in the cart, 42-62 cm up), low enough for a cat up on its hind legs.
+	return GetActorLocation() - GetActorForwardVector() * 100.5f + FVector(0.f, 0.f, 47.f);
 }
 
 void AShadeLemonCart::Interact(AShadeCharacter* Shade)
@@ -281,6 +296,11 @@ FVector AShadeAwning::GetInteractLocation() const
 	return GetActorTransform().TransformPosition(CordLocal + InteractOffset);
 }
 
+FVector AShadeAwning::GetContactLocation(const FVector& From) const
+{
+	return Handle->GetComponentLocation();
+}
+
 FVector AShadeAwning::GetFocusLocation() const
 {
 	return GetActorTransform().TransformPosition(CordLocal + FVector(0.f, 0.f, 55.f));
@@ -358,13 +378,8 @@ void AShadeAwning::UpdateGeometry()
 		A->SetRelativeScale3D(FVector(FMath::Max(D.Size(), 1.f) / 100.f, 1.f, 1.f));
 	}
 
-	// Cord hangs still from a cleat on the wall (its sway and tug bob read as jitter).
-	const FVector Top(CordLocal.X, CordLocal.Y, -18.f);
-	const FVector Bottom = CordLocal;
-	Cord->SetRelativeLocation(Bottom);
-	Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
-	Cord->SetRelativeScale3D(FVector(FMath::Max((Top - Bottom).Size(), 1.f) / 100.f, 1.f, 1.f));
-	Handle->SetRelativeLocation(Bottom);
+	// Cord from a cleat on the wall down to the handle; Shade's paws pull the handle down (PullCm).
+	PoseCord(Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -18.f), CordLocal - FVector(0.f, 0.f, PullCm));
 	Handle->SetRelativeRotation(FRotator::ZeroRotator);
 }
 
@@ -428,6 +443,13 @@ bool AShadeFlowerPot::CanInteract(const AShadeCharacter* Shade) const
 {
 	// Only from up on the wall (the wall's own shadow at its foot must not let Shade nudge it from the ground).
 	return State == 0 && Shade != nullptr && Shade->GetActorLocation().Z > GetActorLocation().Z - 25.f;
+}
+
+FVector AShadeFlowerPot::GetContactLocation(const FVector& From) const
+{
+	const FBoxSphereBounds B = Pot->Bounds;
+	const FVector Away = (B.Origin - From).GetSafeNormal2D();
+	return B.Origin - Away * FMath::Max(B.BoxExtent.X, B.BoxExtent.Y) * 0.8f - FVector(0.f, 0.f, B.BoxExtent.Z * 0.2f);
 }
 
 FVector AShadeFlowerPot::GetFocusLocation() const
@@ -606,6 +628,11 @@ FVector AShadeWashingLine::GetInteractLocation() const
 	return GetActorTransform().TransformPosition(CordLocal + InteractOffset);
 }
 
+FVector AShadeWashingLine::GetContactLocation(const FVector& From) const
+{
+	return Handle->GetComponentLocation();
+}
+
 FVector AShadeWashingLine::GetFocusLocation() const
 {
 	return GetActorTransform().TransformPosition(CordLocal + FVector(0.f, 0.f, 55.f));
@@ -647,6 +674,7 @@ void AShadeWashingLine::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
+	PoseCord(Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -12.f), CordLocal - FVector(0.f, 0.f, PullCm));
 	Time += Dt;
 	GustClock += Dt;
 	if (bHolding && !bSolved)
@@ -766,6 +794,16 @@ bool AShadeShutter::CanInteract(const AShadeCharacter* Shade) const
 FVector AShadeShutter::GetInteractLocation() const
 {
 	return GetActorTransform().TransformPosition(CordLocal + InteractOffset);
+}
+
+FVector AShadeShutter::GetContactLocation(const FVector& From) const
+{
+	return Handle->GetComponentLocation();
+}
+
+void AShadeShutter::SetPull(float Cm)
+{
+	PoseCord(Cord, Handle, FVector(CordLocal.X, CordLocal.Y, PanelHeight * 0.5f), CordLocal - FVector(0.f, 0.f, Cm));
 }
 
 FVector AShadeShutter::GetFocusLocation() const

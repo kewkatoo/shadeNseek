@@ -82,7 +82,7 @@ void UShadeAutoplayComponent::BuildScript()
 	Step(E::MoveTo, TEXT("AP_ShutterCord"), 0.f, 30.f);
 	Step(E::Face, TEXT("Dev_Shutter"), 0.35f);
 	Step(E::Interact, TEXT("Dev_Shutter"));
-	Step(E::WaitShade, TEXT("AP_ShutterMid"), 2.5f);
+	Step(E::WaitShade, TEXT("AP_ShutterMid"), 4.f);  // Shade walks up to the cord and tugs it first
 	Step(E::MoveTo, TEXT("AP_ShutterEnd"), 0.f, 35.f, true);
 	// Puzzle 5: Casa Azzurra's awning shades the wall, then the pot bridges the last gap.
 	Step(E::MoveTo, TEXT("AP_AzzurraCord"), 0.f, 30.f);

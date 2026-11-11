@@ -176,7 +176,7 @@ void AShadeCharacter::MoveInput(const FVector2D& Axis)
 		return;
 	}
 	PendingMove = Axis;
-	if (Grabbed.IsValid() || HoldTarget.IsValid())
+	if (Grabbed.IsValid() || HoldTarget.IsValid() || IsActBusy())
 	{
 		return;
 	}
@@ -203,7 +203,7 @@ void AShadeCharacter::LookInput(const FVector2D& Axis)
 
 void AShadeCharacter::JumpInput()
 {
-	if (!bControlEnabled || EvapState != 0 || Grabbed.IsValid() || HoldTarget.IsValid() || bMerging)
+	if (!bControlEnabled || EvapState != 0 || Grabbed.IsValid() || HoldTarget.IsValid() || bMerging || IsActBusy())
 	{
 		return;
 	}
@@ -230,6 +230,10 @@ void AShadeCharacter::InteractPressed(AShadeInteractable* Explicit)
 		ReleaseGrab();
 		return;
 	}
+	if (IsActBusy())
+	{
+		return;
+	}
 	AShadeInteractable* Target = Explicit ? Explicit : Focused.Get();
 	if (!Target || !Target->CanInteract(this))
 	{
@@ -239,14 +243,33 @@ void AShadeCharacter::InteractPressed(AShadeInteractable* Explicit)
 	{
 		HoldTarget = Target;
 	}
-	Target->Interact(this);
+	const EShadeAction Style = Target->GetActionStyle();
+	if (Style == EShadeAction::None || Style == EShadeAction::Push)
+	{
+		// Instant, or the cart (its Interact grabs it, and the grab starts the push action).
+		Target->Interact(this);
+		return;
+	}
+	// Cords and the pot: Shade walks up and does it with its paws; Interact() fires when they get there.
+	StartAction(Target);
 }
 
 void AShadeCharacter::InteractReleased()
 {
 	if (AShadeInteractable* H = HoldTarget.Get())
 	{
-		H->EndInteract(this);
+		if (ActTarget.Get() == H && ActStage != EActStage::None)
+		{
+			if (bActFired)
+			{
+				H->EndInteract(this);
+			}
+			BeginLet();
+		}
+		else
+		{
+			H->EndInteract(this);
+		}
 	}
 	HoldTarget.Reset();
 }
@@ -265,9 +288,9 @@ void AShadeCharacter::ToggleGrab(AShadeLemonCart* Cart)
 	Grabbed = Cart;
 	Cart->SetGrabbed(true);
 	GrabBlend = 0.f;
-	GetCharacterMovement()->bOrientRotationToMovement = false;
-	Rig->SetPose(ECatPose::Push, 0.3f);
-	ShadeAssets::PlayAt(this, TEXT("SFX_Grab"), GetActorLocation(), 0.7f);
+	CartSpeed = 0.f;
+	// Shade walks round to the tailboard, rears up and puts both paws on it before the cart moves (UpdateAction).
+	StartAction(Cart);
 }
 
 void AShadeCharacter::ReleaseGrab()
@@ -277,9 +300,18 @@ void AShadeCharacter::ReleaseGrab()
 		C->SetGrabbed(false);
 		ShadeAssets::PlayAt(this, TEXT("SFX_Release"), GetActorLocation(), 0.5f);
 	}
+	const bool bWasActing = Grabbed.IsValid() && ActTarget.Get() == Grabbed.Get();
 	Grabbed.Reset();
-	GetCharacterMovement()->bOrientRotationToMovement = true;
+	CartSpeed = 0.f;
 	Rig->SetPose(ECatPose::Locomote, 0.3f);
+	if (bWasActing)
+	{
+		BeginLet();
+	}
+	else
+	{
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+	}
 }
 
 void AShadeCharacter::SetForcedFocus(AShadeInteractable* Target)
@@ -305,6 +337,7 @@ void AShadeCharacter::BeginMerge(const FVector& Spot, float Duration)
 	MergeAlpha = 0.f;
 	ReleaseGrab();
 	InteractReleased();
+	CancelAction();
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
 	SetActorEnableCollision(false);
@@ -330,6 +363,7 @@ void AShadeCharacter::Tick(float DeltaSeconds)
 		}
 	}
 
+	UpdateAction(Dt);
 	UpdateGrab(Dt);
 	UpdateHold(Dt);
 	UpdateSun(Dt);
@@ -459,6 +493,7 @@ void AShadeCharacter::Evaporate()
 	}
 	ReleaseGrab();
 	InteractReleased();
+	CancelAction();
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
 	ShadeAssets::PlayAt(this, TEXT("SFX_Evaporate"), GetActorLocation(), 1.f);
@@ -591,14 +626,284 @@ void AShadeCharacter::UpdateFocus(float Dt)
 	FocusAlpha = ShadeEase::Approach(FocusAlpha, Best ? 1.f : 0.f, 10.f, Dt);
 }
 
-void AShadeCharacter::UpdateGrab(float Dt)
+// =====================================================================================================================
+// Physical interactions: Shade walks up to the thing, turns to it, rears up, puts its paws on it and only then does it
+// do anything - pushing the cart along, tugging a cord, swatting the pot. The paws are IK targets on the cat rig.
+// =====================================================================================================================
+
+bool AShadeCharacter::IsActBusy() const
 {
-	AShadeLemonCart* Cart = Grabbed.Get();
-	if (!Cart)
+	return ActStage == EActStage::Approach || ActStage == EActStage::Reach || ActStage == EActStage::Work;
+}
+
+void AShadeCharacter::StartAction(AShadeInteractable* Target)
+{
+	if (!Target)
 	{
 		return;
 	}
-	GrabBlend = FMath::Min(1.f, GrabBlend + Dt * 5.f);
+	ActTarget = Target;
+	ActStyle = Target->GetActionStyle();
+	ActStage = EActStage::Approach;
+	ActTime = ActStuck = ActCycle = 0.f;
+	bActFired = false;
+	const FVector Me = GetActorLocation();
+	ActContact = Target->GetContactLocation(Me);
+	if (const AShadeLemonCart* Cart = Cast<AShadeLemonCart>(Target))
+	{
+		// Between the handles, facing along the cart, paws on the tailboard.
+		ActFace = Cart->GetPushDirection().GetSafeNormal2D();
+		ActSpot = Cart->GetGrabLocation();
+		Rig->SetPose(ECatPose::Push, 0.4f);
+	}
+	else
+	{
+		FVector D = ActContact - Me;
+		D.Z = 0.f;
+		ActFace = D.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : D.GetSafeNormal();
+		// Close enough that the paws land well within reach (the rig knows its own arm length).
+		const float Reach = Rig->GetPawReach() * (ActStyle == EShadeAction::Swat ? 1.05f : 0.95f);
+		ActSpot = ActContact - ActFace * Reach;
+	}
+	ActSpot.Z = Me.Z;
+	GetCharacterMovement()->bOrientRotationToMovement = true;
+}
+
+void AShadeCharacter::BeginLet()
+{
+	if (ActStage == EActStage::None || ActStage == EActStage::Let)
+	{
+		return;
+	}
+	ActStage = EActStage::Let;
+	ActTime = 0.f;
+	GetCharacterMovement()->bOrientRotationToMovement = !Grabbed.IsValid();
+}
+
+void AShadeCharacter::CancelAction()
+{
+	if (AShadeInteractable* T = ActTarget.Get())
+	{
+		T->SetPull(0.f);
+	}
+	ActTarget.Reset();
+	ActStage = EActStage::None;
+	ActW = ActPull = ActLean = ActRear = 0.f;
+	Rig->ActW = 0.f;
+	GetCharacterMovement()->bOrientRotationToMovement = true;
+}
+
+void AShadeCharacter::UpdateAction(float Dt)
+{
+	AShadeInteractable* T = ActTarget.Get();
+	if (ActStage != EActStage::None && !T)
+	{
+		CancelAction();
+	}
+	if (ActStage == EActStage::None)
+	{
+		Rig->ActW = 0.f;
+		return;
+	}
+	ActTime += Dt;
+	const FVector Me = GetActorLocation();
+	const float Feet = Me.Z - GCapsuleHalf;
+	const FVector Up = FVector::UpVector;
+	const FVector Right = FVector::CrossProduct(Up, ActFace).GetSafeNormal();
+	const bool bCart = ActStyle == EShadeAction::Push;
+	const bool bSwat = ActStyle == EShadeAction::Swat;
+	const float ReachTime = bSwat ? 0.16f : 0.3f;
+	ActContact = T->GetContactLocation(Me);
+
+	switch (ActStage)
+	{
+	case EActStage::Approach:
+	{
+		FVector To = ActSpot - Me;
+		To.Z = 0.f;
+		const float D = To.Size();
+		if (D > 3.f)
+		{
+			AddMovementInput(To / D, FMath::Clamp(D / 25.f, 0.3f, 1.f));
+		}
+		ActStuck = (D > 3.f && GetVelocity().Size2D() < 8.f) ? ActStuck + Dt : 0.f;
+		if (D <= 3.f || ActStuck > 0.35f || ActTime > 1.8f)
+		{
+			// There: square up to it.
+			GetCharacterMovement()->bOrientRotationToMovement = false;
+			const FRotator Want = ActFace.Rotation();
+			SetActorRotation(FMath::RInterpTo(GetActorRotation(), Want, Dt, 10.f));
+			if (FMath::Abs(FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, Want.Yaw)) < 8.f || ActTime > 2.4f)
+			{
+				GetCharacterMovement()->StopMovementImmediately();
+				ActStage = EActStage::Reach;
+				ActTime = 0.f;
+			}
+		}
+		break;
+	}
+	case EActStage::Reach:
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), ActFace.Rotation(), Dt, 10.f));
+		if (ActTime >= ReachTime)
+		{
+			ActStage = EActStage::Work;
+			ActTime = 0.f;
+			ActCycle = 0.f;
+			if (bCart)
+			{
+				ShadeAssets::PlayAt(this, TEXT("SFX_Grab"), ActContact, 0.7f);
+			}
+			else if (ActStyle == EShadeAction::PullHold)
+			{
+				// Paws round the handle: now the cord actually works (released early = nothing happens).
+				if (HoldTarget.Get() == T && T->CanInteract(this))
+				{
+					T->Interact(this);
+					bActFired = true;
+					ShadeAssets::PlayAt(this, TEXT("SFX_Grab"), ActContact, 0.45f);
+				}
+				else
+				{
+					BeginLet();
+				}
+			}
+		}
+		break;
+	case EActStage::Work:
+		if (ActStyle == EShadeAction::PullHold)
+		{
+			ActCycle += Dt / 0.85f;  // one tug every 0.85 s
+		}
+		else if (ActStyle == EShadeAction::PullTap)
+		{
+			// One hard yank: the shutter goes when the cord is well down.
+			if (!bActFired && ActTime >= 0.2f)
+			{
+				if (T->CanInteract(this))
+				{
+					T->Interact(this);
+				}
+				bActFired = true;
+			}
+			if (ActTime >= 0.42f)
+			{
+				BeginLet();
+			}
+		}
+		else if (bSwat)
+		{
+			// Paw cocked, then the swipe: the pot reacts when the paw meets it.
+			if (!bActFired && ActTime >= 0.17f)
+			{
+				if (T->CanInteract(this))
+				{
+					T->Interact(this);
+				}
+				bActFired = true;
+			}
+			if (ActTime >= 0.34f)
+			{
+				BeginLet();
+			}
+		}
+		break;
+	case EActStage::Let:
+		if (ActTime >= 0.35f && ActW <= 0.03f)
+		{
+			T->SetPull(0.f);
+			ActTarget.Reset();
+			ActStage = EActStage::None;
+			ActW = ActPull = ActLean = ActRear = 0.f;
+			Rig->ActW = 0.f;
+			GetCharacterMovement()->bOrientRotationToMovement = !Grabbed.IsValid();
+			return;
+		}
+		break;
+	default:
+		break;
+	}
+
+	// ---- What the paws and body do this frame ---------------------------------------------------------------------
+	const bool bOn = ActStage == EActStage::Reach || ActStage == EActStage::Work;
+	ActW = ShadeEase::Approach(ActW, bOn ? 1.f : 0.f, bOn ? (bSwat ? 14.f : 9.f) : 7.f, Dt);
+	const float Tug = (ActStage == EActStage::Work && ActStyle == EShadeAction::PullHold)
+		? (0.5f - 0.5f * FMath::Cos(2.f * PI * ActCycle)) * ShadeEase::Smooth(ActTime / 0.3f) : 0.f;
+	float WantPull = 0.f;
+	if (ActStage == EActStage::Work)
+	{
+		WantPull = ActStyle == EShadeAction::PullHold ? 3.f + 10.f * Tug
+			: (ActStyle == EShadeAction::PullTap ? 16.f * ShadeEase::Smooth(ActTime / 0.25f) : 0.f);
+	}
+	ActPull = ActStyle == EShadeAction::PullHold && ActStage == EActStage::Work ? WantPull : ShadeEase::Approach(ActPull, WantPull, 16.f, Dt);
+	T->SetPull(ActPull);
+
+	// Height of the work above the ground decides how far up on the hind legs Shade goes (the handle's rest height for
+	// cords, so the body sinks as it pulls the handle down).
+	const float WorkZ = ActContact.Z + (bCart || bSwat ? 0.f : ActPull);
+	float WantRear = bSwat ? 0.12f : Rig->RearForHeight(WorkZ - Feet);
+	if (ActStyle == EShadeAction::PullHold || ActStyle == EShadeAction::PullTap)
+	{
+		WantRear *= 1.f - 0.3f * (ActStyle == EShadeAction::PullHold ? Tug : FMath::Min(ActPull / 16.f, 1.f));
+	}
+	ActRear = ShadeEase::Approach(ActRear, WantRear, 10.f, Dt);
+	if (!bCart)
+	{
+		const float WantLean = ActStyle == EShadeAction::PullHold ? -0.2f - 0.6f * Tug
+			: (ActStyle == EShadeAction::PullTap ? -0.8f * FMath::Min(ActPull / 16.f, 1.f)
+			: (bSwat && ActStage == EActStage::Work && ActTime > 0.1f ? 0.5f : 0.f));
+		ActLean = ShadeEase::Approach(ActLean, WantLean, 10.f, Dt);
+	}
+	else if (ActStage == EActStage::Reach)
+	{
+		ActLean = ShadeEase::Approach(ActLean, 0.3f, 8.f, Dt);
+	}
+
+	FVector PawL, PawR;
+	float WL = 1.f, WR = 1.f, Meta = 135.f, Curl = 45.f;
+	if (bCart)
+	{
+		// Both paws flat on the tailboard, toes up.
+		PawL = ActContact - Right * 4.5f;
+		PawR = ActContact + Right * 4.5f;
+		Meta = 150.f;
+		Curl = -70.f;
+	}
+	else if (bSwat)
+	{
+		// Right paw only: cocked back and up, then the swipe through the contact point.
+		const FVector Cock = ActContact - ActFace * 9.f + Up * 8.f + Right * 2.f;
+		const FVector Hit = ActContact + ActFace * 1.5f;
+		const float S = ActStage == EActStage::Work ? ShadeEase::Smooth((ActTime - 0.09f) / 0.08f) : 0.f;
+		PawR = FMath::Lerp(Cock, Hit, S);
+		PawL = PawR;
+		WL = 0.f;
+		Meta = 95.f;
+		Curl = 20.f;
+	}
+	else
+	{
+		// Both paws round the handle bar, claws hooked over it.
+		PawL = ActContact - Right * 3.5f - Up * 1.f;
+		PawR = ActContact + Right * 3.5f - Up * 1.f;
+	}
+	Rig->ActW = ActW;
+	Rig->ActRear = ActRear;
+	Rig->ActLean = ActLean;
+	Rig->ActMeta = Meta;
+	Rig->ActCurl = Curl;
+	Rig->ActPawW[0] = WL;
+	Rig->ActPawW[1] = WR;
+	Rig->ActPawWorld[0] = PawL;
+	Rig->ActPawWorld[1] = PawR;
+}
+
+void AShadeCharacter::UpdateGrab(float Dt)
+{
+	AShadeLemonCart* Cart = Grabbed.Get();
+	if (!Cart || ActTarget.Get() != Cart || ActStage != EActStage::Work)
+	{
+		return;  // still walking round to the tailboard / rearing up (UpdateAction)
+	}
 	// Input projected onto the cart axis, camera-relative like normal movement.
 	const FRotator Yaw(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector Wish = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X) * PendingMove.Y + FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y) * PendingMove.X;
@@ -608,15 +913,23 @@ void AShadeCharacter::UpdateGrab(float Dt)
 	{
 		Amount = 0.f;
 	}
-	const float Moved = GrabBlend >= 1.f ? Cart->Push(FMath::Clamp(Amount, -1.f, 1.f) * PushSpeed * Dt) : 0.f;
-
+	// A loaded cart: it takes a shove to get going, rolls on a little when Shade eases off, and drags back slowly
+	// (claws hooked over the tailboard).
+	const float Want = FMath::Clamp(Amount, -0.5f, 1.f) * PushSpeed;
+	const float Accel = FMath::Abs(Want) > FMath::Abs(CartSpeed) ? 160.f : 240.f;
+	CartSpeed = FMath::FInterpConstantTo(CartSpeed, Want, Dt, Accel);
+	const float Moved = Cart->Push(CartSpeed * Dt);
+	if (FMath::Abs(Moved) < FMath::Abs(CartSpeed * Dt) * 0.5f)
+	{
+		CartSpeed = Moved / FMath::Max(Dt, 1e-4f);  // stopped at the end of the track
+	}
+	// Shade walks with the cart, paws staying on the tailboard; it leans in hardest while getting the cart moving.
 	const FVector Target = Cart->GetGrabLocation();
-	FVector Loc = GetActorLocation();
-	const FVector Want(Target.X, Target.Y, Loc.Z);
-	Loc = GrabBlend < 1.f ? FMath::Lerp(Loc, Want, FMath::Min(1.f, Dt * 14.f)) : Want;
-	SetActorLocation(Loc, false);
+	SetActorLocation(FVector(Target.X, Target.Y, GetActorLocation().Z), false);
 	SetActorRotation(FMath::RInterpTo(GetActorRotation(), Axis.Rotation(), Dt, 12.f));
 	GetCharacterMovement()->Velocity = Axis * (Moved / FMath::Max(Dt, 1e-4f));
+	const float Effort = Want > 0.f ? 0.45f + 0.55f * FMath::Clamp((Want - CartSpeed) / 50.f, 0.f, 1.f) : (Want < 0.f ? -0.55f : 0.12f);
+	ActLean = ShadeEase::Approach(ActLean, Effort, 6.f, Dt);
 	if (FVector::Dist2D(GetActorLocation(), Target) > 120.f)
 	{
 		ReleaseGrab();
@@ -634,6 +947,10 @@ void AShadeCharacter::UpdateHold(float Dt)
 	{
 		InteractReleased();
 		return;
+	}
+	if (ActTarget.Get() == H)
+	{
+		return;  // UpdateAction walks up to it and faces it
 	}
 	// Face what we're tugging.
 	const FVector To = (H->GetFocusLocation() - GetActorLocation()).GetSafeNormal2D();
@@ -655,7 +972,12 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 	Rig->bGrounded = !GetCharacterMovement()->IsFalling();
 	Rig->Excitement = FMath::Lerp(0.6f, 0.05f, Exposure);
 	Rig->Crouch = JumpWindup > 0.f ? 1.f : 0.f;
-	if (AShadeInteractable* F = Focused.Get())
+	if (ActStage != EActStage::None && ActW > 0.2f)
+	{
+		Rig->bHasLook = true;
+		Rig->LookAtWorld = ActContact;
+	}
+	else if (AShadeInteractable* F = Focused.Get())
 	{
 		Rig->bHasLook = true;
 		Rig->LookAtWorld = F->GetFocusLocation();

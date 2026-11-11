@@ -198,6 +198,13 @@ Same contract rules: no Fab / Marketplace / Megascans, nothing NoAI-licensed, ev
   run now measures ~-20.7 LUFS integrated (was ~-24 to -25), true peak -4.6 dBTP, no clipping.
 - **Fix found on the way:** one frame of coincident IK points could build a rotation from a zero direction in the cat rig
   (engine ensure + an invalid bone transform); `Frame()` now falls back to a valid frame.
+- **Interactions are physical (follow-up, 2026-11-11):** Shade no longer snaps to the cart or tugs cords from 85 cm
+  away. It walks up, turns to the object, rears onto its hind legs and puts its paws on it (IK targets in the cat rig's
+  new interaction layer), and only then does anything happen: both paws on the cart's tailboard while it pushes (the
+  loaded cart takes a moment to get going and rolls on a little), both paws round a cord handle that it pulls down in a
+  tugging rhythm while E is held (awning, washing line, Casa Azzurra), one hard yank on the shutter cord, and a cocked
+  paw swiping the pot off the wall. Cord handles follow the paws (the cord stretches). Autoplay waits for results, so
+  the extra half second per interaction is absorbed; the shutter step's shade wait is 4 s.
 - **Performance:** Shipping autoplay 109 fps mean, p95 92 fps (RTX 4050 laptop, with another session's game running);
   the mountain keeps 50 trees - 140 masked Nanite trees halved the frame rate.
 - **Credit line for videos:** Music: "Home Was You" by Scott Buckley (www.scottbuckley.com.au), CC BY 4.0. His tracks are

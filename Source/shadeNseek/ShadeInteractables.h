@@ -13,6 +13,17 @@ class UPoseableMeshComponent;
 class UShadeCatRig;
 class UMaterialInstanceDynamic;
 
+/** How Shade physically uses an interactable (drives the approach and the paw animation in AShadeCharacter). */
+UENUM()
+enum class EShadeAction : uint8
+{
+	None,      // instant (waking Biscotto)
+	Push,      // up on the hind legs, both front paws on it, walking it along (the cart)
+	PullHold,  // up on the hind legs, both paws on a cord handle, tugging for as long as E is held
+	PullTap,   // one hard tug on a cord
+	Swat       // a paw swipe, as cats do with things on ledges
+};
+
 /**
  * Anything Shade can use with E. The puzzle objects all cast real shadows that the sun subsystem traces against,
  * so "solving" a puzzle is literally moving shade into place.
@@ -52,6 +63,11 @@ public:
 	bool IsSolved() const { return bSolved; }
 	/** 0..1 progress for hold interactions (HUD ring). */
 	virtual float GetProgress() const { return bSolved ? 1.f : 0.f; }
+	virtual EShadeAction GetActionStyle() const { return EShadeAction::None; }
+	/** World point Shade's paws work on, approached from From (the cart's tailboard, a cord handle, the pot's side). */
+	virtual FVector GetContactLocation(const FVector& From) const { return GetFocusLocation(); }
+	/** Cords: how far (cm) the paws have pulled the handle down; the cord stretches with it. */
+	virtual void SetPull(float Cm) {}
 
 protected:
 	void MarkSolved();
@@ -82,6 +98,9 @@ public:
 	virtual FVector GetInteractLocation() const override;
 	virtual FVector GetFocusLocation() const override;
 	virtual bool CanInteract(const AShadeCharacter* Shade) const override;
+	virtual EShadeAction GetActionStyle() const override { return EShadeAction::Push; }
+	/** Middle of the tailboard, where the front paws press. */
+	virtual FVector GetContactLocation(const FVector& From) const override;
 
 	/** Moves the cart along its axis by up to Delta cm (sweeping). Returns the distance actually moved. */
 	float Push(float Delta);
@@ -97,9 +116,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Cart")
 	float SolvedOffset = 300.f;
 
-	/** Distance from the cart centre to where Shade braces (behind the cart). */
+	/** Distance from the cart centre to where Shade stands to push (between the handles, paws on the tailboard). */
 	UPROPERTY(EditAnywhere, Category = "Cart")
-	float GrabDistance = 150.f;
+	float GrabDistance = 126.f;
 
 	UPROPERTY(EditAnywhere, Category = "Cart")
 	float WheelRadius = 22.f;
@@ -150,6 +169,9 @@ public:
 	virtual FVector GetInteractLocation() const override;
 	virtual FVector GetFocusLocation() const override;
 	virtual float GetProgress() const override { return Extension; }
+	virtual EShadeAction GetActionStyle() const override { return EShadeAction::PullHold; }
+	virtual FVector GetContactLocation(const FVector& From) const override;
+	virtual void SetPull(float Cm) override { PullCm = Cm; }
 	bool IsTugging() const { return bHolding; }
 
 	/** Projection from the wall (cm, along local +X) when fully open. */
@@ -204,6 +226,7 @@ public:
 
 private:
 	void UpdateGeometry();
+	float PullCm = 0.f;
 
 	float Extension = 0.f;
 	float TugPhase = 0.f;
@@ -227,6 +250,9 @@ public:
 	virtual void Interact(AShadeCharacter* Shade) override;
 	virtual FVector GetFocusLocation() const override;
 	virtual bool CanInteract(const AShadeCharacter* Shade) const override;
+	virtual EShadeAction GetActionStyle() const override { return EShadeAction::Swat; }
+	/** The near side of the pot, a little below the rim. */
+	virtual FVector GetContactLocation(const FVector& From) const override;
 
 	/** Landing spot relative to the actor. */
 	UPROPERTY(EditAnywhere, Category = "Pot")
@@ -297,6 +323,9 @@ public:
 	virtual FVector GetInteractLocation() const override;
 	virtual FVector GetFocusLocation() const override;
 	virtual float GetProgress() const override { return Extension; }
+	virtual EShadeAction GetActionStyle() const override { return EShadeAction::PullHold; }
+	virtual FVector GetContactLocation(const FVector& From) const override;
+	virtual void SetPull(float Cm) override { PullCm = Cm; }
 
 	/** True while a gust holds the sheets up (their shade is off the steps). */
 	bool IsGusting() const;
@@ -363,6 +392,7 @@ private:
 	float ClickAccum = 0.f;
 	float Time = 0.f;
 	float GustClock = 0.f;
+	float PullCm = 0.f;
 	bool bHolding = false;
 	bool bWasGusting = false;
 	TArray<FShadeSpring> Swing;
@@ -391,6 +421,9 @@ public:
 	virtual FVector GetInteractLocation() const override;
 	virtual FVector GetFocusLocation() const override;
 	virtual float GetProgress() const override { return OpenAngle > 0.f ? Angle / OpenAngle : 0.f; }
+	virtual EShadeAction GetActionStyle() const override { return EShadeAction::PullTap; }
+	virtual FVector GetContactLocation(const FVector& From) const override;
+	virtual void SetPull(float Cm) override;
 
 	UPROPERTY(EditAnywhere, Category = "Shutter")
 	float PanelWidth = 160.f;

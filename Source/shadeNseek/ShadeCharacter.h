@@ -15,6 +15,7 @@ class UMaterialInstanceDynamic;
 class UShadeCatRig;
 class AShadeInteractable;
 class AShadeLemonCart;
+enum class EShadeAction : uint8;
 
 /** One pooled "ink wisp" quad (Shade's trail, burn smoke, evaporation burst). */
 struct FShadeWisp
@@ -124,6 +125,13 @@ protected:
 	void UpdateFocus(float Dt);
 	void UpdateGrab(float Dt);
 	void UpdateHold(float Dt);
+	/** Physical interactions: walk up, face it, rear up, paws on, push / tug / swat, let go (see StartAction). */
+	void UpdateAction(float Dt);
+	void StartAction(AShadeInteractable* Target);
+	void BeginLet();
+	void CancelAction();
+	/** Movement and new interactions are locked while the paws are working (not while letting go). */
+	bool IsActBusy() const;
 	void UpdateEvaporation(float Dt);
 	void UpdateVisuals(float Dt);
 	void UpdateWisps(float Dt);
@@ -176,6 +184,24 @@ protected:
 	TWeakObjectPtr<AShadeLemonCart> Grabbed;
 	float FocusAlpha = 0.f;
 	float GrabBlend = 0.f;
+
+	// Interaction animation state
+	enum class EActStage : uint8 { None, Approach, Reach, Work, Let };
+	TWeakObjectPtr<AShadeInteractable> ActTarget;
+	EShadeAction ActStyle{};
+	EActStage ActStage = EActStage::None;
+	float ActTime = 0.f;        // seconds in the current stage
+	float ActStuck = 0.f;       // seconds the approach made no progress
+	float ActW = 0.f;           // eased weight of the paw layer fed to the rig
+	float ActPull = 0.f;        // cm the paws have pulled a cord handle down
+	float ActLean = 0.f;
+	float ActRear = 0.f;
+	float ActCycle = 0.f;       // tug rhythm phase
+	float CartSpeed = 0.f;      // cm/s along the cart axis: a loaded cart takes a moment to get going and rolls on a little
+	bool bActFired = false;     // the interactable's Interact() has been called (paws on it)
+	FVector ActSpot = FVector::ZeroVector;
+	FVector ActFace = FVector::ForwardVector;
+	FVector ActContact = FVector::ZeroVector;
 	FVector2D PendingMove = FVector2D::ZeroVector;
 
 	bool bControlEnabled = false;

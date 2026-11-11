@@ -123,6 +123,24 @@ public:
 	/** QA: animate a gait in place as if walking at this speed (cm/s) on a moving floor. */
 	float TreadmillSpeed = 0.f;
 
+	// --- Interaction layer (pushing, pulling cords, swatting), written by the owner every frame ------------------------
+	/** 0..1 weight of the whole layer (the owner eases it in and out). */
+	float ActW = 0.f;
+	/** Front paws (0 FL, 1 FR): weight and world target of each paw ball. */
+	float ActPawW[2] = { 0.f, 0.f };
+	FVector ActPawWorld[2] = { FVector::ZeroVector, FVector::ZeroVector };
+	/** Paw shape at the target: metacarpus angle from vertical (+ = lower end forward) and toe curl (claws hooking). */
+	float ActMeta = 70.f;
+	float ActCurl = 30.f;
+	/** 0..1: up on the hind legs - sat back on the haunches, chest raised (to reach high targets). */
+	float ActRear = 0.f;
+	/** -1..1: + leans the weight forward into a push, - back into a pull. */
+	float ActLean = 0.f;
+	/** Comfortable horizontal reach of the front paws ahead of the cat's centre (cm, at the current MeshScale). */
+	float GetPawReach() const;
+	/** How far to rear up (0..1) to put the front paws at this height above the ground (cm). */
+	float RearForHeight(float Height) const;
+
 	void SetPose(ECatPose Pose, float BlendTime = 0.45f);
 	ECatPose GetPose() const { return TargetPose; }
 	float GetPoseWeight(ECatPose Pose) const { return PoseW[static_cast<int32>(Pose)]; }
@@ -156,6 +174,7 @@ private:
 	void ComputeSleep(FCatPoseParams& P) const;
 	void UpdateGait(float Dt, float SpeedN, const FVector& VelRig, const FVector& VelWorld);
 	void UpdateTail(float Dt, const FCatPoseParams& P, const FVector& RootRig, const FQuat& PelvisQ);
+	void ApplyAction(FCatPoseParams& P);
 	void Solve(const FCatPoseParams& P);
 	void Apply();
 	float TraceGround(const FVector& World, float Fallback) const;
@@ -199,6 +218,7 @@ private:
 	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS;
 	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;
 	float SmoothSpeed = 0.f;
+	bool bActFront[2] = { false, false };  // front legs held by the interaction layer (not used to lower the body)
 
 	// Tail: per-segment world directions on damped angular springs (positions are derived)
 	FVector TailX[9];

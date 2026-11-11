@@ -346,6 +346,7 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	}
 	if (SitW > 0.f) { ComputeSit(Tmp); P.Add(Tmp, SitW); }
 	if (SleepW > 0.f) { ComputeSleep(Tmp); P.Add(Tmp, SleepW); }
+	ApplyAction(P);
 
 	// Breathing (slower and deeper asleep), yawn + stretch, blinks.
 	Breath = FMath::Sin(Time * (SleepW > 0.5f ? 1.5f : 2.4f));
@@ -792,6 +793,76 @@ void UShadeCatRig::ComputeSleep(FCatPoseParams& P) const
 }
 
 // =====================================================================================================================
+// Interaction layer: paws on a cart, a cord in both paws, a swat at a pot
+// =====================================================================================================================
+
+float UShadeCatRig::GetPawReach() const
+{
+	using namespace CatBone;
+	// Shoulder ahead of the centre plus a bit over half the arm: the paw lands well inside its reach, never locked out.
+	const float Arm = BoneLen[UArmL] + BoneLen[FArmL] + BoneLen[HandL];
+	return (RestPos[UArmL].X + 0.55f * Arm) * MeshScale;
+}
+
+float UShadeCatRig::RearForHeight(float Height) const
+{
+	using namespace CatBone;
+	const float M = MeshScale;
+	const float Arm = (BoneLen[UArmL] + BoneLen[FArmL] + BoneLen[HandL]) * M;
+	const float Shoulder = RestPos[UArmL].Z * M;
+	// Standing, the paws comfortably reach a little above the shoulder; rearing lifts the shoulder by up to most of the
+	// pelvis-to-shoulder length.
+	const float Lift = FMath::Max((RestPos[UArmL] - RestPos[Pelvis]).Size() * M * 0.75f, 1.f);
+	return Sat((Height - (Shoulder + 0.15f * Arm)) / Lift);
+}
+
+void UShadeCatRig::ApplyAction(FCatPoseParams& P)
+{
+	using namespace CatBone;
+	const float W = Sat(ActW);
+	bActFront[0] = bActFront[1] = false;
+	if (W <= 0.001f)
+	{
+		return;
+	}
+	const float M = MeshScale;
+	const float R = Sat(ActRear) * W;
+	const float Lean = FMath::Clamp(ActLean, -1.f, 1.f) * W;
+	// Up on the hind legs: rump lower and back, chest raised, neck bent forward so the head stays near level; the hocks
+	// drop toward the ground as the weight goes onto them.
+	P.PelvisOffset += FVector(-2.5f * R + 1.6f * Lean, 0.f, -4.f * R - 0.6f * FMath::Abs(Lean)) * M;
+	P.BodyPitch += 50.f * R - 5.f * Lean;
+	P.SpinePitch[1] += 3.f * R;
+	P.SpinePitch[2] += 4.f * R - 2.f * Lean;
+	P.SpinePitch[3] += 2.f * R - 2.f * Lean;
+	P.NeckPitch -= 26.f * R + 6.f * Lean;
+	P.HeadPitch -= 6.f * FMath::Max(Lean, 0.f);
+	P.EarBack += 10.f * FMath::Abs(Lean) * W;
+	for (int32 l = 2; l < 4; ++l)
+	{
+		P.Meta[l] += 34.f * R;
+	}
+	for (int32 l = 0; l < 2; ++l)
+	{
+		const float A = Sat(ActPawW[l]) * W;
+		if (A <= 0.001f)
+		{
+			continue;
+		}
+		bActFront[l] = A > 0.5f;
+		P.Ball[l] = FMath::Lerp(P.Ball[l], ToRig(ActPawWorld[l]), A);
+		P.Meta[l] = FMath::Lerp(P.Meta[l], ActMeta, A);
+		P.Curl[l] = FMath::Lerp(P.Curl[l], ActCurl, A);
+		P.Scap[l] = FMath::Lerp(P.Scap[l], 6.f, A);
+	}
+	// Tail low and still with effort.
+	for (int32 i = 0; i < 8; ++i)
+	{
+		P.TailPitch[i] = FMath::Lerp(P.TailPitch[i], -10.f + 2.f * i, 0.5f * W);
+	}
+}
+
+// =====================================================================================================================
 // Solve: params -> bone transforms (rig space)
 // =====================================================================================================================
 
@@ -859,7 +930,10 @@ void UShadeCatRig::Solve(const FCatPoseParams& P)
 			Root = ScapTop + QScap.RotateVector(RP(C[1]) - RP(C[0]));
 			Set(C[0], ScapTop, Aim(C[0], Root - ScapTop, Right));
 			const FVector WristT = Ball - MDir * Lmeta;
-			Over = FMath::Max(Over, FVector::Dist(Root, WristT) - 0.985f * (L1 + L2));
+			if (!bActFront[l])  // a paw held on a target out of reach must not drag the body down
+			{
+				Over = FMath::Max(Over, FVector::Dist(Root, WristT) - 0.985f * (L1 + L2));
+			}
 			SolveTwoBone(Root, WristT, L1, L2, FVector(-1.f, 0.12f * L.Side, 0.f), Mid, End);
 		}
 		else

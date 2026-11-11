@@ -68,7 +68,7 @@ The autoplay route finishes in ~1:40 (title to end card about 1:50).
 ## Code map (`Source/shadeNseek`)
 | File | Role |
 |---|---|
-| `ShadeCharacter` | Shade: movement, camera, sun exposure / evaporation / respawn, interaction focus, cart pushing, ink-wisp particles |
+| `ShadeCharacter` | Shade: movement, camera, sun exposure / evaporation / respawn, interaction focus, physical interactions (walks up, rears onto its hind legs, paws on the cart's tailboard / round a cord handle / swiping the pot; the effect starts when the paws get there; the cart has weight), ink-wisp particles |
 | `ShadeCatRig` | Procedural quadruped animation on a `UPoseableMeshComponent`: paws planted in the world and traced onto the ground (stairs too), digitigrade leg IK with shoulder blades, walk / trot gaits from ground speed, idle re-stepping, a lowered carriage and rolling shoulder blades on the move, spine bending into turns and slopes, jump crouch / air pose / landing squash, a tail of independent damped angular springs (lags and swings, never resonates), sprung ears, blinking, look-at; sit and sleep are blended in the same pose space |
 | `ShadeSpringArm` | Follow-camera boom pivoting on the capsule centre: pulls in fast and eases out slowly on collisions, holds a pull-in briefly (no pumping at edges), ignores start-penetrating hits and keeps a minimum distance (the camera never ends up inside Shade); small props never block the camera |
 | `ShadeSunSubsystem` | Sun queries + `-sunmap` QA image |
