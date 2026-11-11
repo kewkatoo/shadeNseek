@@ -5,7 +5,7 @@ Original model, generated from scratch:
   2. This script (Blender) cleans and decimates it, adds cupped ears with inner-ear colouring, real eyeballs set in
      almond sockets, whiskers and brow whiskers, paints a ginger mackerel-tabby coat into vertex colours, builds a
      37-bone digitigrade skeleton (shoulder blades, toes, 8-bone tail), skins it with heat-diffused weights and adds
-     five combed fur shells (material slot 3; UV1.x = shell height) so the silhouette reads as soft fur.
+     eight combed fur shells (material slot 3; UV1.x = shell height) so the silhouette reads as soft fur.
 Material slots: 0 M_CatBody, 1 M_CatEye, 2 M_CatWhisker, 3 M_CatShell.
 Exports asset-library/Models/generated/SK_Cat.fbx plus preview renders in Saved/CatPreview.
 
@@ -67,7 +67,7 @@ scene.collection.objects.link(body)
 s1 = body.modifiers.new("smooth", 'SMOOTH')
 s1.factor, s1.iterations = 0.5, 6
 dec = body.modifiers.new("decimate", 'DECIMATE')
-dec.ratio = 24000 / max(len(F), 1)
+dec.ratio = 32000 / max(len(F), 1)  # dense enough that the painted stripes stay crisp
 s2 = body.modifiers.new("smooth2", 'SMOOTH')
 s2.factor, s2.iterations = 0.35, 2
 dg = bpy.context.evaluated_depsgraph_get()
@@ -295,7 +295,7 @@ for v in me.vertices:
 # =====================================================================================================================
 # 5. Fur shells (before the accessories so they only wrap the body). Weights are duplicated with the vertices.
 # =====================================================================================================================
-N_SHELLS = 5
+N_SHELLS = 8  # enough layers that the coat reads as a volume of hair, not stacked sheets
 bm = bmesh.new()
 bm.from_mesh(me)
 lay = bm.faces.layers.int.new("shell")  # create layers before holding element references

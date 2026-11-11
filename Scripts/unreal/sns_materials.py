@@ -476,9 +476,13 @@ def coat_color(g):
     return g.mul(g.mul(coat, g.scalar("CoatBrightness", 0.92)), g.lerp(g.const(1.0), g.const(0.16), g.scalar("CoatDark", 0.0)))
 
 
+def strand_tex(g, tiling):
+    """T_FurStrands: R per-strand length (0 between strands, tapering into tufts), G tone of the tuft, B tone of the hair."""
+    return g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("FurTiling", tiling)))
+
+
 def strand_map(g, tiling):
-    """T_FurStrands R: per-strand length (0 between strands)."""
-    return (g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("FurTiling", tiling))), "R")
+    return (strand_tex(g, tiling), "R")
 
 
 def fur_strands(g, h, st=None):
@@ -607,8 +611,9 @@ def build_cat_fur():
     g = Graph("M_CatFur", shading=unreal.MaterialShadingModel.MSM_SUBSURFACE)
     coat = coat_color(g)
     # Neighbouring hairs differ a little in tone, so the coat never reads as painted plastic.
-    grain = (g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("GrainTiling", 7.0))), "R")
-    coat = g.mul(coat, g.lerp(g.const(0.84), g.const(1.07), grain))
+    # The skin-level coat carries the same tufts as the shells above it (tone of each lock of hair).
+    tufts = (strand_tex(g, 1.2), "G")
+    coat = g.mul(coat, g.lerp(g.const(0.86), g.const(1.07), tufts))
     nm = g.texs(tex("T_FurNormal"), S_NORMAL, g.uv(g.scalar("FurNormalTiling", 8.0)))
     # Grazing light picks out the fuzz of pale tips rather than a glossy rim.
     col = g.lerp(coat, hair_tips(g, coat, 1.5, (0.03, 0.025, 0.018)), g.mul(g.fresnel(2.2, 0.0), g.scalar("Sheen", 0.5)))
@@ -626,10 +631,11 @@ def build_cat_shell():
     g = Graph("M_CatShell", blend=unreal.BlendMode.BLEND_MASKED, shading=unreal.MaterialShadingModel.MSM_SUBSURFACE)
     h = shell_height(g)
     coat = coat_color(g)
-    st = strand_map(g, 4.6)
-    # Each strand its own tone (longer guard hairs a touch lighter); roots sit in the coat's own shadow, tips are pale
-    # and catch the light - the depth that makes it read as fur.
-    coat = g.mul(coat, g.lerp(g.const(0.86), g.const(1.1), st))
+    sm = strand_tex(g, 1.2)
+    st = (sm, "R")
+    # Each lock of hair its own tone, each hair a little different again; roots sit in the coat's own shadow, tips are
+    # pale and catch the light - the depth that makes it read as fur.
+    coat = g.mul(g.mul(coat, g.lerp(g.const(0.84), g.const(1.1), (sm, "G"))), g.lerp(g.const(0.93), g.const(1.06), (sm, "B")))
     col = g.lerp(g.mul(coat, g.const(0.5)), hair_tips(g, coat, 1.3, (0.02, 0.016, 0.012)), h)
     g.out(col, MP.MP_BASE_COLOR)
     g.out(g.const(0.88), MP.MP_ROUGHNESS)

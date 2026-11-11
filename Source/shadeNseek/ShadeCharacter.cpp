@@ -239,10 +239,17 @@ void AShadeCharacter::JumpInput()
 	{
 		return;
 	}
-	// Cats gather themselves before they spring: a short crouch, then the jump.
-	if (JumpWindup <= 0.f && !GetCharacterMovement()->IsFalling())
+	if (GetCharacterMovement()->IsFalling())
 	{
-		JumpWindup = 0.11f;
+		TryWallKick();
+		return;
+	}
+	// Cats gather themselves before they spring: a short crouch, then the forequarters come up and the hind legs drive
+	// (quicker on the run, where the stride itself is the gather).
+	if (JumpWindup <= 0.f)
+	{
+		JumpWindupTotal = GetVelocity().Size2D() > 150.f ? 0.1f : 0.17f;
+		JumpWindup = JumpWindupTotal;
 	}
 }
 
@@ -399,6 +406,7 @@ void AShadeCharacter::Tick(float DeltaSeconds)
 	LandRecover = FMath::Max(0.f, LandRecover - Dt);
 	ScrambleCooldown = FMath::Max(0.f, ScrambleCooldown - Dt);
 	UpdateAction(Dt);
+	UpdateWallKick(Dt);
 	if (bScrambling || TryScramble())
 	{
 		UpdateScramble(Dt);
@@ -940,6 +948,7 @@ void AShadeCharacter::UpdateAction(float Dt)
 	Rig->ActCurl = Curl;
 	Rig->ActPawW[0] = WL;
 	Rig->ActPawW[1] = WR;
+	Rig->ActPawW[2] = Rig->ActPawW[3] = 0.f;
 	Rig->ActPawWorld[0] = PawL;
 	Rig->ActPawWorld[1] = PawR;
 
@@ -966,6 +975,89 @@ void AShadeCharacter::UpdateAction(float Dt)
 // =====================================================================================================================
 // Ledge scramble and sitting
 // =====================================================================================================================
+
+bool AShadeCharacter::TryWallKick()
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (!Move->IsFalling() || WallKicks >= 2 || bScrambling || ActStage != EActStage::None || EvapState != 0 || bMerging || !bControlEnabled
+		|| Grabbed.IsValid() || HoldTarget.IsValid())
+	{
+		return false;
+	}
+	if (GetVelocity().Z < -520.f)
+	{
+		return false;  // dropping too fast to get a purchase
+	}
+	// A real wall square in front: near-vertical, visible (never the invisible edge-of-the-world walls), and reaching
+	// down to where the hind paws are.
+	const FVector Face = GetActorForwardVector().GetSafeNormal2D();
+	UWorld* W = GetWorld();
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(ShadeWallKick), false, this);
+	const FVector Loc = GetActorLocation();
+	auto IsWall = [&](const FHitResult& H)
+	{
+		const UPrimitiveComponent* C = H.GetComponent();
+		return H.bBlockingHit && !H.bStartPenetrating && C && C->IsVisible() && !(H.GetActor() && H.GetActor()->IsHidden())
+			&& FMath::Abs(H.ImpactNormal.Z) < 0.3f && FVector::DotProduct(H.ImpactNormal.GetSafeNormal2D(), -Face) > 0.55f;
+	};
+	FHitResult Wall, Low;
+	if (!W->LineTraceSingleByChannel(Wall, Loc, Loc + Face * (GCapsuleRadius + 26.f), ECC_Pawn, Q) || !IsWall(Wall))
+	{
+		return false;
+	}
+	const FVector Feet = Loc - FVector(0, 0, GCapsuleHalf - 4.f);
+	if (!W->LineTraceSingleByChannel(Low, Feet, Feet + Face * (GCapsuleRadius + 34.f), ECC_Pawn, Q) || !IsWall(Low))
+	{
+		return false;
+	}
+	const FVector N = Wall.ImpactNormal.GetSafeNormal2D();
+	// Up the wall: most of the sideways speed bled off into the kick, a little push to stay close to the wall.
+	FVector V = GetVelocity();
+	V -= N * FVector::DotProduct(V, N);
+	V *= 0.35f;
+	V -= N * 45.f;
+	V.Z = WallKicks == 0 ? 430.f : 380.f;
+	LaunchCharacter(V, true, true);
+	SetActorRotation((-N).Rotation());
+	++WallKicks;
+	KickT = 0.f;
+	KickWall = Wall.ImpactPoint;
+	KickN = N;
+	ShadeAssets::PlayAt(this, TEXT("SFX_Land"), Low.ImpactPoint, 0.22f, 1.3f);
+	ShadeAssets::PlayAt(this, TEXT("SFX_Jump"), GetActorLocation(), 0.35f, 1.1f);
+	return true;
+}
+
+void AShadeCharacter::UpdateWallKick(float Dt)
+{
+	if (KickT >= 0.32f)
+	{
+		return;
+	}
+	KickT += Dt;
+	if (bScrambling || ActStage != EActStage::None || EvapState != 0 || bMerging)
+	{
+		KickT = 10.f;
+		return;
+	}
+	// Body reared up along the wall; forepaws scrabbling up it above the head, hind paws pressed to it and driving.
+	const float T = KickT;
+	const float Wt = T < 0.05f ? ShadeEase::Smooth(T / 0.05f) : 1.f - ShadeEase::Smooth((T - 0.14f) / 0.18f);
+	const FVector Loc = GetActorLocation();
+	const FVector OnWall = Loc - KickN * FVector::DotProduct(Loc - KickWall, KickN) + KickN * 2.f;
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, -KickN).GetSafeNormal();
+	const float Scrab = 4.f * FMath::Sin(T * 42.f);
+	Rig->ActW = Wt;
+	Rig->ActRear = 0.85f;
+	Rig->ActLean = 0.8f;
+	Rig->ActMeta = 165.f;
+	Rig->ActCurl = -40.f;
+	Rig->ActPawW[0] = Rig->ActPawW[1] = Rig->ActPawW[2] = Rig->ActPawW[3] = 1.f;
+	Rig->ActPawWorld[0] = OnWall - Right * 4.f + FVector(0, 0, 16.f + Scrab);
+	Rig->ActPawWorld[1] = OnWall + Right * 4.f + FVector(0, 0, 16.f - Scrab);
+	Rig->ActPawWorld[2] = OnWall - Right * 3.5f - FVector(0, 0, GCapsuleHalf - 2.f + 0.5f * Scrab);
+	Rig->ActPawWorld[3] = OnWall + Right * 3.5f - FVector(0, 0, GCapsuleHalf - 2.f - 0.5f * Scrab);
+}
 
 bool AShadeCharacter::TryScramble()
 {
@@ -1072,6 +1164,11 @@ void AShadeCharacter::UpdateScramble(float Dt)
 	Rig->ActPawW[0] = Rig->ActPawW[1] = 1.f;
 	Rig->ActPawWorld[0] = ScrambleEdge + ScrambleFace * 4.f - Right * 4.f + FVector(0, 0, 1.f);
 	Rig->ActPawWorld[1] = ScrambleEdge + ScrambleFace * 4.f + Right * 4.f + FVector(0, 0, 1.f);
+	// Hind paws scrabble at the wall below the edge until the body is up, then come over.
+	const float Scrab = 2.5f * FMath::Sin(T * 38.f);
+	Rig->ActPawW[2] = Rig->ActPawW[3] = 1.f - ShadeEase::Smooth((T - 0.35f) / 0.3f);
+	Rig->ActPawWorld[2] = ScrambleEdge - ScrambleFace * 1.5f - Right * 3.5f - FVector(0, 0, 14.f + Scrab);
+	Rig->ActPawWorld[3] = ScrambleEdge - ScrambleFace * 1.5f + Right * 3.5f - FVector(0, 0, 14.f - Scrab);
 	if (T >= 1.f)
 	{
 		EndScramble();
@@ -1188,7 +1285,10 @@ void AShadeCharacter::UpdateVisuals(float Dt)
 	Rig->TurnRate = TurnRate;
 	Rig->bGrounded = !GetCharacterMovement()->IsFalling();
 	Rig->Excitement = FMath::Lerp(0.6f, 0.05f, Exposure);
-	Rig->Crouch = JumpWindup > 0.f ? 1.f : 0.f;
+	// Wind-up: gather low, then (the last ~0.06 s) the front lifts off while the hind legs stay down and drive.
+	const float LiftDur = FMath::Min(0.065f, JumpWindupTotal * 0.6f);
+	Rig->Crouch = JumpWindup > 0.f ? (JumpWindup > LiftDur ? 1.f : 0.4f + 0.6f * JumpWindup / LiftDur) : 0.f;
+	Rig->Launch = (JumpWindup > 0.f && JumpWindup <= LiftDur) ? ShadeEase::Smooth(1.f - JumpWindup / LiftDur) : 0.f;
 	if (ActStage != EActStage::None && ActW > 0.2f)
 	{
 		Rig->bHasLook = true;
@@ -1353,6 +1453,7 @@ void AShadeCharacter::Landed(const FHitResult& Hit)
 	Super::Landed(Hit);
 	const float Impact = FMath::Clamp(-GetVelocity().Z / 700.f, 0.f, 1.2f);
 	Rig->Land(Impact);
+	WallKicks = 0;
 	if (Impact > 0.85f)
 	{
 		LandRecover = 0.32f * FMath::Min(Impact, 1.f);  // a real drop (well past an ordinary hop): legs take it, a beat to recover

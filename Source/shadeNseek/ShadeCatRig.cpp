@@ -267,7 +267,8 @@ void UShadeCatRig::SetPose(ECatPose Pose, float BlendTime)
 
 void UShadeCatRig::Land(float Strength)
 {
-	LandComp.Velocity += 55.f * FMath::Clamp(Strength, 0.f, 1.5f);
+	LandStrength = FMath::Clamp(Strength, 0.f, 1.5f);
+	LandComp.Velocity += 55.f * LandStrength;
 }
 
 void UShadeCatRig::ResetDynamics()
@@ -420,27 +421,13 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		}
 	}
 
+	AirTime = bGrounded ? 0.f : AirTime + Dt;
 	if (!bGrounded)
 	{
 		for (FCatLeg& L : Legs) { L.bPlanted = false; L.SwingT = 1.f; }
 		bWasGrounded = false;
 		return;
 	}
-	if (!bWasGrounded)
-	{
-		// Touchdown: plant every paw where the air pose left it.
-		for (int32 l = 0; l < 4; ++l)
-		{
-			FCatLeg& L = Legs[l];
-			const float Z = TraceGround(L.BallWorld, GroundFallback);
-			L.PlantWorld = L.BallWorld = FVector(L.BallWorld.X, L.BallWorld.Y, Z + L.Home.Z * M);
-			L.bPlanted = true;
-			L.SwingT = 1.f;
-			if (OnFootPlant && l < 2) { OnFootPlant(l); }
-		}
-		bWasGrounded = true;
-	}
-
 	const float Stride = StrideN * M;
 	auto StartSwing = [&](FCatLeg& L, float Dur, bool bSettle)
 	{
@@ -452,6 +439,33 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		const float Base = L.bFront ? 3.9f : 3.3f;
 		L.SwingLift = (bSettle ? 2.2f : Base * FMath::Lerp(0.7f, 1.35f, Sat((SpeedN - 40.f) / 220.f))) * M;
 	};
+
+	if (!bWasGrounded)
+	{
+		// Touchdown, forepaws first: they plant where the air pose reached them and take the weight (the nose dips);
+		// the hind paws, still folded under the belly, come down a beat later - longer after a bigger drop - and plant
+		// under the hips.
+		const float HindDelay = 0.09f + 0.07f * Sat(LandStrength);
+		for (int32 l = 0; l < 4; ++l)
+		{
+			FCatLeg& L = Legs[l];
+			if (L.bFront)
+			{
+				const float Z = TraceGround(L.BallWorld, GroundFallback);
+				L.PlantWorld = L.BallWorld = FVector(L.BallWorld.X, L.BallWorld.Y, Z + L.Home.Z * M);
+				L.bPlanted = true;
+				L.SwingT = 1.f;
+				if (OnFootPlant) { OnFootPlant(l); }
+			}
+			else
+			{
+				StartSwing(L, HindDelay, true);
+				L.SwingLift = 0.8f * M;
+			}
+		}
+		LandPitchS.Velocity -= 60.f + 90.f * Sat(LandStrength);
+		bWasGrounded = true;
+	}
 
 	int32 Swinging = 0;
 	for (const FCatLeg& L : Legs) { Swinging += L.bPlanted ? 0 : 1; }
@@ -562,6 +576,9 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 	AccelPitch.Update(FMath::Clamp(-Acc.X / 110.f, -4.f, 4.f) * (1.f - Air), 90.f, 15.f, Dt);
 	Bend.Update(FMath::Clamp(TurnRate * 0.055f, -24.f, 24.f), 80.f, 16.f, Dt);
 	CrouchS.Update(Crouch, 420.f, 34.f, Dt);
+	LaunchS.Update(bGrounded ? Launch : 0.f, 520.f, 40.f, Dt);
+	LandPitchS.Update(0.f, 140.f, 15.f, Dt);
+	const float Lift = FMath::Max(LaunchS.Value, 0.f);
 	LandComp.Update(0.f, 150.f, 13.f, Dt);
 	const float Comp = FMath::Max(LandComp.Value, 0.f) * 0.11f;   // cm-ish, sprung
 
@@ -571,9 +588,14 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 	const float Carry = Moving * (1.f - Air);
 	const float HipDrop = (1.2f + 0.9f * Sprint) * M * Carry;
 	const float ChestDrop = (2.6f + 1.2f * Sprint) * M * Carry;
-	P.PelvisOffset = FVector(-1.2f * CrouchS.Value * M, 0.f, HindZ.Value - Bob - HipDrop - CrouchS.Value * 5.5f * M - Comp * M + LowerFix.Value);
+	// Hind paws still coming down after a forepaws-first landing hold the rump up a moment.
+	float HindLanding = 0.f;
+	for (int32 l = 2; l < 4; ++l) { HindLanding += (!Legs[l].bPlanted && bGrounded && Legs[l].bSettleStep) ? 0.5f : 0.f; }
+	P.PelvisOffset = FVector(-1.2f * CrouchS.Value * M - 1.5f * Lift * M, 0.f,
+		HindZ.Value - Bob - HipDrop - CrouchS.Value * 5.5f * M - Lift * 1.2f * M - Comp * M + LowerFix.Value + HindLanding * 1.6f * M);
+	// In the air the body follows the arc: nose up and stretched on the rise, nose down reaching for the landing.
 	P.BodyPitch = FMath::RadiansToDegrees(FMath::Atan2(FrontZ.Value - HindZ.Value - (ChestDrop - HipDrop), 27.f * M)) + AccelPitch.Value
-		+ Air * (8.f * Up - 9.f * Down) - CrouchS.Value * 4.f;
+		+ Air * (20.f * Up - 18.f * Down) - CrouchS.Value * 4.f + 26.f * Lift + LandPitchS.Value;
 	// A slight weight shift from side to side with the steps.
 	P.BodyRoll = FMath::Sin(Cyc) * 1.1f * Carry * (1.f - Sprint);
 
@@ -584,7 +606,7 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 	P.SpineYaw[2] = 0.35f * Bend.Value - Wig * 0.4f;
 	P.SpineYaw[3] = 0.35f * Bend.Value;
 	const float Flex = FMath::Sin(2.f * Cyc) * 2.4f * Sprint;
-	P.SpinePitch[1] = Flex + 5.f * CrouchS.Value - 4.f * Air * Up + 3.f * Comp;
+	P.SpinePitch[1] = Flex + 5.f * CrouchS.Value - 4.f * Air * Up + 3.f * Comp + 4.f * Lift;
 	P.SpinePitch[2] = -Flex * 0.5f + 3.f * CrouchS.Value;
 	P.SpinePitch[3] = -Flex * 0.6f - 2.f * CrouchS.Value;
 	P.NeckPitch = -5.f * Moving - 6.f * Sprint;
@@ -653,10 +675,28 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 			}
 		}
 	}
+	if (Lift > 0.001f && bGrounded)
+	{
+		// The spring starts at the front: the forepaws come up off the ground, curled, while the hind legs stay coiled.
+		for (int32 l = 0; l < 2; ++l)
+		{
+			const FCatLeg& L = Legs[l];
+			FVector A = FVector(L.Home.X + 4.f, L.Home.Y, 7.f) * M;
+			A.Z += P.PelvisOffset.Z;
+			P.Ball[l] = FMath::Lerp(P.Ball[l], A, Lift);
+			P.Meta[l] = FMath::Lerp(P.Meta[l], -45.f, Lift);
+			P.Curl[l] = FMath::Lerp(P.Curl[l], 45.f, Lift);
+		}
+	}
 	if (Air > 0.001f)
 	{
-		// Front paws tuck on the way up and reach for the landing on the way down; hind legs push off, then tuck.
+		// A real leap: forelegs up and reaching first while the hind legs drive off straight behind (only for the first
+		// instant - then they fold); a compact tuck over the top; then the forelegs reach down for the landing while
+		// the hind legs stay folded under the belly (they land a beat after the fore, see UpdateGait).
 		const FVector Pel = RP(Pelvis) + P.PelvisOffset;
+		const float Rise = Up;
+		const float Fall = Sat(-Velocity.Z / 300.f);
+		const float Drive = Sat(Velocity.Z / 250.f) * (1.f - ShadeEase::Smooth((AirTime - 0.06f) / 0.12f));
 		for (int32 l = 0; l < 4; ++l)
 		{
 			const FCatLeg& L = Legs[l];
@@ -664,20 +704,21 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 			float MetaA, CurlA;
 			if (L.bFront)
 			{
-				const FVector Tuck = FVector(L.Home.X + 3.f, L.Home.Y, 8.5f) * M;
-				const FVector Reach = FVector(L.Home.X + 5.f, L.Home.Y, 2.f) * M;
-				A = FMath::Lerp(Tuck, Reach, Down);
-				MetaA = FMath::Lerp(-55.f, 18.f, Down);
-				CurlA = FMath::Lerp(55.f, 10.f, Down);
+				const FVector Tuck(L.Home.X + 3.f, L.Home.Y, 8.5f);
+				const FVector Reach(L.Home.X + 7.5f, L.Home.Y, 11.f);
+				const FVector Land(L.Home.X + 6.f, L.Home.Y, -1.5f);
+				A = FMath::Lerp(FMath::Lerp(Tuck, Reach, Rise), Land, Fall) * M;
+				MetaA = FMath::Lerp(FMath::Lerp(-55.f, -25.f, Rise), 18.f, Fall);
+				CurlA = FMath::Lerp(FMath::Lerp(55.f, 30.f, Rise), 5.f, Fall);
 			}
 			else
 			{
-				const FVector Push = FVector(L.Home.X - 6.f, L.Home.Y, 3.f) * M;
-				const FVector Tuck = FVector(L.Home.X + 2.f, L.Home.Y, 6.f) * M;
-				const FVector Reach = FVector(L.Home.X, L.Home.Y, 2.5f) * M;
-				A = Up > 0.3f ? FMath::Lerp(Tuck, Push, Sat((Up - 0.3f) / 0.7f)) : FMath::Lerp(Tuck, Reach, Down);
-				MetaA = FMath::Lerp(-40.f, 10.f, Down);
-				CurlA = 35.f;
+				const FVector Tuck(L.Home.X + 3.f, L.Home.Y, 7.f);
+				const FVector Push(L.Home.X - 9.f, L.Home.Y, -1.f);
+				const FVector Fold(L.Home.X + 4.5f, L.Home.Y, 6.f);
+				A = FMath::Lerp(FMath::Lerp(Tuck, Push, Drive), Fold, Fall) * M;
+				MetaA = FMath::Lerp(FMath::Lerp(-35.f, -70.f, Drive), -30.f, Fall);
+				CurlA = FMath::Lerp(FMath::Lerp(35.f, 15.f, Drive), 40.f, Fall);
 			}
 			A.Z += Pel.Z - RP(Pelvis).Z;
 			P.Ball[l] = FMath::Lerp(P.Ball[l], A, Air);
@@ -703,7 +744,7 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 		// A slow wave travelling from the root to the tip keeps a carried tail alive without whipping it.
 		const float Walking = Moving * (1.f - Sprint) * (1.f - Air);
 		Pt += FMath::Sin(Time * 1.1f - i * 0.5f) * (i * 0.8f) * Walking;
-		Pt = FMath::Lerp(Pt, AirP[i], Air);
+		Pt = FMath::Lerp(Pt, AirP[i] - 10.f * Up + 22.f * Sat(-Velocity.Z / 300.f), Air);  // streams low on the rise, lifts to balance the fall
 		P.TailPitch[i] = Pt;
 		const float Sway = FMath::Sin(Time * 1.3f + i * 0.5f) * (1.2f + i * 1.2f) * (1.f - 0.75f * Moving)
 			+ FMath::Sin(Cyc + i * 0.4f) * 1.2f * Moving + (1.f - Moving) * (4.f + i * 3.f)
@@ -866,15 +907,22 @@ void UShadeCatRig::ApplyAction(FCatPoseParams& P)
 	{
 		P.Meta[l] += 34.f * R;
 	}
-	for (int32 l = 0; l < 2; ++l)
+	for (int32 l = 0; l < 4; ++l)
 	{
 		const float A = Sat(ActPawW[l]) * W;
 		if (A <= 0.001f)
 		{
 			continue;
 		}
-		bActFront[l] = A > 0.5f;
 		P.Ball[l] = FMath::Lerp(P.Ball[l], ToRig(ActPawWorld[l]), A);
+		if (l >= 2)
+		{
+			// Hind paws braced against a wall: toes pressed flat to it.
+			P.Meta[l] = FMath::Lerp(P.Meta[l], -60.f, A);
+			P.Curl[l] = FMath::Lerp(P.Curl[l], -30.f, A);
+			continue;
+		}
+		bActFront[l] = A > 0.5f;
 		P.Meta[l] = FMath::Lerp(P.Meta[l], ActMeta, A);
 		P.Curl[l] = FMath::Lerp(P.Curl[l], ActCurl, A);
 		P.Scap[l] = FMath::Lerp(P.Scap[l], 6.f, A);
@@ -979,7 +1027,7 @@ void UShadeCatRig::Solve(const FCatPoseParams& P)
 		Set(C[4], BallOut, Aim(C[4], TDir, FVector::RightVector));
 	}
 	// Legs that cannot reach lower the body a touch (and it rises back when they can).
-	const float Want = Over > 0.f ? LowerFix.Value - Over : FMath::Min(0.f, LowerFix.Value + 0.5f * M);
+	const float Want = (Over > 0.f && bGrounded) ? LowerFix.Value - Over : FMath::Min(0.f, LowerFix.Value + 0.5f * M);  // (in the air the legs stretch freely)
 	LowerFix.Value = FMath::Lerp(LowerFix.Value, FMath::Clamp(Want, -2.5f * M, 0.f), 0.12f);
 }
 

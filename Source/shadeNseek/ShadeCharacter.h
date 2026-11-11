@@ -137,6 +137,10 @@ protected:
 	void EndScramble();
 	/** Standing still in the shade for a while, Shade sits down; it gets up the moment it is asked to go. */
 	void UpdateIdle(float Dt);
+	/** Jump pressed in the air facing a wall: forepaws scrabble up it, hind paws kick off it for more height (up to two
+	 *  kicks per leap - a cat bounding up a wall to a ledge). */
+	bool TryWallKick();
+	void UpdateWallKick(float Dt);
 	void BeginLet();
 	void CancelAction();
 	/** Movement and new interactions are locked while the paws are working (not while letting go). */
@@ -223,6 +227,11 @@ protected:
 	float LandRecover = 0.f;      // seconds of slowed legs after a hard landing
 	float IdleTime = 0.f;         // seconds standing still with nothing asked of it
 	bool bSitting = false;
+	float JumpWindupTotal = 0.11f;  // length of the current wind-up (shorter on the run)
+	int32 WallKicks = 0;          // kicks used since leaving the ground
+	float KickT = 10.f;           // seconds since the last wall kick
+	FVector KickWall = FVector::ZeroVector;   // a point on the wall (world)
+	FVector KickN = FVector::ForwardVector;   // its normal, horizontal
 	bool bScrambling = false;
 	float ScrambleT = 0.f;        // 0..1 through the scramble
 	float ScrambleCooldown = 0.f;

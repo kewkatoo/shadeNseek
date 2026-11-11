@@ -115,7 +115,8 @@ public:
 	float TurnRate = 0.f;       // deg/s, + = turning right
 	bool bGrounded = true;
 	float Excitement = 0.4f;    // tail carriage / ear alertness
-	float Crouch = 0.f;         // 0..1 jump wind-up
+	float Crouch = 0.f;         // 0..1 jump wind-up (gathering low)
+	float Launch = 0.f;         // 0..1 the forequarters coming up off the ground just before the spring (hind legs still down)
 	bool bHasLook = false;
 	FVector LookAtWorld = FVector::ZeroVector;
 	/** Size of the cat relative to the authored model (1 = 34 cm pelvis-to-head). */
@@ -126,9 +127,9 @@ public:
 	// --- Interaction layer (pushing, pulling cords, swatting), written by the owner every frame ------------------------
 	/** 0..1 weight of the whole layer (the owner eases it in and out). */
 	float ActW = 0.f;
-	/** Front paws (0 FL, 1 FR): weight and world target of each paw ball. */
-	float ActPawW[2] = { 0.f, 0.f };
-	FVector ActPawWorld[2] = { FVector::ZeroVector, FVector::ZeroVector };
+	/** Paws (0 FL, 1 FR, 2 HL, 3 HR): weight and world target of each paw ball (hind paws: wall kicks, scrambles). */
+	float ActPawW[4] = { 0.f, 0.f, 0.f, 0.f };
+	FVector ActPawWorld[4] = { FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector };
 	/** Paw shape at the target: metacarpus angle from vertical (+ = lower end forward) and toe curl (claws hooking). */
 	float ActMeta = 70.f;
 	float ActCurl = 30.f;
@@ -224,7 +225,9 @@ private:
 	FVector PrevVelRig = FVector::ZeroVector;
 
 	// Body springs
-	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS;
+	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS, LaunchS, LandPitchS;
+	float LandStrength = 0.f;   // last landing (0..1.5): how long the hind paws take to come down after the fore
+	float AirTime = 0.f;        // seconds since the paws left the ground
 	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;
 	float SmoothSpeed = 0.f;
 	bool bActFront[2] = { false, false };  // front legs held by the interaction layer (not used to lower the body)

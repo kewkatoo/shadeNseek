@@ -288,19 +288,7 @@ def utility():
     streak = (streak - streak.min()) / (streak.max() - streak.min())
     save(height_to_normal(streak, 2.2), "T_FurNormal")
     save(tile_noise(512, 5, 0.6, 2, seed=44), "T_InkNoise")
-    # Fur shells: tileable strand map. R = strand length (0..1) with a tapered round cross-section, 0 between strands;
-    # a shell at height h keeps the texels whose strand is longer than h, so strands thin out toward the tips.
-    W = 512
-    fur = np.zeros((W, W))
-    oy, ox = np.mgrid[-3:4, -3:4]
-    rr = np.sqrt(ox ** 2 + oy ** 2)
-    for _ in range(11000):
-        cx, cy = rng.integers(0, W, 2)
-        length = rng.uniform(0.4, 1.0)
-        prof = np.clip(1 - rr / rng.uniform(1.3, 2.6), 0, 1) ** 0.7
-        ys_, xs_ = (cy + oy) % W, (cx + ox) % W
-        fur[ys_, xs_] = np.maximum(fur[ys_, xs_], length * prof)
-    save(fur, "T_FurStrands")
+    fur_strands()
     # Neutral defaults for materials whose maps are optional.
     flat = np.zeros((16, 16, 3), np.uint8)
     flat[..., 0], flat[..., 1], flat[..., 2] = 255, 190, 0
@@ -309,6 +297,48 @@ def utility():
     nrm[..., 0], nrm[..., 1], nrm[..., 2] = 128, 128, 255
     save(nrm, "T_FlatNormal")
     save(np.full((16, 16, 3), 255, np.uint8), "T_White")
+
+
+def fur_strands():
+    """Fur shells: tileable 1024 strand map in clumped tufts (how real fur lies - hairs gather into locks that taper to a
+    shared tip, with stray guard hairs between). R = strand length (0..1) with a tapered round cross-section, 0 between
+    strands: a shell at height h keeps the texels whose strand is longer than h, so the coat thins into pointed tufts
+    toward the tips. G = tone of the tuft, B = tone of the single hair (colour variation in the material)."""
+    r = np.random.default_rng(2611)
+    W = 1024
+    R = np.zeros((W, W), np.float32)
+    G = np.full((W, W), 0.5, np.float32)
+    B = np.full((W, W), 0.5, np.float32)
+
+    def stamp(cx, cy, rad, length, tone_g, tone_b):
+        n = int(np.ceil(rad)) + 1
+        oy, ox = np.mgrid[-n:n + 1, -n:n + 1]
+        prof = np.clip(1 - np.sqrt(ox ** 2 + oy ** 2) / rad, 0, 1) ** 0.7
+        v = (length * prof).astype(np.float32)
+        ys_, xs_ = (int(cy) + oy) % W, (int(cx) + ox) % W
+        cur = R[ys_, xs_]
+        win = v > cur
+        R[ys_[win], xs_[win]] = v[win]
+        G[ys_[win], xs_[win]] = tone_g
+        B[ys_[win], xs_[win]] = tone_b
+
+    # Tufts: hairs scattered round a centre, longest in the middle, so the upper shells leave a point per tuft.
+    for _ in range(1500):
+        cx, cy = r.uniform(0, W, 2)
+        rc = r.uniform(12, 24)
+        lc = r.uniform(0.72, 1.0)
+        tone = r.uniform(0, 1)
+        for _ in range(int(rc * 6)):
+            d = np.abs(r.normal(0, 0.5)) * rc
+            a = r.uniform(0, 2 * np.pi)
+            length = lc * (1 - 0.5 * min(d / rc, 1.0) ** 2) * r.uniform(0.85, 1.0)
+            stamp(cx + d * np.cos(a), cy + d * np.sin(a), r.uniform(1.1, 2.0), length, tone, r.uniform(0, 1))
+    # Undercoat and stray guard hairs between the tufts.
+    for _ in range(40000):
+        cx, cy = r.uniform(0, W, 2)
+        guard = r.uniform() < 0.12
+        stamp(cx, cy, r.uniform(1.0, 1.6), r.uniform(0.75, 1.0) if guard else r.uniform(0.15, 0.5), r.uniform(0, 1), 1.0 if guard else r.uniform(0, 1))
+    save(np.stack([R, G, B], axis=-1), "T_FurStrands")
 
 
 if __name__ == "__main__":
