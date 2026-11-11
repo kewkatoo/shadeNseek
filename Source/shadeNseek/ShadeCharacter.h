@@ -196,6 +196,7 @@ protected:
 	float ActPull = 0.f;        // cm the paws have pulled a cord handle down
 	float ActLean = 0.f;
 	float ActRear = 0.f;
+	float ActRearFix = 0.f;     // extra rear when the paws come up short of a high handle
 	float ActCycle = 0.f;       // tug rhythm phase
 	float CartSpeed = 0.f;      // cm/s along the cart axis: a loaded cart takes a moment to get going and rolls on a little
 	bool bActFired = false;     // the interactable's Interact() has been called (paws on it)

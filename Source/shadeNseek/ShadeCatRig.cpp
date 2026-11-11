@@ -816,6 +816,30 @@ float UShadeCatRig::RearForHeight(float Height) const
 	return Sat((Height - (Shoulder + 0.15f * Arm)) / Lift);
 }
 
+FVector UShadeCatRig::GripOffset(float MetaDeg, float CurlDeg) const
+{
+	// Same conventions as the leg solve: MDir = wrist -> ball, TDir = ball -> toe tips.
+	const float A = FMath::DegreesToRadians(MetaDeg);
+	const float Cu = FMath::DegreesToRadians(CurlDeg);
+	const FVector Back(-FMath::Sin(A), 0.f, FMath::Cos(A));     // ball -> wrist
+	const FVector Toes(FMath::Cos(Cu), 0.f, -FMath::Sin(Cu));   // ball -> toe tips
+	const FVector Bis = Back + Toes;
+	if (Bis.SizeSquared() < 0.04f)
+	{
+		return FVector::ZeroVector;  // an open, straight paw: nothing to close round
+	}
+	// A bar resting in the crook touches the toe pads and the back of the paw: out along the bisector by (bar radius +
+	// pad thickness) / sin(half the crook angle).
+	const float SinHalf = FMath::Sqrt(FMath::Max(0.5f * (1.f - FVector::DotProduct(Back, Toes)), 0.05f));
+	const float R = GripBarRadius + 0.8f * MeshScale;
+	return Bis.GetSafeNormal() * FMath::Min(R / SinHalf, 6.f * MeshScale);
+}
+
+FVector UShadeCatRig::BallForGrip(const FVector& GripWorld) const
+{
+	return GripWorld - RigToWorld.TransformVectorNoScale(GripOffset(ActMeta, ActCurl));
+}
+
 void UShadeCatRig::ApplyAction(FCatPoseParams& P)
 {
 	using namespace CatBone;
@@ -944,6 +968,11 @@ void UShadeCatRig::Solve(const FCatPoseParams& P)
 			SolveTwoBone(Root, HockT, L1, L2, FVector(1.f, 0.1f * L.Side, 0.f), Mid, End);
 		}
 		const FVector BallOut = End + MDir * Lmeta;
+		if (l < 2)
+		{
+			PawOut[l] = BallOut;
+			GripOut[l] = BallOut + GripOffset(P.Meta[l], P.Curl[l]);
+		}
 		Set(C[1], Root, Aim(C[1], Mid - Root, Right));
 		Set(C[2], Mid, Aim(C[2], End - Mid, Right));
 		Set(C[3], End, Aim(C[3], MDir, FVector::RightVector));

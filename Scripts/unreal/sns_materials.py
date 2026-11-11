@@ -464,10 +464,15 @@ def coat_color(g):
     return g.mul(g.mul(coat, g.scalar("CoatBrightness", 0.92)), g.lerp(g.const(1.0), g.const(0.16), g.scalar("CoatDark", 0.0)))
 
 
-def fur_strands(g, h):
+def strand_map(g, tiling):
+    """T_FurStrands R: per-strand length (0 between strands)."""
+    return (g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("FurTiling", tiling))), "R")
+
+
+def fur_strands(g, h, st=None):
     """Shell opacity: keep texels whose strand is longer than the shell height (strands taper to the tips)."""
-    st = g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("FurTiling", 3.6)))
-    return g.add(g.mul(g.sub((st, "R"), g.mul(h, g.const(0.94))), g.const(24.0)), g.const(0.5))
+    st = st or strand_map(g, 3.6)
+    return g.add(g.mul(g.sub(st, g.mul(h, g.const(0.94))), g.const(24.0)), g.const(0.5))
 
 
 def no_shadow(g, mask):
@@ -581,18 +586,27 @@ def build_shade_whisker():
     return g.finish(clip=0.5, skeletal=True)
 
 
+def hair_tips(g, coat, gain, lift):
+    """Sunlit hair tips: paler and a little less saturated than the coat (ginger fur greys toward cream at the ends)."""
+    return g.add(g.mul(g.desat(coat, g.const(0.28)), g.const(gain)), g.const3(lift))
+
+
 def build_cat_fur():
     g = Graph("M_CatFur", shading=unreal.MaterialShadingModel.MSM_SUBSURFACE)
     coat = coat_color(g)
-    nm = g.texs(tex("T_FurNormal"), S_NORMAL, g.uv(g.const(5.0)))
-    sheen = g.fresnel(2.4, 0.0)
-    col = g.lerp(coat, g.add(g.mul(coat, g.const(1.45)), g.const3((0.03, 0.026, 0.02))), g.mul(sheen, g.const(0.4)))
+    # Neighbouring hairs differ a little in tone, so the coat never reads as painted plastic.
+    grain = (g.texs(tex("T_FurStrands"), S_MASKS, g.uv(g.scalar("GrainTiling", 7.0))), "R")
+    coat = g.mul(coat, g.lerp(g.const(0.84), g.const(1.07), grain))
+    nm = g.texs(tex("T_FurNormal"), S_NORMAL, g.uv(g.scalar("FurNormalTiling", 8.0)))
+    # Grazing light picks out the fuzz of pale tips rather than a glossy rim.
+    col = g.lerp(coat, hair_tips(g, coat, 1.5, (0.03, 0.025, 0.018)), g.mul(g.fresnel(2.2, 0.0), g.scalar("Sheen", 0.5)))
     g.out(col, MP.MP_BASE_COLOR)
-    g.out(g.scalar("Roughness", 0.8), MP.MP_ROUGHNESS)
-    g.out(g.scalar("Specular", 0.25), MP.MP_SPECULAR)
-    g.out(g.lerp(g.const3((0, 0, 1)), (nm, "RGB"), g.const(0.3)), MP.MP_NORMAL)
-    g.out(g.mul(coat, g.const(0.5)), MP.MP_SUBSURFACE_COLOR)
-    g.out(g.const(0.25), MP.MP_OPACITY)
+    g.out(g.scalar("Roughness", 0.9), MP.MP_ROUGHNESS)
+    g.out(g.scalar("Specular", 0.2), MP.MP_SPECULAR)
+    g.out(g.lerp(g.const3((0, 0, 1)), (nm, "RGB"), g.scalar("FurNormalStrength", 0.55)), MP.MP_NORMAL)
+    # Light through thin ears and whisker pads glows red-orange.
+    g.out(g.mul(coat, g.const3((0.75, 0.42, 0.3))), MP.MP_SUBSURFACE_COLOR)
+    g.out(g.const(0.3), MP.MP_OPACITY)
     return g.finish(skeletal=True)
 
 
@@ -600,13 +614,16 @@ def build_cat_shell():
     g = Graph("M_CatShell", blend=unreal.BlendMode.BLEND_MASKED, shading=unreal.MaterialShadingModel.MSM_SUBSURFACE)
     h = shell_height(g)
     coat = coat_color(g)
-    # Roots sit in the shadow of the coat, tips catch the light.
-    col = g.mul(coat, g.lerp(g.const(0.6), g.const(1.12), h))
+    st = strand_map(g, 4.6)
+    # Each strand its own tone (longer guard hairs a touch lighter); roots sit in the coat's own shadow, tips are pale
+    # and catch the light - the depth that makes it read as fur.
+    coat = g.mul(coat, g.lerp(g.const(0.86), g.const(1.1), st))
+    col = g.lerp(g.mul(coat, g.const(0.5)), hair_tips(g, coat, 1.3, (0.02, 0.016, 0.012)), h)
     g.out(col, MP.MP_BASE_COLOR)
-    g.out(g.const(0.85), MP.MP_ROUGHNESS)
+    g.out(g.const(0.88), MP.MP_ROUGHNESS)
     g.out(g.const(0.2), MP.MP_SPECULAR)
-    g.out(no_shadow(g, fur_strands(g, h)), MP.MP_OPACITY_MASK)
-    g.out(g.mul(coat, g.const(0.6)), MP.MP_SUBSURFACE_COLOR)
+    g.out(no_shadow(g, fur_strands(g, h, st)), MP.MP_OPACITY_MASK)
+    g.out(g.mul(coat, g.const3((0.8, 0.45, 0.32))), MP.MP_SUBSURFACE_COLOR)
     g.out(g.const(0.35), MP.MP_OPACITY)
     return g.finish(clip=0.5, skeletal=True)
 
@@ -615,18 +632,32 @@ def build_cat_eye():
     g = Graph("M_CatEye")
     iris, pupil_open, d, lidm, lash = eye_shapes(g)
     streak = g.texs(tex("T_WearMask"), S_GRAY, g.uv(g.const(3.0)))
-    ring = g.sat(g.mul(g.sub(d, g.const(0.08)), g.const(6.0)))
-    iris_col = g.lerp(g.vec("IrisInner", (0.6, 0.4, 0.06)), g.vec("IrisOuter", (0.3, 0.34, 0.08)), ring)
-    iris_col = g.mul(iris_col, g.lerp(g.const(0.75), g.const(1.15), (streak, "R")))
+    # Amber-gold round the pupil out to a green-gold rim, with radial fibres.
+    ring = g.sat(g.mul(g.sub(d, g.const(0.06)), g.const(5.0)))
+    iris_col = g.lerp(g.vec("IrisInner", (0.85, 0.52, 0.08)), g.vec("IrisOuter", (0.46, 0.5, 0.1)), ring)
+    iris_col = g.mul(iris_col, g.lerp(g.const(0.7), g.const(1.2), (streak, "R")))
     limbal = g.sat(g.sub(g.const(1.0), g.mul(g.absv(g.sub(d, g.const(0.25))), g.const(45.0))))
-    iris_col = g.mul(iris_col, g.sub(g.const(1.0), g.mul(limbal, g.const(0.65))))
-    eye = g.lerp(g.vec("Sclera", (0.62, 0.58, 0.45)), iris_col, iris)
+    iris_col = g.mul(iris_col, g.sub(g.const(1.0), g.mul(limbal, g.const(0.7))))
+    eye = g.lerp(g.vec("Sclera", (0.34, 0.27, 0.15)), iris_col, iris)
     eye = g.mul(eye, pupil_open)
+    # Set into the socket: the lids shade the eye toward the edge of the almond opening (+-0.28 x +-0.18 in UV).
+    tc = tcoord(g)
+    rel = g.sub(tc, (g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), ""))
+    rs = g.div(rel, (g.node(unreal.MaterialExpressionConstant2Vector, r=0.29, g=0.18), ""))
+    sock = g.lerp(g.const(1.0), g.const(0.3), g.sat(g.mul(g.sub(g.dot(rs, rs), g.const(0.45)), g.const(1.8))))
+    eye = g.mul(eye, sock)
     lidc = g.mul(g.vec("LidColor", (0.55, 0.24, 0.07)), g.sub(g.const(1.0), g.mul(lash, g.const(0.85))))
     g.out(g.lerp(eye, lidc, lidm), MP.MP_BASE_COLOR)
     g.out(g.lerp(g.const(0.04), g.const(0.8), lidm), MP.MP_ROUGHNESS)
     g.out(g.lerp(g.const(0.9), g.const(0.25), lidm), MP.MP_SPECULAR)
-    g.out(g.mul(g.mul(iris_col, g.mul(iris, pupil_open)), g.mul(g.scalar("IrisGlow", 0.05), g.sub(g.const(1.0), lidm))), MP.MP_EMISSIVE_COLOR)
+    # Catchlight: the bright sky in the cornea, high in the eye (on the centre line, so both eyes agree).
+    cd = g.node(unreal.MaterialExpressionDistance)
+    g.link(rel, cd, "A")
+    g.link((g.node(unreal.MaterialExpressionConstant2Vector, r=0.0, g=-0.085), ""), cd, "B")
+    catch = g.sat(g.mul(g.sub(g.const(0.032), (cd, "")), g.const(80.0)))
+    glow = g.mul(g.mul(iris_col, g.mul(iris, pupil_open)), g.scalar("IrisGlow", 0.12))
+    glow = g.add(glow, g.mul(catch, g.mul(g.vec("CatchColor", (1.0, 0.97, 0.9)), g.scalar("Catchlight", 2.4))))
+    g.out(g.mul(glow, g.sub(g.const(1.0), lidm)), MP.MP_EMISSIVE_COLOR)
     return g.finish(skeletal=True)
 
 

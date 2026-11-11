@@ -68,9 +68,16 @@ public:
 	virtual FVector GetContactLocation(const FVector& From) const { return GetFocusLocation(); }
 	/** Cords: how far (cm) the paws have pulled the handle down; the cord stretches with it. */
 	virtual void SetPull(float Cm) {}
+	/** Cords: the paws have the handle. It goes to HoldAt (world) with its bar along Across, the cord following it; W
+	 *  blends from hanging free (0) to fully in the paws (1). */
+	void SetHold(const FVector& HoldAt, const FVector& Across, float W) { HoldWorld = HoldAt; HoldAcross = Across; HoldW = W; }
 
 protected:
 	void MarkSolved();
+
+	FVector HoldWorld = FVector::ZeroVector;
+	FVector HoldAcross = FVector::RightVector;
+	float HoldW = 0.f;
 
 	UPROPERTY(VisibleAnywhere, Category = "Shade")
 	TObjectPtr<USceneComponent> Root;
@@ -423,7 +430,7 @@ public:
 	virtual float GetProgress() const override { return OpenAngle > 0.f ? Angle / OpenAngle : 0.f; }
 	virtual EShadeAction GetActionStyle() const override { return EShadeAction::PullTap; }
 	virtual FVector GetContactLocation(const FVector& From) const override;
-	virtual void SetPull(float Cm) override;
+	virtual void SetPull(float Cm) override { PullCm = Cm; }
 
 	UPROPERTY(EditAnywhere, Category = "Shutter")
 	float PanelWidth = 160.f;
@@ -449,6 +456,7 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Shutter")
 	FVector CordLocal = FVector(-15.f, -160.f, -140.f);
+	float PullCm = 0.f;
 
 	UPROPERTY(EditAnywhere, Category = "Shutter")
 	FVector InteractOffset = FVector(0.f, -45.f, 0.f);

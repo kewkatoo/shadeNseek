@@ -171,12 +171,17 @@ def awning_parts():
     save(v, "SM_AwningValance", [mat("MI_Awning_Terracotta"), mat("MI_Iron_Black")], collision="complex", uv_tile=100.0)
     a = cyl(2.2, 100, 0, (0, 0, 0), (-90, 0, 0), steps=10)
     save(a, "SM_AwningArm", [mat("MI_Iron_Black")], collision=None)
-    cord = cyl(0.7, 100, 0, (0, 0, 0), (-90, 0, 0), steps=6)
+    cord = cyl(0.7, 100, 0, (0, 0, 0), (-90, 0, 0), steps=8)
     save(cord, "SM_Cord", [mat("MI_Linen_White")], collision=None)
-    h = cyl(1.8, 12, 0, (0, -6, 0), (0, 0, 90), steps=10)
-    append(h, sphere(1.5, 0, (0, -6, 0)))
-    append(h, sphere(1.5, 0, (0, 6, 0)))
-    save(h, "SM_CordHandle", [mat("MI_Wood_Beam")], collision=None)
+    # Wooden toggle the cord is tied to: a turned bar across Y (centred, 12 long, ~1.8 radius where the paws close round
+    # it), the cord wrapped round its middle and knotted on top. The cord leaves the knot at z = 2.6 (GCordKnot in
+    # ShadeInteractables.cpp); the toggle's local Z is turned to hang along the cord. Roll 90 turns +Z into +Y, so a
+    # piece built up from its base starts at -half to come out centred.
+    h = revolve([(1.15, 0), (1.5, 0.5), (1.75, 1.6), (1.95, 4.0), (2.05, 6.0), (1.95, 8.0), (1.75, 10.4), (1.5, 11.5), (1.15, 12)],
+                0, (0, -6, 0), (0, 0, 90), steps=14)
+    append(h, cyl(2.35, 2.2, 1, (0, -1.1, 0), (0, 0, 90), steps=14))
+    append(h, sphere(1.25, 1, (0, 0, 2.3)))
+    save(h, "SM_CordHandle", [mat("MI_Wood_Beam"), mat("MI_Linen_White")], collision=None)
 
 
 def railing():

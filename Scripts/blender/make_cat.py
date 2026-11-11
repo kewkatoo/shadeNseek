@@ -183,13 +183,13 @@ bpy.ops.object.mode_set(mode='OBJECT')
 # =====================================================================================================================
 # 4. Coat colours (linear; exported as sRGB bytes). Ginger mackerel tabby, cream bib/belly/muzzle/socks.
 # =====================================================================================================================
-GINGER = Vector((0.74, 0.34, 0.10))
-DARK = Vector((0.40, 0.14, 0.035))
-CREAM = Vector((0.93, 0.85, 0.72))
+GINGER = Vector((0.79, 0.43, 0.16))
+DARK = Vector((0.47, 0.18, 0.05))
+CREAM = Vector((0.91, 0.82, 0.67))
 PINK = Vector((0.78, 0.40, 0.38))
 PAD = Vector((0.55, 0.26, 0.25))
 LID = Vector((0.16, 0.07, 0.03))
-INNER_EAR = Vector((0.86, 0.6, 0.55))
+INNER_EAR = Vector((0.72, 0.45, 0.39))
 SOCKETS = {sx: (Vector((sx * 0.019, -0.2525, 0.3075)), rot(yaw=sx * 26, roll=-sx * 13)) for sx in (1, -1)}
 NOSE = Vector((0, -0.2672, 0.2962))
 
@@ -243,15 +243,16 @@ def coat(p):
         top = smoothstep(0.17, 0.25, p.z)
         stripe = smoothstep(0.25, 0.75, s) * (0.35 + 0.6 * top)
         dorsal = smoothstep(0.012, 0.0, abs(p.x)) * smoothstep(0.24, 0.27, p.z)
-        c = c.lerp(DARK, min(1.0, stripe * 0.8 + dorsal * 0.5))
+        c = c * (0.86 + 0.14 * smoothstep(0.27, 0.15, p.z))
+        c = c.lerp(DARK, min(1.0, stripe * 0.9 + dorsal * 0.5))
     # Cream: bib, belly, inner legs, muzzle, chin, socks.
-    bib = smoothstep(0.03, 0.0, abs(p.x) - 0.012) * smoothstep(0.22, 0.16, p.z) * smoothstep(-0.03, -0.12, p.y)
+    bib = smoothstep(0.026, 0.0, abs(p.x) - 0.011 + 0.006 * n1) * smoothstep(0.22, 0.16, p.z) * smoothstep(-0.03, -0.12, p.y)
     throat = smoothstep(-0.13, -0.2, p.y) * smoothstep(0.27, 0.24, p.z) * smoothstep(0.035, 0.015, abs(p.x))
     belly = smoothstep(0.175, 0.155, p.z) * smoothstep(0.04, 0.02, abs(p.x)) * smoothstep(0.16, 0.08, p.y)
     muzzle = smoothstep(-0.243, -0.258, p.y) * smoothstep(0.297, 0.287, p.z)
     chin = smoothstep(-0.235, -0.25, p.y) * smoothstep(0.278, 0.27, p.z)
     socks = smoothstep(0.04, 0.02, p.z)
-    inner = smoothstep(0.03, 0.022, abs(p.x)) * smoothstep(0.16, 0.12, p.z) * (1.0 if leg else 0.0)
+    inner = smoothstep(0.03, 0.022, abs(p.x)) * smoothstep(0.11, 0.07, p.z) * (1.0 if leg else 0.0)
     ed = eye_dist(p)
     around_eye = max(0.0, smoothstep(1.9, 1.35, ed) - smoothstep(1.35, 1.12, ed)) * 0.6
     c = c.lerp(CREAM, min(1.0, max(bib, throat, belly, muzzle, chin, socks, inner, around_eye)))
@@ -412,7 +413,7 @@ def ear_color(sx):
         front = q.y < -0.001 - 0.002 * (1 - h)
         c = GINGER.lerp(DARK, 0.35 + 0.4 * h)
         if front:
-            c = INNER_EAR.lerp(CREAM, 0.55 * (1 - h) ** 2)
+            c = INNER_EAR.lerp(CREAM, 0.3 * (1 - h) ** 2)
         return c
     return f
 

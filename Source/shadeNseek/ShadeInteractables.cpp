@@ -40,13 +40,37 @@ namespace
 		C->SetCollisionResponseToChannel(ECC_Sunlight, ECR_Block);
 	}
 
-	/** A cord from Top down to the handle at Bottom (actor space); pulling the handle stretches it. */
-	void PoseCord(UStaticMeshComponent* Cord, UStaticMeshComponent* Handle, const FVector& Top, const FVector& Bottom)
+	/** Height of the knot the cord is tied to above the toggle's bar (SM_CordHandle, sns_meshes.py). */
+	constexpr float GCordKnot = 2.6f;
+
+	/**
+	 * A cord from Top (actor space) down to its wooden toggle. On its own the toggle hangs at Free; held, it goes where the
+	 * paws actually have it (HoldWorld, world) with its bar across them, tilted to hang along the cord, and the cord stays
+	 * tied to the knot on top of it.
+	 */
+	void PoseCord(const AActor* Owner, UStaticMeshComponent* Cord, UStaticMeshComponent* Handle, const FVector& Top, const FVector& Free,
+		const FVector& HoldWorld, const FVector& HoldAcross, float HoldW)
 	{
-		Cord->SetRelativeLocation(Bottom);
-		Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
-		Cord->SetRelativeScale3D(FVector(FMath::Max((Top - Bottom).Size(), 1.f) / 100.f, 1.f, 1.f));
-		Handle->SetRelativeLocation(Bottom);
+		const FTransform& Xf = Owner->GetActorTransform();
+		FVector At = Free;
+		FVector Across = FVector::RightVector;
+		if (HoldW > 0.001f)
+		{
+			const FVector Held = Xf.InverseTransformPosition(HoldWorld);
+			At = Free + (Held - Free).GetClampedToMaxSize(35.f) * FMath::Min(HoldW, 1.f);
+			FVector A = Xf.InverseTransformVectorNoScale(HoldAcross);
+			if (FVector::DotProduct(A, Across) < 0.f)
+			{
+				A = -A;
+			}
+			Across = FMath::Lerp(Across, A, FMath::Min(HoldW, 1.f)).GetSafeNormal(UE_SMALL_NUMBER, FVector::RightVector);
+		}
+		const FVector Up = (Top - At).GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector);
+		Handle->SetRelativeLocationAndRotation(At, FRotationMatrix::MakeFromZY(Up, Across).Rotator());
+		const FVector Knot = At + Up * GCordKnot;
+		const FVector Span = Top - Knot;
+		Cord->SetRelativeLocationAndRotation(Knot, Span.Rotation());
+		Cord->SetRelativeScale3D(FVector(FMath::Max(Span.Size(), 1.f) / 100.f, 1.f, 1.f));
 	}
 
 	void NoCollision(UPrimitiveComponent* C)
@@ -298,7 +322,7 @@ FVector AShadeAwning::GetInteractLocation() const
 
 FVector AShadeAwning::GetContactLocation(const FVector& From) const
 {
-	return Handle->GetComponentLocation();
+	return GetActorTransform().TransformPosition(CordLocal - FVector(0.f, 0.f, PullCm));  // where it hangs, not where it is held
 }
 
 FVector AShadeAwning::GetFocusLocation() const
@@ -379,8 +403,7 @@ void AShadeAwning::UpdateGeometry()
 	}
 
 	// Cord from a cleat on the wall down to the handle; Shade's paws pull the handle down (PullCm).
-	PoseCord(Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -18.f), CordLocal - FVector(0.f, 0.f, PullCm));
-	Handle->SetRelativeRotation(FRotator::ZeroRotator);
+	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -18.f), CordLocal - FVector(0.f, 0.f, PullCm), HoldWorld, HoldAcross, HoldW);
 }
 
 // =====================================================================================================================
@@ -609,11 +632,7 @@ void AShadeWashingLine::BeginPlay()
 	Line->SetRelativeRotation(LineVec.Rotation());
 	Line->SetRelativeScale3D(FVector(LineVec.Size() / 100.f, 1.2f, 1.2f));
 	// The cord runs down the wall from the pulley to a handle at cat height.
-	const FVector Top(CordLocal.X, CordLocal.Y, -12.f);
-	Cord->SetRelativeLocation(CordLocal);
-	Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
-	Cord->SetRelativeScale3D(FVector(FMath::Max((Top - CordLocal).Size(), 1.f) / 100.f, 1.f, 1.f));
-	Handle->SetRelativeLocation(CordLocal);
+	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -12.f), CordLocal, HoldWorld, HoldAcross, 0.f);
 	FlapAudio = ShadeAssets::Loop(Root, TEXT("SFX_LaundryFlap_Loop"), 0.f, true);
 	if (FlapAudio)
 	{
@@ -630,7 +649,7 @@ FVector AShadeWashingLine::GetInteractLocation() const
 
 FVector AShadeWashingLine::GetContactLocation(const FVector& From) const
 {
-	return Handle->GetComponentLocation();
+	return GetActorTransform().TransformPosition(CordLocal - FVector(0.f, 0.f, PullCm));  // where it hangs, not where it is held
 }
 
 FVector AShadeWashingLine::GetFocusLocation() const
@@ -674,7 +693,7 @@ void AShadeWashingLine::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
-	PoseCord(Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -12.f), CordLocal - FVector(0.f, 0.f, PullCm));
+	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -12.f), CordLocal - FVector(0.f, 0.f, PullCm), HoldWorld, HoldAcross, HoldW);
 	Time += Dt;
 	GustClock += Dt;
 	if (bHolding && !bSolved)
@@ -778,11 +797,7 @@ void AShadeShutter::BeginPlay()
 	DefaultMesh(Handle, TEXT("SM_CordHandle"));
 	PanelShade->SetBoxExtent(FVector(2.5f, PanelWidth * 0.5f, PanelHeight * 0.5f));
 	PanelShade->SetRelativeLocation(FVector(3.f, PanelWidth * 0.5f, PanelHeight * 0.5f));
-	const FVector Top(CordLocal.X, CordLocal.Y, PanelHeight * 0.5f);
-	Cord->SetRelativeLocation(CordLocal);
-	Cord->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
-	Cord->SetRelativeScale3D(FVector(FMath::Max((Top - CordLocal).Size(), 1.f) / 100.f, 1.f, 1.f));
-	Handle->SetRelativeLocation(CordLocal);
+	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, PanelHeight * 0.5f), CordLocal, HoldWorld, HoldAcross, 0.f);
 	Hinge->SetRelativeRotation(FRotator::ZeroRotator);
 }
 
@@ -798,12 +813,7 @@ FVector AShadeShutter::GetInteractLocation() const
 
 FVector AShadeShutter::GetContactLocation(const FVector& From) const
 {
-	return Handle->GetComponentLocation();
-}
-
-void AShadeShutter::SetPull(float Cm)
-{
-	PoseCord(Cord, Handle, FVector(CordLocal.X, CordLocal.Y, PanelHeight * 0.5f), CordLocal - FVector(0.f, 0.f, Cm));
+	return GetActorTransform().TransformPosition(CordLocal - FVector(0.f, 0.f, PullCm));  // where it hangs, not where it is held
 }
 
 FVector AShadeShutter::GetFocusLocation() const
@@ -829,6 +839,7 @@ void AShadeShutter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
 	StateTime += Dt;
+	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, PanelHeight * 0.5f), CordLocal - FVector(0.f, 0.f, PullCm), HoldWorld, HoldAcross, HoldW);
 	if (!bSolved && !DoneEvent.IsNone() && State == 0)
 	{
 		if (const AShadeGameMode* G = GM(this))

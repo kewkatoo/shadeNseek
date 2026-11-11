@@ -140,6 +140,15 @@ public:
 	float GetPawReach() const;
 	/** How far to rear up (0..1) to put the front paws at this height above the ground (cm). */
 	float RearForHeight(float Height) const;
+	/** Where the front paw balls actually ended up last solve (world). */
+	FVector GetPawWorld(int32 Paw) const { return ToWorld(PawOut[FMath::Clamp(Paw, 0, 1)]); }
+	/** Where a bar held in this front paw actually sits (world, last solve): in the cup between the back of the paw and
+	 *  the curled toes, touching both. What the paws hold is moved here. */
+	FVector GetGripWorld(int32 Paw) const { return ToWorld(GripOut[FMath::Clamp(Paw, 0, 1)]); }
+	/** The paw-ball target (world) that puts the grip of a paw shaped ActMeta / ActCurl on GripWorld. */
+	FVector BallForGrip(const FVector& GripWorld) const;
+	/** Radius (cm) of the bar the paws close round (the cord toggles). */
+	static constexpr float GripBarRadius = 1.8f;
 
 	void SetPose(ECatPose Pose, float BlendTime = 0.45f);
 	ECatPose GetPose() const { return TargetPose; }
@@ -219,6 +228,10 @@ private:
 	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;
 	float SmoothSpeed = 0.f;
 	bool bActFront[2] = { false, false };  // front legs held by the interaction layer (not used to lower the body)
+	FVector PawOut[2] = { FVector::ZeroVector, FVector::ZeroVector };   // solved front paw balls (rig space)
+	FVector GripOut[2] = { FVector::ZeroVector, FVector::ZeroVector };  // where a held bar sits in them (rig space)
+	/** Rig-space offset from the paw ball to the grip for a paw with this metacarpus angle and toe curl (degrees). */
+	FVector GripOffset(float MetaDeg, float CurlDeg) const;
 
 	// Tail: per-segment world directions on damped angular springs (positions are derived)
 	FVector TailX[9];

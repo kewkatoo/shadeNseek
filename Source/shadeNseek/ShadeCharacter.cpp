@@ -645,7 +645,7 @@ void AShadeCharacter::StartAction(AShadeInteractable* Target)
 	ActTarget = Target;
 	ActStyle = Target->GetActionStyle();
 	ActStage = EActStage::Approach;
-	ActTime = ActStuck = ActCycle = 0.f;
+	ActTime = ActStuck = ActCycle = ActRearFix = 0.f;
 	bActFired = false;
 	const FVector Me = GetActorLocation();
 	ActContact = Target->GetContactLocation(Me);
@@ -685,10 +685,11 @@ void AShadeCharacter::CancelAction()
 	if (AShadeInteractable* T = ActTarget.Get())
 	{
 		T->SetPull(0.f);
+		T->SetHold(FVector::ZeroVector, FVector::RightVector, 0.f);
 	}
 	ActTarget.Reset();
 	ActStage = EActStage::None;
-	ActW = ActPull = ActLean = ActRear = 0.f;
+	ActW = ActPull = ActLean = ActRear = ActRearFix = 0.f;
 	Rig->ActW = 0.f;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
@@ -808,12 +809,14 @@ void AShadeCharacter::UpdateAction(float Dt)
 		}
 		break;
 	case EActStage::Let:
+		ActRearFix = ShadeEase::Approach(ActRearFix, 0.f, 5.f, Dt);
 		if (ActTime >= 0.35f && ActW <= 0.03f)
 		{
 			T->SetPull(0.f);
+			T->SetHold(FVector::ZeroVector, FVector::RightVector, 0.f);
 			ActTarget.Reset();
 			ActStage = EActStage::None;
-			ActW = ActPull = ActLean = ActRear = 0.f;
+			ActW = ActPull = ActLean = ActRear = ActRearFix = 0.f;
 			Rig->ActW = 0.f;
 			GetCharacterMovement()->bOrientRotationToMovement = !Grabbed.IsValid();
 			return;
@@ -838,9 +841,9 @@ void AShadeCharacter::UpdateAction(float Dt)
 	T->SetPull(ActPull);
 
 	// Height of the work above the ground decides how far up on the hind legs Shade goes (the handle's rest height for
-	// cords, so the body sinks as it pulls the handle down).
-	const float WorkZ = ActContact.Z + (bCart || bSwat ? 0.f : ActPull);
-	float WantRear = bSwat ? 0.12f : Rig->RearForHeight(WorkZ - Feet);
+	// cords, so the body sinks as it pulls the handle down; the paw balls sit a few cm above the bar they close round).
+	const float WorkZ = ActContact.Z + (bCart || bSwat ? 0.f : ActPull + 4.f);
+	float WantRear = bSwat ? 0.12f : FMath::Min(Rig->RearForHeight(WorkZ - Feet) + ActRearFix, 1.f);
 	if (ActStyle == EShadeAction::PullHold || ActStyle == EShadeAction::PullTap)
 	{
 		WantRear *= 1.f - 0.3f * (ActStyle == EShadeAction::PullHold ? Tug : FMath::Min(ActPull / 16.f, 1.f));
@@ -882,9 +885,12 @@ void AShadeCharacter::UpdateAction(float Dt)
 	}
 	else
 	{
-		// Both paws round the handle bar, claws hooked over it.
-		PawL = ActContact - Right * 3.5f - Up * 1.f;
-		PawR = ActContact + Right * 3.5f - Up * 1.f;
+		// Both paws closed round the toggle's bar either side of the knot: each paw ball goes where that puts the bar in
+		// the cup between the back of the paw and the curled toes.
+		Rig->ActMeta = Meta;
+		Rig->ActCurl = Curl;
+		PawL = Rig->BallForGrip(ActContact - Right * 3.5f);
+		PawR = Rig->BallForGrip(ActContact + Right * 3.5f);
 	}
 	Rig->ActW = ActW;
 	Rig->ActRear = ActRear;
@@ -895,6 +901,25 @@ void AShadeCharacter::UpdateAction(float Dt)
 	Rig->ActPawW[1] = WR;
 	Rig->ActPawWorld[0] = PawL;
 	Rig->ActPawWorld[1] = PawR;
+
+	if (!bCart && !bSwat)
+	{
+		// The toggle is in the paws: it goes where they actually are (last solve), never hanging in the air beside them.
+		const FVector Grip = 0.5f * (Rig->GetGripWorld(0) + Rig->GetGripWorld(1));
+		T->SetHold(Grip, Right, ShadeEase::Smooth((ActW - 0.7f) / 0.25f));
+		if (ActStage == EActStage::Work && ActW > 0.95f)
+		{
+			// Paws arrived but short of the handle: shuffle in and come up higher on the hind legs until they close on it
+			// (not while they are still on their way, or it would creep in on every reach).
+			const FVector Gap = ActContact - Grip;
+			const float Ahead = FVector::DotProduct(Gap, ActFace);
+			if (Ahead > 1.5f)
+			{
+				AddActorWorldOffset(ActFace * FMath::Min(Ahead - 1.f, 30.f * Dt), true);
+			}
+			ActRearFix = FMath::Clamp(ActRearFix + FMath::Clamp(Gap.Z, -4.f, 6.f) * 0.06f * Dt, 0.f, 0.35f);
+		}
+	}
 }
 
 void AShadeCharacter::UpdateGrab(float Dt)
