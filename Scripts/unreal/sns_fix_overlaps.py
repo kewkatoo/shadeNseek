@@ -43,7 +43,7 @@ SKIP = ("Sphere", "SM_Mountains", "mountainside", "coastal_cliff", "coast_rocks"
         "MatineeCam", "flower_", "shrub_", "periwinkle", "fern_", "iceplant", "weed_plant", "grass")
 GROUND = ("SM_Slab_", "SM_Stairs")
 STRUCT = ("SM_H_", "SM_BridgeHouse", "SM_ChurchFront", "SM_PotWall", "SM_Campanile", "SM_Dome", "SM_Bench_Stone", "SM_Railing",
-          "SM_Post_100", "SM_Beam_100", "SM_Bollard", "SM_Bell", "SM_DoorSill", "SM_ShopSill", "SM_LanePlinth", "SM_Planter_Long", "large_iron_gate",
+          "SM_Post_100", "SM_Beam_100", "SM_Bollard", "SM_Bell", "SM_DoorSill", "SM_ShopSill", "SM_LanePlinth", "SM_N0Infill", "SM_Planter_Long", "large_iron_gate",
           "island_tree")
 FLOWERS = ("flower_", "shrub_", "periwinkle")
 # fixed into a wall by design (brackets, hose reels, the lion-head fountain): not judged against the houses, but props

@@ -1,4 +1,4 @@
-"""A stone plinth (base course) along the foot of every house front on the lane: the joint between walls and street.
+﻿"""A stone plinth (base course) along the foot of every house front on the lane: the joint between walls and street.
 
     Scripts/run_ue_python.ps1 -Script Scripts/unreal/sns_fix_plinth.py      (then sns_fix_overlaps.py)
 
@@ -35,7 +35,7 @@ def name(a):
 
 
 acts = eas.get_all_level_actors()
-walls = [a for a in acts if name(a).startswith("SM_H_") or name(a) == "SM_BridgeHouse"]
+walls = [a for a in acts if name(a).startswith("SM_H_") or name(a) in ("SM_BridgeHouse", "SM_N0Infill")]
 for a in acts:
     if name(a) == "SM_LanePlinth":
         a.destroy_actor()
