@@ -5,7 +5,7 @@ Masters (parameter names are shared with C++ where noted):
                macro variation so plaster never looks tiled
   M_Paint      painted planks (shutters/doors/crates) with chipped wear showing the wood beneath
   M_Prop       Poly Haven props (diff / nor_dx / arm)
-  M_Foliage    masked two-sided foliage with wind (alpha texture)
+  M_Foliage    masked two-sided foliage with wind (alpha texture); parts round Shade as it pushes through (MPC_Shade)
   M_Card       masked two-sided card (RGBA diffuse) - bougainvillea / leafy sprays
   M_Cloth      two-sided fabric with optional hanging flutter (laundry), used static for awnings
   M_Iron, M_Glass, M_Emissive, M_Water, M_Majolica
@@ -17,7 +17,11 @@ Masters (parameter names are shared with C++ where noted):
   M_CatEye     (C++: Lid, LidColor)  wet amber-green eye, slit pupil, limbal ring, blinking lids
   M_CatWhisker
   M_Wisp       translucent ink/ember/dust puffs driven by custom primitive data 0..2
+MPC_Shade      (C++: AShadeCharacter::UpdateFoliageBrush) CatPos, CatFwd, CatVel, CatTrail - where the cat is, for foliage
+
+SNS_MATS=M_Foliage,... rebuilds only those masters (and skips the instances), so nothing else is re-saved.
 """
+import os
 import unreal
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -226,6 +230,93 @@ def camera_fade(g, alpha, near=35.0, span=110.0):
     return g.mul(alpha, fade)
 
 
+MPC_PATH = f"{MAT_DIR}/MPC_Shade"
+MPC_VECTORS = ("CatPos", "CatFwd", "CatVel", "CatTrail")
+MPC = None
+
+
+def shade_mpc():
+    """Where Shade is, for the foliage to part round it. Written every frame by AShadeCharacter::UpdateFoliageBrush:
+    CatPos (the paws' ground point, w = on), CatFwd (facing xy, w = half the body's length), CatVel, CatTrail (a point that
+    follows the cat a beat behind, w = how far behind it is)."""
+    if eal.does_asset_exist(MPC_PATH):
+        mpc = eal.load_asset(MPC_PATH)
+    else:
+        mpc = tools.create_asset("MPC_Shade", MAT_DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
+    have = [str(p.get_editor_property("parameter_name")) for p in mpc.get_editor_property("vector_parameters")]
+    if have != list(MPC_VECTORS):
+        ps = []
+        for n in MPC_VECTORS:
+            p = unreal.CollectionVectorParameter()
+            p.set_editor_property("parameter_name", n)
+            p.set_editor_property("default_value", unreal.LinearColor(0.0, 0.0, -100000.0, 0.0))
+            ps.append(p)
+        mpc.set_editor_property("vector_parameters", ps)
+        eal.save_loaded_asset(mpc)
+        log("MPC_Shade parameters", list(MPC_VECTORS))
+    return mpc
+
+
+def mpc_vec(g, name):
+    e = g.node(unreal.MaterialExpressionCollectionParameter)
+    e.set_editor_property("collection", MPC)
+    e.set_editor_property("parameter_name", name)
+    return (e, "")
+
+
+BRUSH_HLSL = """
+float3 Off = 0;
+float H = saturate((WP.z - OP.z) / 24.0);
+H *= 0.4 + 0.6 * H;
+if (CP.w > 0.5 && H > 0.001)
+{
+    float Lvl = saturate(1.0 - max(abs(OP.z - CP.z) - 18.0, 0.0) / 30.0);
+    float2 D = WP.xy - CP.xy;
+    float T = clamp(dot(D, CF.xy), -CF.w, CF.w);
+    float2 DD = D - CF.xy * T;
+    float Dist = length(DD);
+    float F = saturate(1.0 - Dist / 26.0);
+    F = F * F * (3.0 - 2.0 * F);
+    float2 Away = DD / max(Dist, 0.5);
+    float2 D2 = WP.xy - CT.xy;
+    float Dist2 = length(D2);
+    float F2 = saturate(1.0 - Dist2 / 24.0);
+    F2 = F2 * F2 * (3.0 - 2.0 * F2) * saturate(CT.w) * (1.0 - F);
+    float2 Away2 = D2 / max(Dist2, 0.5);
+    float Sp = saturate(length(CV.xy) / 250.0);
+    float Jig = sin(Time * 16.0 + dot(WP.xy, float2(0.21, 0.34))) * Sp;
+    float K = F * Lvl * H;
+    float K2 = F2 * Lvl * H;
+    float2 Push = (Away * (11.0 + 2.5 * Jig) + clamp(CV.xy / 250.0, -1.0, 1.0) * 5.0) * K + Away2 * 7.0 * K2;
+    Off = float3(Push, -5.5 * K - 3.5 * K2);
+}
+return Off;
+"""
+
+
+def brush_wpo(g):
+    """Leaves and flowers part round Shade's body as it walks through them, swept a little the way it goes and fluttering
+    while it pushes; behind it they stand back up a beat later (the wake). Only plants about level with the cat's paws
+    react, and a stem bends more toward its tip. Body = a segment along the spine (CatFwd), so plants part along the
+    flanks rather than round a point. Needs MPC_Shade (shade_mpc())."""
+    cu = g.node(unreal.MaterialExpressionCustom, code=BRUSH_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3,
+                description="ShadeBrush")
+    ins = []
+    for n in ("WP", "OP", "CP", "CF", "CV", "CT", "Time"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", n)
+        ins.append(ci)
+    cu.set_editor_property("inputs", ins)
+    g.link(g.wpos(), cu, "WP")
+    g.link(g.opos(), cu, "OP")
+    g.link(mpc_vec(g, "CatPos"), cu, "CP")
+    g.link(mpc_vec(g, "CatFwd"), cu, "CF")
+    g.link(mpc_vec(g, "CatVel"), cu, "CV")
+    g.link(mpc_vec(g, "CatTrail"), cu, "CT")
+    g.link(g.time(), cu, "Time")
+    return (cu, "")
+
+
 def wind_wpo(g, amp_name="WindAmp", amp=2.0, speed=1.6, height=180.0):
     wp = g.wpos()
     phase = g.div(g.add(g.mask(wp, r=True), g.mask(wp, g=True)), g.const(90.0))
@@ -306,7 +397,12 @@ def build_foliage():
     g.out((arm, "R"), MP.MP_AMBIENT_OCCLUSION)
     g.out(camera_fade(g, (al, "R")), MP.MP_OPACITY_MASK)
     g.out(g.mul(col, g.const(0.55)), MP.MP_SUBSURFACE_COLOR)
-    g.out(wind_wpo(g, amp=1.6), MP.MP_WORLD_POSITION_OFFSET)
+    g.out(g.add(wind_wpo(g, amp=1.6), brush_wpo(g)), MP.MP_WORLD_POSITION_OFFSET)
+    try:
+        # Nanite culls by the mesh's own bounds unless told how far WPO can move it (brush ~15 cm + wind).
+        g.m.set_editor_property("max_world_position_offset_displacement", 24.0)
+    except Exception as e:
+        log("max WPO displacement", e)
     return g.finish(clip=0.4)
 
 
@@ -804,16 +900,21 @@ def build_instances(M):
 FLAT_N = tex("T_FlatNormal")
 FLAT_ARM = tex("T_FlatARM")
 WHITE = tex("T_White")
+MPC = shade_mpc()
 M = {}
+ONLY = [s.strip() for s in os.environ.get("SNS_MATS", "").split(",") if s.strip()]
 for fn in (build_surface, build_paint, build_prop, build_foliage, build_card, build_cloth, build_iron, build_glass, build_emissive,
            build_majolica, build_water, build_terrain, build_shade_body, build_shade_shell, build_shade_eye, build_shade_whisker,
            build_cat_fur, build_cat_shell, build_cat_eye, build_cat_whisker, build_wisp):
+    if ONLY and ("M_" + "".join(w.capitalize() for w in fn.__name__[6:].split("_"))) not in ONLY:
+        continue
     try:
         m = fn()
         M[m.get_name()] = m
     except Exception as e:
         import traceback
         log("ERROR", fn.__name__, e, traceback.format_exc())
-build_instances(M)
+if not ONLY:
+    build_instances(M)
 eal.save_directory("/Game/Shade/Materials", only_if_is_dirty=True, recursive=True)
 log("ALL DONE")

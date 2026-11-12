@@ -22,6 +22,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
 
 namespace
 {
@@ -124,6 +126,7 @@ void AShadeCharacter::BeginPlay()
 	Rig->Init(Body);
 	Rig->MeshScale = GMeshScale;
 	Rig->Excitement = 0.55f;
+	BrushMPC = LoadObject<UMaterialParameterCollection>(nullptr, TEXT("/Game/Shade/Materials/MPC_Shade.MPC_Shade"));
 	Body->SetRelativeRotation(FRotator(0.f, Rig->GetFacingYaw(), 0.f));
 	Body->SetRelativeScale3D(FVector(GMeshScale * Rig->GetUnitScale()));
 	if (Rig->IsReady())
@@ -418,6 +421,7 @@ void AShadeCharacter::Tick(float DeltaSeconds)
 	UpdateEvaporation(Dt);
 	UpdateFocus(Dt);
 	UpdateVisuals(Dt);
+	UpdateFoliageBrush(Dt);
 	UpdateWisps(Dt);
 	UpdateCamera(Dt);
 	PendingMove = FVector2D::ZeroVector;
@@ -1188,6 +1192,36 @@ void AShadeCharacter::EndScramble()
 	{
 		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
+}
+
+void AShadeCharacter::UpdateFoliageBrush(float Dt)
+{
+	UMaterialParameterCollectionInstance* I = BrushMPC ? GetWorld()->GetParameterCollectionInstance(BrushMPC) : nullptr;
+	if (!I)
+	{
+		return;
+	}
+	// The ground point under the paws, the facing (the body is a segment along it, so plants part along the flanks), the
+	// velocity (they are swept a little the way the cat goes and flutter while it pushes through), and a point that
+	// follows a beat behind on a critically damped spring: the wake, where they are slow to stand back up.
+	const FVector Feet = GetActorLocation() - FVector(0.f, 0.f, GCapsuleHalf);
+	const bool bOn = EvapState == 0 && !bMerging && Body && Body->IsVisible();
+	if (!bBrushInit || FVector::DistSquared(BrushTrail, Feet) > FMath::Square(300.f))
+	{
+		BrushTrail = Feet;
+		BrushTrailVel = FVector::ZeroVector;
+		bBrushInit = true;
+	}
+	const float W = 9.f;
+	BrushTrailVel += ((Feet - BrushTrail) * (W * W) - BrushTrailVel * (2.f * W)) * Dt;
+	BrushTrail += BrushTrailVel * Dt;
+	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
+	const FVector V = GetVelocity();
+	const float Lag = FMath::Clamp(FVector::Dist2D(BrushTrail, Feet) / 8.f, 0.f, 1.f);
+	I->SetVectorParameterValue(TEXT("CatPos"), FLinearColor(Feet.X, Feet.Y, Feet.Z, bOn ? 1.f : 0.f));
+	I->SetVectorParameterValue(TEXT("CatFwd"), FLinearColor(Fwd.X, Fwd.Y, 0.f, 15.f * GMeshScale));
+	I->SetVectorParameterValue(TEXT("CatVel"), FLinearColor(V.X, V.Y, V.Z, 0.f));
+	I->SetVectorParameterValue(TEXT("CatTrail"), FLinearColor(BrushTrail.X, BrushTrail.Y, BrushTrail.Z, bOn ? Lag : 0.f));
 }
 
 void AShadeCharacter::UpdateIdle(float Dt)

@@ -8,6 +8,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UPoseableMeshComponent;
+class UMaterialParameterCollection;
 class UStaticMeshComponent;
 class UPointLightComponent;
 class UAudioComponent;
@@ -137,6 +138,14 @@ protected:
 	void EndScramble();
 	/** Standing still in the shade for a while, Shade sits down; it gets up the moment it is asked to go. */
 	void UpdateIdle(float Dt);
+	/** Tells the foliage where the cat is (MPC_Shade, read by M_Foliage): leaves and flowers part round its body as it
+	 *  walks through them and stand back up behind it. */
+	void UpdateFoliageBrush(float Dt);
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialParameterCollection> BrushMPC;
+	FVector BrushTrail = FVector::ZeroVector;     // follows the cat a beat behind: the wake
+	FVector BrushTrailVel = FVector::ZeroVector;
+	bool bBrushInit = false;
 	/** Jump pressed in the air facing a wall: forepaws scrabble up it, hind paws kick off it for more height (up to two
 	 *  kicks per leap - a cat bounding up a wall to a ledge). */
 	bool TryWallKick();
