@@ -145,9 +145,10 @@ _SLABS = [0]
 
 
 def slab(x0, x1, y0, y1, ztop, thick, material, folder="Ground"):
-    """A true-size slab mesh (UVs at world scale, so ground textures never stretch)."""
+    """A true-size slab mesh (UVs at world scale, so ground textures never stretch). Square edges: a bevel rolled the
+    paving down into a groove at the foot of every facade (a bright seam - the houses looked lifted off the street)."""
     _SLABS[0] += 1
-    m = box(x1 - x0, y1 - y0, thick, 0, (0, 0, -thick / 2), bev=2.0 if thick < 200 else 0.0)
+    m = box(x1 - x0, y1 - y0, thick, 0, (0, 0, -thick / 2))
     sm = save(m, f"SM_Slab_{_SLABS[0]:02d}", [mat(material)], folder=HOUSES, nanite=True, uv_tile=200.0)
     return place(sm, ((x0 + x1) / 2, (y0 + y1) / 2, ztop), folder=folder)
 
