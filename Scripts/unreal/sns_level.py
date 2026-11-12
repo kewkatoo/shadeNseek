@@ -776,10 +776,12 @@ for (kind, (x, y, z), yaw, extra) in DECOR:
     tx, ty = math.cos(math.radians(yaw - 90)), math.sin(math.radians(yaw - 90))  # along the wall
     if kind == "sill" and R.random() < 0.75:
         # The box sits on the sill and only moves a few cm out; an ajar shutter in the way means no box at all.
-        wb = put(mesh("SM_WindowBox"), x, y, z, yaw - 90, (extra / 80 * 0.95, 1, 1), kind="windowbox", collision=False,
+        # Solid (Shade steps up and walks along it through the flowers), but not to the camera or the sun traces.
+        wb = put(mesh("SM_WindowBox"), x, y, z, yaw - 90, (extra / 80 * 0.95, 1, 1), kind="windowbox", collision=True,
                  support=("house",), slide=(nx, ny), max_slide=8, tol=0.8)
         if wb is None:
             continue
+        wb.static_mesh_component.set_collision_response_to_channel(unreal.CollisionChannel.ECC_CAMERA, unreal.CollisionResponseType.ECR_IGNORE)
         b = wb.get_actor_location()
         for k in range(3):
             fl = pick(FLOWERS)

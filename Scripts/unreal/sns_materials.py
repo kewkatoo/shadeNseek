@@ -20,9 +20,12 @@ Masters (parameter names are shared with C++ where noted):
 MPC_Shade      (C++: AShadeCharacter::UpdateFoliageBrush) CatPos, CatFwd, CatVel, CatTrail - where the cat is, for foliage
 
 SNS_MATS=M_Foliage,... rebuilds only those masters (and skips the instances), so nothing else is re-saved.
+SNS_MIS=MI_Terracotta,... rebuilds only those instances (no masters).
 """
 import os
 import unreal
+
+MI_ONLY = [s.strip() for s in os.environ.get("SNS_MIS", "").split(",") if s.strip()]
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 mel = unreal.MaterialEditingLibrary
@@ -799,6 +802,8 @@ def build_wisp():
 # =====================================================================================================================
 def mi(name, parent, scalars=None, vectors=None, textures=None, folder=MAT_DIR):
     path = f"{folder}/{name}"
+    if MI_ONLY and name not in MI_ONLY:
+        return eal.load_asset(path) if eal.does_asset_exist(path) else None
     inst = eal.load_asset(path) if eal.does_asset_exist(path) else tools.create_asset(name, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     mel.set_material_instance_parent(inst, parent)
     for k, v in (scalars or {}).items():
@@ -841,7 +846,11 @@ def build_instances(M):
     # (finer tiling: at 0.9 the rock's pebbles read as coarse granite gravel on the benches and steps)
     mi("MI_StepStone", S, dict(ground, Tiling=1.6, RoughMul=1.0, Brightness=0.95, NormalStrength=0.6), {"Tint": (1.0, 0.97, 0.92)},
        surf("worn_rock_natural_01"))
-    mi("MI_Terracotta", S, dict(ground, Tiling=1.6, RoughMul=2.5), None, surf("GlazedTerracotta001"))
+    # Unglazed, weathered terracotta (window boxes): the rough plaster's fine sandy grain tinted to fired clay, patchy from
+    # box to box, darker and greener toward the base where the water runs out. (The glazed tile set read as orange sponge.)
+    mi("MI_Terracotta", S, {"Tiling": 2.2, "RoughMul": 1.25, "NormalStrength": 0.8, "MacroAmount": 0.22, "DirtAmount": 0.55,
+                            "DirtHeight": 9.0, "Brightness": 1.0},
+       {"Tint": (1.0, 0.36, 0.17), "DirtTint": (0.6, 0.58, 0.44)}, surf("white_rough_plaster"))
     mi("MI_Sand", S, dict(ground, Tiling=0.6), None, surf("coast_sand_01"))
     mi("MI_Cliff", S, {"Tiling": 0.35, "MacroAmount": 0.25}, {"Tint": (0.95, 0.9, 0.84)}, surf("marble_cliff_02"))
     mi("MI_Soil", S, {"Tiling": 3.0, "MacroAmount": 0.3, "DirtAmount": 0.0, "RoughMul": 1.1}, {"Tint": (0.36, 0.25, 0.17)}, surf("coast_sand_01"))
@@ -903,6 +912,8 @@ WHITE = tex("T_White")
 MPC = shade_mpc()
 M = {}
 ONLY = [s.strip() for s in os.environ.get("SNS_MATS", "").split(",") if s.strip()]
+if MI_ONLY and not ONLY:
+    ONLY = ["(none)"]   # instances only: rebuild no masters
 for fn in (build_surface, build_paint, build_prop, build_foliage, build_card, build_cloth, build_iron, build_glass, build_emissive,
            build_majolica, build_water, build_terrain, build_shade_body, build_shade_shell, build_shade_eye, build_shade_whisker,
            build_cat_fur, build_cat_shell, build_cat_eye, build_cat_whisker, build_wisp):
@@ -914,7 +925,13 @@ for fn in (build_surface, build_paint, build_prop, build_foliage, build_card, bu
     except Exception as e:
         import traceback
         log("ERROR", fn.__name__, e, traceback.format_exc())
-if not ONLY:
+if MI_ONLY:
+    # Only some instances: their masters as they are on disk.
+    for n in ("M_Surface", "M_Paint", "M_Prop", "M_Foliage", "M_Card", "M_Cloth", "M_Iron", "M_Glass", "M_Emissive", "M_Majolica",
+              "M_Water", "M_Terrain", "M_CatFur", "M_CatShell", "M_CatEye", "M_CatWhisker"):
+        if n not in M and eal.does_asset_exist(f"{MAT_DIR}/{n}"):
+            M[n] = eal.load_asset(f"{MAT_DIR}/{n}")
+if not ONLY or MI_ONLY:
     build_instances(M)
 eal.save_directory("/Game/Shade/Materials", only_if_is_dirty=True, recursive=True)
 log("ALL DONE")

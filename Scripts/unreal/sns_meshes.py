@@ -3,7 +3,10 @@
 C++-referenced: SM_WispQuad, SM_LemonCart, SM_CartWheel, SM_AwningRoller, SM_AwningCanvas, SM_AwningValance, SM_AwningArm,
                 SM_Cord, SM_CordHandle, SM_CatCollar
 Set pieces:     SM_Railing_200, SM_Card, SM_BougainClump_*, SM_LeafyClump, SM_Sheet_*, SM_Towel_*, SM_Rope_100, SM_Dome,
-                SM_Campanile, SM_Bell, SM_Bollard, SM_Bench_Stone, SM_Planter_Long, SM_Beam_100, SM_Post_100, SM_LemonCluster
+                SM_Campanile, SM_Bell, SM_Bollard, SM_Bench_Stone, SM_Planter_Long, SM_Beam_100, SM_Post_100, SM_LemonCluster,
+                SM_WindowBox
+
+SNS_MESHES=window_box,... runs only those builders (nothing else is re-saved).
 """
 import math
 import os
@@ -320,12 +323,46 @@ def street_bits():
     save(box(14, 14, 100, 0, (0, 0, 50), bev=1.5), "SM_Post_100", [mat("MI_Wood_Beam")], uv_tile=100.0)
     # A blank box module (pawn blockers / generic masses), 100^3 centred.
     save(box(100, 100, 100, 0), "SM_Block", [mat("MI_Wall_White")], uv_tile=100.0)
-    # Hanging basket and window box for flowers.
-    wb = box(80, 22, 20, 0, (0, 0, 10), bev=1.5)
-    save(wb, "SM_WindowBox", [mat("MI_Terracotta")], collision=None, uv_tile=60.0)
 
 
-for fn in (wisp_quad, cart_wheel, lemon_cart, lemon_cluster, awning_parts, cat_collar, railing, cards, laundry, dome, campanile, street_bits):
+def window_box():
+    """Terracotta window box for the sills: a trough on two feet with a foot moulding, a raised panel and a small
+    medallion on both long faces, a bead and a rolled rim; hollow above the soil (slot 1), which sits 4 cm under the rim
+    with a few clods. 80 x 22 x 20 overall like the old plain block (the level scales it along X to the sill), pivot at
+    the bottom centre. Simple box collision: Shade steps up and walks along it through the flowers instead of through it."""
+    rr = random.Random(31)
+
+    def hollow(part):
+        return subtract(part, box(73, 15, 12, 0, (0, 0, 19)))   # the inside, open from z 13 up
+
+    m = new()
+    for x in (-29, 29):
+        append(m, box(12, 18, 1.6, 0, (x, 0, 0.8), bev=0.5))                     # feet
+    append(m, hollow(box(77, 19, 16.6, 0, (0, 0, 9.7), bev=1.2)))               # body z 1.4..18
+    append(m, box(78.4, 20.4, 2.4, 0, (0, 0, 2.6), bev=0.7))                     # foot moulding z 1.4..3.8
+    append(m, hollow(box(78.4, 20.4, 1.2, 0, (0, 0, 15.6), bev=0.45)))         # bead under the rim
+    append(m, hollow(box(80, 22, 3.4, 0, (0, 0, 18.3), bev=1.1)))              # rolled rim z 16.6..20
+    for s in (-1, 1):
+        append(m, box(54, 1.2, 7.5, 0, (0, s * 9.9, 9.0), bev=0.4))               # raised panel
+        append(m, sphere(2.4, 0, (0, s * 10.2, 9.0), scale=(1.0, 0.32, 1.0), steps=10))  # medallion
+    append(m, box(73.6, 15.6, 2.0, 1, (0, 0, 15.0), bev=0.5))                    # soil, top at z 16
+    for _ in range(7):
+        append(m, sphere(rr.uniform(2.0, 3.4), 1, (rr.uniform(-32, 32), rr.uniform(-4.5, 4.5), 16.0), scale=(1.3, 1.0, 0.32), steps=8))
+    sm = save(m, "SM_WindowBox", [mat("MI_Terracotta"), mat("MI_Soil")], collision=None, uv_tile=60.0)
+    if sm:
+        ses = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+        ses.remove_collisions(sm)
+        ses.add_simple_collisions(sm, unreal.ScriptCollisionShapeType.BOX)
+        eal.save_loaded_asset(sm)
+        bb = sm.get_bounding_box()
+        log("SM_WindowBox bounds", bb.min, bb.max, "collision boxes", ses.get_simple_collision_count(sm))
+
+
+ONLY = [s.strip() for s in os.environ.get("SNS_MESHES", "").split(",") if s.strip()]
+for fn in (wisp_quad, cart_wheel, lemon_cart, lemon_cluster, awning_parts, cat_collar, railing, cards, laundry, dome, campanile, street_bits,
+           window_box):
+    if ONLY and fn.__name__ not in ONLY:
+        continue
     try:
         fn()
         log("mesh ok", fn.__name__)
