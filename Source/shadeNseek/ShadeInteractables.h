@@ -381,6 +381,23 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Washing")
 	TObjectPtr<UStaticMeshComponent> Handle;
 
+	/** The cord's way to the line: a pulley at the top of the cord on the front wall, a guide rope along it and round the
+	 *  corner to the pulley on the side wall where the line starts, and a pulley on the far house where it ends. */
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> CordPulley;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> LinePulley;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> FarPulley;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> GuideFront;
+
+	UPROPERTY(VisibleAnywhere, Category = "Washing")
+	TObjectPtr<UStaticMeshComponent> GuideSide;
+
 	UPROPERTY(VisibleAnywhere, Category = "Washing")
 	TArray<TObjectPtr<USceneComponent>> SheetPivots;
 
@@ -394,6 +411,7 @@ public:
 private:
 	float GustEnvelope(float T) const;
 	void UpdateSheets(float Dt);
+	FVector CordTop = FVector(0.f, 0.f, -12.f);   // where the cord leaves its pulley (actor space)
 
 	float Extension = 0.f;
 	float ClickAccum = 0.f;

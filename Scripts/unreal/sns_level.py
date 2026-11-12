@@ -458,6 +458,8 @@ F = "Houses"
 house("N0", -1000, -100, -900, -160, 0, 900, wall="MI_Wall_Cream", faces=("+y",), door=("+y", 250))
 house("S0", -1000, -250, 160, 760, 0, 820, wall="MI_Wall_Peach", faces=("-y", "+y"), door=("-y", 200))
 bsm = build_bridge_mesh()  # sns_bridge.py: vault cut 2 cm inside the house fronts (no z-fighting)
+# (N0 / S0 still get windows along the bridge: after a full rebuild run sns_fix_overlaps.py, which cuts their parts that
+#  poke into the passage away and settles every prop that clips into something.)
 place(bsm, (-450, 0, 0), folder=F)
 blocker(-1010, 0, 200, 40, 340, 400)
 house("W0", -1400, -1000, -160, 160, 0, 700, wall="MI_Wall_White", faces=("+x",), door=("+x", 0))

@@ -596,6 +596,16 @@ AShadeWashingLine::AShadeWashingLine()
 	NoCollision(Cord);
 	NoCollision(Handle);
 	Cord->SetCastShadow(false);
+	CordPulley = MakeMesh(this, TEXT("CordPulley"), Root);
+	LinePulley = MakeMesh(this, TEXT("LinePulley"), Root);
+	FarPulley = MakeMesh(this, TEXT("FarPulley"), Root);
+	GuideFront = MakeMesh(this, TEXT("GuideFront"), Root);
+	GuideSide = MakeMesh(this, TEXT("GuideSide"), Root);
+	for (UStaticMeshComponent* C : { CordPulley.Get(), LinePulley.Get(), FarPulley.Get(), GuideFront.Get(), GuideSide.Get() })
+	{
+		NoCollision(C);
+		C->SetCastShadow(false);
+	}
 	for (int32 i = 0; i < 3; ++i)
 	{
 		USceneComponent* P = CreateDefaultSubobject<USceneComponent>(*FString::Printf(TEXT("SheetPivot%d"), i));
@@ -631,8 +641,36 @@ void AShadeWashingLine::BeginPlay()
 	Line->SetRelativeLocation(FVector::ZeroVector);
 	Line->SetRelativeRotation(LineVec.Rotation());
 	Line->SetRelativeScale3D(FVector(LineVec.Size() / 100.f, 1.2f, 1.2f));
+	// Where the cord goes (it used to run straight up into the plaster): a pulley on the front wall at the top of the cord,
+	// a guide rope from its wheel along the wall and round the corner to a pulley on the side wall where the line starts,
+	// and one on the far house where it ends. SM_Pulley: pivot on the wall, local +Y out of it, wheel 7 cm out, r 3.2.
+	// The cord hangs off the wheel 7 cm from the wall: at 2 cm it passed through the open shutter beside it (5.2 proud).
+	DefaultMesh(CordPulley, TEXT("SM_Pulley"));
+	DefaultMesh(LinePulley, TEXT("SM_Pulley"));
+	DefaultMesh(FarPulley, TEXT("SM_Pulley"));
+	DefaultMesh(GuideFront, TEXT("SM_Rope_100"));
+	DefaultMesh(GuideSide, TEXT("SM_Rope_100"));
+	{
+		const float WallY = CordLocal.Y + 2.f;                       // the front wall (CordLocal is placed 2 cm off it)
+		CordLocal.Y = WallY - 7.f;
+		const FVector Wheel(CordLocal.X + 3.2f, WallY - 7.f, -10.f);   // the cord comes off the wheel's near side
+		CordPulley->SetRelativeLocationAndRotation(FVector(Wheel.X, WallY, Wheel.Z), FRotator(0.f, 180.f, 0.f));
+		LinePulley->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -3.2f), FRotator(0.f, -90.f, 0.f));          // side wall, +X out
+		FarPulley->SetRelativeLocationAndRotation(FVector(Span, 0.f, Rise - 3.2f), FRotator(0.f, 90.f, 0.f));     // far wall, -X out
+		auto Rope = [](UStaticMeshComponent* R, const FVector& A, const FVector& B)
+		{
+			const FVector D = B - A;
+			R->SetRelativeLocationAndRotation(A, D.Rotation());
+			R->SetRelativeScale3D(FVector(FMath::Max(D.Size(), 1.f) / 100.f, 1.2f, 1.2f));
+		};
+		const FVector OverWheel(Wheel.X, Wheel.Y, Wheel.Z + 3.2f);
+		const FVector Corner(7.f, Wheel.Y, Wheel.Z + 3.2f);            // round the corner of the house, 7 cm off both walls
+		Rope(GuideFront, OverWheel, Corner);
+		Rope(GuideSide, Corner, FVector(7.f, -3.2f, 0.f));             // along the side wall to over the line's pulley
+		CordTop = FVector(CordLocal.X, CordLocal.Y, Wheel.Z);
+	}
 	// The cord runs down the wall from the pulley to a handle at cat height.
-	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -12.f), CordLocal, HoldWorld, HoldAcross, 0.f);
+	PoseCord(this, Cord, Handle, CordTop, CordLocal, HoldWorld, HoldAcross, 0.f);
 	FlapAudio = ShadeAssets::Loop(Root, TEXT("SFX_LaundryFlap_Loop"), 0.f, true);
 	if (FlapAudio)
 	{
@@ -693,7 +731,7 @@ void AShadeWashingLine::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
-	PoseCord(this, Cord, Handle, FVector(CordLocal.X, CordLocal.Y, -12.f), CordLocal - FVector(0.f, 0.f, PullCm), HoldWorld, HoldAcross, HoldW);
+	PoseCord(this, Cord, Handle, CordTop, CordLocal - FVector(0.f, 0.f, PullCm), HoldWorld, HoldAcross, HoldW);
 	Time += Dt;
 	GustClock += Dt;
 	if (bHolding && !bSolved)

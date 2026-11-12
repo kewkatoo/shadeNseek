@@ -371,9 +371,25 @@ def door_sills():
         save(m, name, [mat("MI_StepStone")], collision="complex", uv_tile=100.0)
 
 
+def pulley():
+    """Wall pulley for cords (the washing line): a plate on the wall, an axle out of it and a wooden wheel between two
+    iron flanges, the wheel's plane parallel to the wall. Pivot on the wall surface at the wheel's centre height; local +Y
+    points out of the wall (wheel centre 7 cm out, clear of open shutters - they stand 5.2 cm proud), X along the wall.
+    Slots: 0 iron, 1 wood. (C++: AShadeWashingLine.)"""
+    m = new()
+    append(m, box(5.0, 0.8, 11.0, 0, (0, 0.4, 0), bev=0.25))                    # plate
+    for zz in (4.2, -4.2):
+        append(m, cyl(0.5, 0.6, 0, (0, 0.8, zz), (0, 0, 90), steps=8))          # screw heads
+    append(m, cyl(0.6, 7.6, 0, (0, 0.6, 0), (0, 0, 90), steps=8))                # axle / standoff
+    append(m, cyl(3.2, 1.0, 1, (0, 6.5, 0), (0, 0, 90), steps=20))               # wheel (groove between the flanges)
+    append(m, cyl(3.6, 0.35, 0, (0, 6.15, 0), (0, 0, 90), steps=20))             # flanges
+    append(m, cyl(3.6, 0.35, 0, (0, 7.5, 0), (0, 0, 90), steps=20))
+    save(m, "SM_Pulley", [mat("MI_Iron_Black"), mat("MI_Wood_Beam")], collision=None, uv_tile=20.0)
+
+
 ONLY = [s.strip() for s in os.environ.get("SNS_MESHES", "").split(",") if s.strip()]
 for fn in (wisp_quad, cart_wheel, lemon_cart, lemon_cluster, awning_parts, cat_collar, railing, cards, laundry, dome, campanile, street_bits,
-           window_box, door_sills):
+           window_box, door_sills, pulley):
     if ONLY and fn.__name__ not in ONLY:
         continue
     try:
