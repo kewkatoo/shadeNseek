@@ -138,6 +138,8 @@ protected:
 	void EndScramble();
 	/** Standing still in the shade for a while, Shade sits down; it gets up the moment it is asked to go. */
 	void UpdateIdle(float Dt);
+	/** Level ground under the whole cat (not a stair, not a step's edge): only there does it sit down. */
+	bool IsGroundLevelForSitting() const;
 	/** Tells the foliage where the cat is (MPC_Shade, read by M_Foliage): leaves and flowers part round its body as it
 	 *  walks through them and stand back up behind it. */
 	void UpdateFoliageBrush(float Dt);

@@ -1224,13 +1224,42 @@ void AShadeCharacter::UpdateFoliageBrush(float Dt)
 	I->SetVectorParameterValue(TEXT("CatTrail"), FLinearColor(BrushTrail.X, BrushTrail.Y, BrushTrail.Z, bOn ? Lag : 0.f));
 }
 
+bool AShadeCharacter::IsGroundLevelForSitting() const
+{
+	// The sit is a pose for level ground: on a stair or a step edge the body sat on one step with a hind paw hanging over
+	// the next. Ground under the middle and under where all four paws would be must agree within a couple of cm.
+	UWorld* W = GetWorld();
+	if (!W)
+	{
+		return false;
+	}
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(ShadeSitGround), false, this);
+	const FVector Base = GetActorLocation() - FVector(0.f, 0.f, GCapsuleHalf);
+	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Fwd);
+	float Lo = TNumericLimits<float>::Max(), Hi = -TNumericLimits<float>::Max();
+	for (const FVector& Off : { FVector::ZeroVector, Fwd * 16.f + Right * 5.f, Fwd * 16.f - Right * 5.f, -Fwd * 14.f + Right * 7.f,
+								 -Fwd * 14.f - Right * 7.f, -Fwd * 20.f })
+	{
+		FHitResult Hit;
+		const FVector P = Base + Off * GMeshScale;
+		if (!W->LineTraceSingleByChannel(Hit, P + FVector(0.f, 0.f, 12.f), P - FVector(0.f, 0.f, 25.f), ECC_Visibility, Q))
+		{
+			return false;  // an edge: nothing under part of the cat
+		}
+		Lo = FMath::Min(Lo, Hit.ImpactPoint.Z);
+		Hi = FMath::Max(Hi, Hit.ImpactPoint.Z);
+	}
+	return Hi - Lo < 2.5f;
+}
+
 void AShadeCharacter::UpdateIdle(float Dt)
 {
 	const bool bStill = bControlEnabled && EvapState == 0 && !bMerging && !bScrambling && JumpWindup <= 0.f
 		&& !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() < 4.f && PendingMove.IsNearlyZero()
 		&& ActStage == EActStage::None && !Grabbed.IsValid() && !HoldTarget.IsValid();
 	IdleTime = bStill ? IdleTime + Dt : 0.f;
-	if (!bSitting && IdleTime > 5.f && Exposure < 0.05f)
+	if (!bSitting && IdleTime > 5.f && Exposure < 0.05f && IsGroundLevelForSitting())
 	{
 		bSitting = true;
 		Rig->SetPose(ECatPose::Sit, 1.3f);  // rump first, then the forepaws settle (see UShadeCatRig::BlendShaped)

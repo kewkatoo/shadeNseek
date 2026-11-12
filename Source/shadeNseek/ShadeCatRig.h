@@ -265,6 +265,11 @@ private:
 	// Body springs
 	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS, LaunchS, LandPitchS, LedgeS;
 	float GroundRig = 0.f;      // rig-space height of the ground under the cat (a nap cat a few cm off its bench, the hovering capsule)
+	/** The collision sphere is 19 cm but the nose is ~30 cm ahead of the centre: against a wall or a ledge (jumps above
+	 *  all) the head went into it. After each solve the line from mid-back to the nose tip is traced; the body draws back
+	 *  along its length (ClearX, rig X) until the nose is clear. */
+	void UpdateClearance();
+	float ClearX = 0.f;
 	float LandStrength = 0.f;   // last landing (0..1.5): how long the hind paws take to come down after the fore
 	float AirTime = 0.f;        // seconds since the paws left the ground
 	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;

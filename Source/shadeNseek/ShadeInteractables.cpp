@@ -1051,17 +1051,21 @@ void AShadeNapCat::Tick(float DeltaSeconds)
 	}
 	if (Collar && Collar->IsVisible())
 	{
-		// Round the base of the neck, a third of the way up from the shoulders: an oval that dips into the throat ruff
-		// (sized from the neck bone so it fits whatever the cat's scale), bell hanging at the throat.
+		// Round the base of the neck, a third of the way up from the shoulders (sized from the neck bone so it fits whatever
+		// the cat's scale), bell hanging at the throat. With the neck rising it is an oval that dips into the throat ruff;
+		// with the neck level or bowed (asleep, getting up, looking down) there is no ruff below it, so it closes into a
+		// snug ring round the neck, a little nearer the head - the oval used to hang off the top of the neck round the chest.
 		const FVector N = Mesh->GetBoneLocation(TEXT("neck"));
 		const FVector H = Mesh->GetBoneLocation(TEXT("head"));
 		const float Len = FVector::Dist(N, H);
 		if (Len > 1.f)
 		{
 			const FVector Axis = (H - N) / Len;
+			const float Upright = FMath::Clamp(FVector::DotProduct(Axis, FVector::UpVector) * 2.f + 0.2f, 0.f, 1.f);
 			const FMatrix Frame = FRotationMatrix::MakeFromXZ(Axis, FVector::UpVector);
-			Collar->SetWorldLocationAndRotation(N + Axis * (0.36f * Len) - Frame.GetUnitAxis(EAxis::Z) * (0.2f * Len), Frame.Rotator());
-			Collar->SetWorldScale3D(FVector(0.05f * Len, 0.049f * Len, 0.066f * Len));
+			const FVector At = N + Axis * (FMath::Lerp(0.44f, 0.36f, Upright) * Len) - Frame.GetUnitAxis(EAxis::Z) * (FMath::Lerp(0.03f, 0.2f, Upright) * Len);
+			Collar->SetWorldLocationAndRotation(At, Frame.Rotator());
+			Collar->SetWorldScale3D(FVector(0.05f * Len, 0.049f * Len, FMath::Lerp(0.047f, 0.066f, Upright) * Len));
 		}
 	}
 	if (Purr)
