@@ -185,6 +185,32 @@ def scan(name,f,n=21):
         rows.append(f"{s:.2f}:{ov:+.1f}/{max(o['over'][2],o['over'][3]):+.1f}")
     print(f"{name:16s} worst front over {worst:+.2f}  ", ' '.join(rows[::2]))
 
+TAIL_PTS = [(0, 0.172, 0.222), (0, 0.215, 0.226), (0, 0.26, 0.226), (0, 0.305, 0.222), (0, 0.35, 0.216), (0, 0.393, 0.208),
+            (0, 0.433, 0.199), (0, 0.468, 0.19), (0, 0.488, 0.185)]
+SIT_TP = [-24, -34, -40, -26, -24, -24, -24, -22]   # = UShadeCatRig::ComputeSit TP / TY
+SIT_TY = [21, 43, 80, 155, 168, 178, 191, 209]
+
+
+def sit_tail(P, TP=SIT_TP, TY=SIT_TY, ground=1.1):
+    """Tail joint positions for a pose (pelvis frame = body pitch, as UpdateTail's TailFrame), clamped above the ground."""
+    pts = [bpt(*q) for q in TAIL_PTS]
+    Ls = [float(np.linalg.norm(pts[i + 1] - pts[i])) for i in range(8)]
+    Ls[7] = 2.45
+    QPel = rot(P.pitch, 0, P.roll) @ rot(P.sp[0], P.sy[0])
+    x = R['Pelvis'] + P.pel + QPel @ (R['Tail1'] - R['Pelvis'])
+    out = [x.copy()]
+    for i in range(8):
+        t, f = np.radians(TP[i]), np.radians(TY[i])
+        d = QPel @ np.array([-np.cos(t) * np.cos(f), np.cos(t) * np.sin(f), np.sin(t)])
+        n = x + d * Ls[i]
+        if n[2] < ground:
+            n[2] = ground
+            n = x + (n - x) / np.linalg.norm(n - x) * Ls[i]
+        x = n
+        out.append(x.copy())
+    return out
+
+
 if __name__ == '__main__':
     report('stand', stand())
     report('sit', newsit())
@@ -192,3 +218,4 @@ if __name__ == '__main__':
     scan('loaf->sit', lambda u: rise_from_loaf(sleep(),newsit(),u))
     scan('stand->sit', lambda u: sit_down(stand(),newsit(),u))
     scan('sit->stand', lambda r: get_up(newsit(),loco_from(newsit()),r))
+    print('sit tail (x, y, z):', ' '.join('(%.0f,%.0f,%.1f)' % tuple(p) for p in sit_tail(newsit())))

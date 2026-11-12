@@ -358,9 +358,22 @@ def window_box():
         log("SM_WindowBox bounds", bb.min, bb.max, "collision boxes", ses.get_simple_collision_count(sm))
 
 
+def door_sills():
+    """Stone thresholds for the houses' door and shop openings. The openings are cut 25 cm into the wall but the lane's
+    paving stops at the facade, so each doorway was a pit down to the bedrock 40 cm below (a dark trench between the
+    doorstep and the door). Pivot on the facade line at lane level; local -Y runs into the house (under the door leaf),
+    +Y 2 cm under the doorstep; the top sits 2 mm under the doorstep's so they meet without z-fighting; filled down to
+    the bedrock so no side shows. Widths are a hair inside the openings' jambs."""
+    for name, w, inner, top in (("SM_DoorSill", 111.6, 19.0, 13.8), ("SM_ShopSill", 229.6, 24.0, 11.8)):
+        d = inner + 2.0
+        h = top + 40.0
+        m = box(w, d, h, 0, (0, -inner + d / 2, top - h / 2), bev=0.4)
+        save(m, name, [mat("MI_StepStone")], collision="complex", uv_tile=100.0)
+
+
 ONLY = [s.strip() for s in os.environ.get("SNS_MESHES", "").split(",") if s.strip()]
 for fn in (wisp_quad, cart_wheel, lemon_cart, lemon_cluster, awning_parts, cat_collar, railing, cards, laundry, dome, campanile, street_bits,
-           window_box):
+           window_box, door_sills):
     if ONLY and fn.__name__ not in ONLY:
         continue
     try:

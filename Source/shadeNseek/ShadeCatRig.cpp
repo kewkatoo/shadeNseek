@@ -303,8 +303,12 @@ void UShadeCatRig::ResetDynamics()
 	bTailInit = false;
 }
 
-float UShadeCatRig::TraceGround(const FVector& World, float Fallback) const
+float UShadeCatRig::TraceGround(const FVector& World, float Fallback, bool* bOutHit) const
 {
+	if (bOutHit)
+	{
+		*bOutHit = false;
+	}
 	UWorld* W = GetWorld();
 	if (!W)
 	{
@@ -315,9 +319,48 @@ float UShadeCatRig::TraceGround(const FVector& World, float Fallback) const
 	const float Up = 32.f * MeshScale;
 	if (W->LineTraceSingleByChannel(Hit, World + FVector(0, 0, Up), World - FVector(0, 0, 55.f * MeshScale), ECC_Visibility, Q))
 	{
+		if (bOutHit)
+		{
+			*bOutHit = true;
+		}
 		return Hit.ImpactPoint.Z;
 	}
 	return Fallback;
+}
+
+FVector UShadeCatRig::Foothold(const FVector& Want, const FCatLeg& L, float Fallback, float* OutPull) const
+{
+	// Ground under the spot (a lower step within the trace counts: the body pitches down to it, as on stairs). Over thin
+	// air - past the end of a window box, a sill, a wall top - search back along the body for the edge and stand on it.
+	if (OutPull)
+	{
+		*OutPull = 0.f;
+	}
+	bool bHit = false;
+	const float Z = TraceGround(Want, Fallback, &bHit);
+	if (bHit)
+	{
+		return FVector(Want.X, Want.Y, Z);
+	}
+	const float M = MeshScale;
+	const FVector Back = ToWorld(FVector((L.Home.X + (L.bFront ? -32.f : 32.f)) * M, L.Home.Y * M, 0.f));
+	for (int32 k = 1; k <= 10; ++k)
+	{
+		FVector P = FMath::Lerp(Want, Back, k / 10.f);
+		P.Z = Want.Z;
+		bool bK = false;
+		const float Zk = TraceGround(P, Fallback, &bK);
+		if (bK)
+		{
+			FVector In = FMath::Lerp(Want, Back, FMath::Min(1.f, (k + 0.4f) / 10.f));   // a little in from the edge
+			if (OutPull)
+			{
+				*OutPull = FVector::Dist2D(Want, In);
+			}
+			return FVector(In.X, In.Y, Zk);
+		}
+	}
+	return FVector(Want.X, Want.Y, Fallback);
 }
 
 FQuat UShadeCatRig::Aim(int32 Bone, const FVector& Dir, const FVector& SideHint) const
@@ -360,6 +403,21 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	const float SleepW = FamW[FamSleep];
 	// Seated, and until the body is mostly up again, the gait doesn't tidy the paws back under the body.
 	bHoldGait = TransTo != FamLoco || TransS < 0.65f;
+	// The ground under the cat in rig space: sitting and lying rest on it, not on the rig origin (a nap cat placed a few
+	// cm above its bench floated there; the walking capsule hovers a couple of cm).
+	if (UWorld* W = GetWorld())
+	{
+		// (starts just above the paws, so a bench or a table the cat sits under is not taken for the floor)
+		const FVector C = RigToWorld.GetLocation();
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(CatGround), false, GetOwner());
+		float Want = 0.f;
+		if (W->LineTraceSingleByChannel(Hit, C + FVector(0, 0, 8.f * MeshScale), C - FVector(0, 0, 20.f * MeshScale), ECC_Visibility, Q))
+		{
+			Want = FMath::Clamp(Hit.ImpactPoint.Z - C.Z, -12.f * MeshScale, 6.f * MeshScale);
+		}
+		GroundRig = FMath::Lerp(GroundRig, Want, 1.f - FMath::Exp(-10.f * Dt));
+	}
 
 	FCatPoseParams Loco;
 	ComputeLocomotion(Dt, Loco);
@@ -401,6 +459,7 @@ void UShadeCatRig::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 			L.bPlanted = true;
 			L.SwingT = 1.f;
 			L.bInit = true;
+			L.Pull = 0.f;
 		}
 	}
 	ApplyAction(P);
@@ -465,8 +524,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		const FVector HomeW = ToWorld(L.Home * M);
 		if (!L.bInit || FVector::Dist2D(L.BallWorld, HomeW) > 70.f * M)
 		{
-			const float Z = TraceGround(HomeW, GroundFallback);
-			L.PlantWorld = L.BallWorld = FVector(HomeW.X, HomeW.Y, Z + L.Home.Z * M);
+			L.PlantWorld = L.BallWorld = Foothold(HomeW, L, GroundFallback, &L.Pull) + FVector(0.f, 0.f, L.Home.Z * M);
 			L.bPlanted = true;
 			L.SwingT = 1.f;
 			L.bInit = true;
@@ -481,7 +539,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 	AirTime = bGrounded ? 0.f : AirTime + Dt;
 	if (!bGrounded)
 	{
-		for (FCatLeg& L : Legs) { L.bPlanted = false; L.SwingT = 1.f; }
+		for (FCatLeg& L : Legs) { L.bPlanted = false; L.SwingT = 1.f; L.Pull = 0.f; }
 		bWasGrounded = false;
 		return;
 	}
@@ -508,8 +566,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 			FCatLeg& L = Legs[l];
 			if (L.bFront)
 			{
-				const float Z = TraceGround(L.BallWorld, GroundFallback);
-				L.PlantWorld = L.BallWorld = FVector(L.BallWorld.X, L.BallWorld.Y, Z + L.Home.Z * M);
+				L.PlantWorld = L.BallWorld = Foothold(L.BallWorld, L, GroundFallback, &L.Pull) + FVector(0.f, 0.f, L.Home.Z * M);
 				L.bPlanted = true;
 				L.SwingT = 1.f;
 				if (OnFootPlant) { OnFootPlant(l); }
@@ -534,8 +591,9 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		{
 			const bool bCross = (L.PrevPhase < Duty && Ph >= Duty) || (L.PrevPhase > Ph && Ph >= Duty);
 			// A paw left far behind (turning, accelerating) steps early.
+			// (a paw held back on a ledge's edge doesn't count as left behind: stepping again would land it there again)
 			const FVector Rel = ToRig(L.PlantWorld) - L.Home * M;
-			const bool bLate = Rel.X < -0.62f * Stride || FVector2D(Rel.X, Rel.Y).Size() > 0.85f * Stride;
+			const bool bLate = Rel.X + (L.bFront ? L.Pull : 0.f) < -0.62f * Stride || FVector2D(Rel.X, Rel.Y).Size() - L.Pull > 0.85f * Stride;
 			if (bCross || bLate)
 			{
 				StartSwing(L, FMath::Clamp((1.f - Duty) / Freq, 0.15f, 0.5f), false);
@@ -552,7 +610,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 		for (int32 l = 0; l < 4; ++l)
 		{
 			const FVector Rel = ToRig(Legs[l].PlantWorld) - Legs[l].Home * M;
-			const float D = FVector2D(Rel.X, Rel.Y).Size();
+			const float D = FVector2D(Rel.X, Rel.Y).Size() - Legs[l].Pull;
 			if (D > BestD) { BestD = D; Best = l; }
 		}
 		if (Best != INDEX_NONE)
@@ -580,7 +638,8 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 				// Land ahead of the hip/shoulder so the paw passes under it at mid-stance.
 				Target += VelWorld * (Remaining + 0.5f * Duty / Freq);
 			}
-			Target.Z = TraceGround(Target, GroundFallback) + L.Home.Z * M;
+			float Pull = 0.f;
+			Target = Foothold(Target, L, GroundFallback, &Pull) + FVector(0.f, 0.f, L.Home.Z * M);
 			L.SwingTo = Target;
 			const float E = ShadeEase::Smooth(T);
 			FVector Pos = FMath::Lerp(L.SwingFrom, L.SwingTo, E);
@@ -589,6 +648,7 @@ void UShadeCatRig::UpdateGait(float Dt, float SpeedN, const FVector& VelRig, con
 			if (L.SwingT >= 1.f)
 			{
 				L.bPlanted = true;
+				L.Pull = Pull;
 				L.PlantWorld = L.BallWorld = L.SwingTo;
 				if (OnFootPlant) { OnFootPlant(l); }
 			}
@@ -648,7 +708,12 @@ void UShadeCatRig::ComputeLocomotion(float Dt, FCatPoseParams& P)
 	// Hind paws still coming down after a forepaws-first landing hold the rump up a moment.
 	float HindLanding = 0.f;
 	for (int32 l = 2; l < 4; ++l) { HindLanding += (!Legs[l].bPlanted && bGrounded && Legs[l].bSettleStep) ? 0.5f : 0.f; }
-	P.PelvisOffset = FVector(-1.2f * CrouchS.Value * M - 1.5f * Lift * M, 0.f,
+	// Paws that could only find footing back on a ledge's edge (the end of a window box): the body draws back over them
+	// instead of leaning out over thin air (the capsule may perch a few cm past the edge).
+	const float FrontPull = FMath::Max(Legs[0].Pull, Legs[1].Pull);
+	const float HindPull = FMath::Max(Legs[2].Pull, Legs[3].Pull);
+	LedgeS.Update(bGrounded ? FMath::Clamp(0.8f * (HindPull - FrontPull), -11.f * M, 11.f * M) : 0.f, 140.f, 24.f, Dt);
+	P.PelvisOffset = FVector(-1.2f * CrouchS.Value * M - 1.5f * Lift * M + LedgeS.Value, 0.f,
 		HindZ.Value - Bob - HipDrop - CrouchS.Value * 5.5f * M - Lift * 1.2f * M - Comp * M + LowerFix.Value + HindLanding * 1.6f * M);
 	// In the air the body follows the arc: nose up and stretched on the rise, nose down reaching for the landing.
 	P.BodyPitch = FMath::RadiansToDegrees(FMath::Atan2(FrontZ.Value - HindZ.Value - (ChestDrop - HipDrop), 27.f * M)) + AccelPitch.Value
@@ -866,14 +931,21 @@ void UShadeCatRig::ComputeSit(FCatPoseParams& P) const
 		P.Curl[l] += 25.f * Sh;
 		P.BodyRoll -= Legs[l].Side * 1.6f * Sh;
 	}
-	// Tail wrapped round the forepaws; the tip flicks and creeps.
-	static const float TP[8] = { -40.f, -62.f, -45.f, -16.f, -6.f, -4.f, -2.f, 0.f };
-	static const float TY[8] = { 8.f, 22.f, 44.f, 66.f, 86.f, 102.f, 116.f, 126.f };
+	// Tail down off the rump and laid along the ground up the right side, the tip curling in beside the hind paw (solved
+	// in Scripts/cat_rig_check.py for this body pitch; it used to stick straight out sideways). The tip flicks and creeps.
+	static const float TP[8] = { -24.f, -34.f, -40.f, -26.f, -24.f, -24.f, -24.f, -22.f };
+	static const float TY[8] = { 21.f, 43.f, 80.f, 155.f, 168.f, 178.f, 191.f, 209.f };
 	for (int32 i = 0; i < 8; ++i)
 	{
 		const float Tip = Sat((i - 3) / 4.f);
 		P.TailPitch[i] = TP[i] + FMath::Abs(TailFlick.Value) * 0.35f * Sat((i - 4) / 3.f);
 		P.TailYaw[i] = TY[i] + TailFlick.Value * Tip + 5.f * FMath::Sin(Time * 0.7f - i * 0.5f) * Sat((i - 4) / 3.f);
+	}
+	// Resting on the real ground under the cat.
+	P.PelvisOffset.Z += GroundRig;
+	for (int32 l = 0; l < 4; ++l)
+	{
+		P.Ball[l].Z += GroundRig;
 	}
 }
 
@@ -920,6 +992,12 @@ void UShadeCatRig::ComputeSleep(FCatPoseParams& P) const
 	{
 		P.TailPitch[i] = TP[i] + FMath::Abs(TailFlick.Value) * 0.15f * Sat((i - 5) / 2.f);
 		P.TailYaw[i] = TY[i] + 0.35f * TailFlick.Value * Sat((i - 4) / 3.f);
+	}
+	// Resting on the real ground under the cat.
+	P.PelvisOffset.Z += GroundRig;
+	for (int32 l = 0; l < 4; ++l)
+	{
+		P.Ball[l].Z += GroundRig;
 	}
 }
 
@@ -1389,9 +1467,9 @@ void UShadeCatRig::UpdateTail(float Dt, const FCatPoseParams& P, const FVector& 
 	{
 		TailX[i] = TailX[i - 1] + TailDirW[i - 1] * Len[i - 1];
 		FVector R = ToRig(TailX[i]);
-		if (R.Z < 1.1f * M)
+		if (R.Z < GroundRig + 1.1f * M)
 		{
-			R.Z = 1.1f * M;
+			R.Z = GroundRig + 1.1f * M;
 			TailX[i] = TailX[i - 1] + (ToWorld(R) - TailX[i - 1]).GetSafeNormal() * Len[i - 1];
 		}
 	}

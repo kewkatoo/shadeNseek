@@ -80,6 +80,7 @@ struct FCatLeg
 	bool bSettleStep = false;
 	float PrevPhase = 0.f;
 	float GroundZ = 0.f;         // rig-space ground height under this paw
+	float Pull = 0.f;            // cm the paw's footing was pulled back from where it wanted to go (thin air: on the edge)
 };
 
 /**
@@ -221,7 +222,10 @@ private:
 	void ApplyAction(FCatPoseParams& P);
 	void Solve(const FCatPoseParams& P);
 	void Apply();
-	float TraceGround(const FVector& World, float Fallback) const;
+	float TraceGround(const FVector& World, float Fallback, bool* bOutHit = nullptr) const;
+	/** Where a paw can stand near where it wants to go (world, Z = the ground). Over thin air (past the end of a window
+	 *  box or a sill) it searches back along the body for the edge; OutPull = how far back that was. */
+	FVector Foothold(const FVector& Want, const FCatLeg& L, float Fallback, float* OutPull) const;
 
 	FQuat Aim(int32 Bone, const FVector& Dir, const FVector& SideHint) const;
 	FVector RP(int32 Bone) const { return RestPos[Bone] * MeshScale; }
@@ -259,7 +263,8 @@ private:
 	FVector PrevVelRig = FVector::ZeroVector;
 
 	// Body springs
-	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS, LaunchS, LandPitchS;
+	FShadeSpring HindZ, FrontZ, Bend, AccelPitch, LandComp, LowerFix, CrouchS, AirS, LaunchS, LandPitchS, LedgeS;
+	float GroundRig = 0.f;      // rig-space height of the ground under the cat (a nap cat a few cm off its bench, the hovering capsule)
 	float LandStrength = 0.f;   // last landing (0..1.5): how long the hind paws take to come down after the fore
 	float AirTime = 0.f;        // seconds since the paws left the ground
 	FShadeSpring HeadYawS, HeadPitchS, EarBackS, EarOutS;

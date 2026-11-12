@@ -300,6 +300,9 @@ class House:
         for k in range(5):
             self.part(self.oriented_box(face, u - ow / 2 + 14 + k * (ow - 28) / 4, (oh - ow / 2) / 2, -12.5, 2.5, 2, oh - ow / 2 - 30, 4))
         self.part(self.oriented_box(face, u, 7, 22, ow + 50, 44, 14, 7))
+        # threshold: fills the opening's floor (the lane paving stops at the facade; it was a pit to the bedrock) level
+        # with the doorstep, from under the door leaf to 2 cm under the step (= SM_DoorSill, sns_fix_doorways.py)
+        self.part(self.oriented_box(face, u, -13.1, -8.5, ow - 0.4, 21, 53.8, 7))
         DECOR.append(("door", self.world(self.P(face, u, 0, 30)), self.yaw(face), ow))
 
     def shopfront(self, face, u):
@@ -307,6 +310,7 @@ class House:
         self.cut(face, u, 0, ow, oh, True)
         self.part(self.oriented_box(face, u, 110, -22, ow - 4, 2, 220, 2))
         self.part(self.oriented_box(face, u, 6, 22, ow + 40, 40, 12, 7))
+        self.part(self.oriented_box(face, u, -14.1, -11.0, ow - 0.4, 26, 51.8, 7))   # threshold (= SM_ShopSill)
         DECOR.append(("shop", self.world(self.P(face, u, 0, 30)), self.yaw(face), ow))
 
     def balcony(self, face, u, zb, ow):

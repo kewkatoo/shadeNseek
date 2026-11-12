@@ -60,7 +60,7 @@ AShadeCharacter::AShadeCharacter()
 	Move->MaxStepHeight = 26.f;
 	Move->SetWalkableFloorAngle(52.f);
 	Move->bCanWalkOffLedgesWhenCrouching = true;
-	Move->PerchRadiusThreshold = 6.f;
+	Move->PerchRadiusThreshold = 11.f;  // stand no more than ~8 cm past an edge (the paws then find the edge, see UShadeCatRig::Foothold)
 
 	CameraBoom = CreateDefaultSubobject<UShadeSpringArm>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
