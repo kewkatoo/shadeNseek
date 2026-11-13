@@ -27,3 +27,4 @@ Compress-Archive -Path (Join-Path $lib "*") -DestinationPath (Join-Path $dist "a
 Remove-Item (Join-Path $dist "stage"), $lib -Recurse -Force
 
 Get-ChildItem $dist -Filter *.zip | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }
+python -I (Join-Path $root "Scripts\check_submission.py") $root

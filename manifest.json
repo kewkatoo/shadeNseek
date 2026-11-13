@@ -364,6 +364,13 @@
     "author": "Shade and Seek team"
   },
   {
+    "path": "asset-library/Models/generated/ue_export",
+    "source_name": "FBX export of every mesh made or edited in the editor, as the game shows it: the village (houses, bridge, paving, plinth, sills, window boxes, washing line...) built by Scripts/unreal/sns_*.py with GeometryScript, and the Poly Haven props as split/fitted there (their CC0 originals are in Models/polyhaven). Index: asset-library/SOURCES.csv",
+    "source_url": "this project",
+    "license": "Original work (CC0-1.0 dedication)",
+    "author": "Shade and Seek team"
+  },
+  {
     "path": "asset-library/Textures/polyhaven/rough_wood",
     "source_name": "Poly Haven - Rough Wood",
     "source_url": "https://polyhaven.com/a/rough_wood",
